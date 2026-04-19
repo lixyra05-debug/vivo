@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Activity,
   ArrowLeft,
   Baby,
+  Check,
   HeartPulse,
   ShieldAlert,
   Sprout,
   User,
 } from 'lucide-react-native';
-import { Button } from '@/src/components/ui/Button';
-import { Chip } from '@/src/components/ui/Chip';
+import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
+import { FadeIn } from '@/src/components/ui/FadeIn';
+import { GlassCard } from '@/src/components/ui/GlassCard';
+import { Input } from '@/src/components/ui/Input';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
-import { SelectableCard } from '@/src/components/ui/SelectableCard';
+import { TappableChip } from '@/src/components/onboarding/TappableChip';
+import { TappableSelectableCard } from '@/src/components/onboarding/TappableSelectableCard';
 import { Colors } from '@/src/constants/colors';
 import { upsertUserProfile } from '@/src/lib/api/auth';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
@@ -29,35 +33,18 @@ interface ProfileOption {
 
 const OPTIONS: ProfileOption[] = [
   { value: 'standard', title: 'Standard', description: 'Algorithme par défaut', Icon: User },
-  {
-    value: 'diabetic',
-    title: 'Diabète / Poids',
-    description: 'Malus max sur les édulcorants',
-    Icon: HeartPulse,
-  },
-  {
-    value: 'athlete',
-    title: 'Sportif',
-    description: 'Blocage aspartame et MSG',
-    Icon: Activity,
-  },
+  { value: 'diabetic', title: 'Diabète / Poids', description: 'Malus max édulcorants', Icon: HeartPulse },
+  { value: 'athlete', title: 'Sportif', description: 'Blocage aspartame & MSG', Icon: Activity },
   { value: 'child', title: 'Enfant', description: 'Tolérance zéro additifs', Icon: Baby },
-  {
-    value: 'pregnant',
-    title: 'Femme enceinte',
-    description: 'Tolérance zéro additifs',
-    Icon: Sprout,
-  },
-  {
-    value: 'intolerant',
-    title: 'Intolérances',
-    description: 'Pénalité lactose / gluten',
-    Icon: ShieldAlert,
-  },
+  { value: 'pregnant', title: 'Femme enceinte', description: 'Tolérance zéro additifs', Icon: Sprout },
+  { value: 'intolerant', title: 'Intolérances', description: 'Pénalité lactose / gluten', Icon: ShieldAlert },
 ];
 
 const ALLERGENS = ['Gluten', 'Lactose', 'Arachides', 'Fruits à coque', 'Œufs', 'Soja'];
-const INTOLERANCES = ['gluten', 'lactose'];
+const INTOLERANCES = [
+  { value: 'gluten', label: 'Gluten' },
+  { value: 'lactose', label: 'Lactose' },
+];
 
 export default function SettingsHealthProfileScreen() {
   const router = useRouter();
@@ -67,7 +54,7 @@ export default function SettingsHealthProfileScreen() {
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [healthProfile, setHealthProfile] = useState<HealthProfile>(
-    profile?.health_profile ?? 'standard'
+    profile?.health_profile ?? 'standard',
   );
   const [allergies, setAllergies] = useState<string[]>(profile?.allergies ?? []);
   const [intolerances, setIntolerances] = useState<string[]>(profile?.intolerances ?? []);
@@ -101,7 +88,7 @@ export default function SettingsHealthProfileScreen() {
     } catch (err) {
       Alert.alert(
         'Enregistrement impossible',
-        err instanceof Error ? err.message : 'Erreur inconnue'
+        err instanceof Error ? err.message : 'Erreur inconnue',
       );
     } finally {
       setSaving(false);
@@ -110,92 +97,153 @@ export default function SettingsHealthProfileScreen() {
 
   return (
     <ScreenContainer scroll>
-      <View className="gap-6">
-        <View className="flex-row items-center gap-3">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            className="h-10 w-10 items-center justify-center rounded-full bg-white"
-          >
-            <ArrowLeft color={Colors.text} size={20} />
-          </Pressable>
-          <Text className="font-display text-2xl font-bold text-sage-800">
-            Modifier mon profil
-          </Text>
-        </View>
+      <View style={{ gap: 22 }}>
+        <FadeIn delay={0}>
+          <View style={styles.topRow}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
+              style={styles.backButton}
+            >
+              <ArrowLeft color={Colors.text} size={20} strokeWidth={2.2} />
+            </Pressable>
+            <Text
+              style={{
+                fontFamily: 'BricolageGrotesque-Bold',
+                fontSize: 22,
+                color: Colors.text,
+                letterSpacing: -0.4,
+                flex: 1,
+              }}
+            >
+              Mon profil
+            </Text>
+          </View>
+        </FadeIn>
 
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Prénom / pseudo
-          </Text>
-          <TextInput
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Ton prénom"
-            placeholderTextColor={Colors.textMuted}
-            className="rounded-2xl bg-white px-4 py-3 text-base text-sage-800"
-            autoCapitalize="words"
-          />
-        </View>
+        <FadeIn delay={80}>
+          <View style={{ gap: 8 }}>
+            <Text style={styles.sectionLabel}>Prénom</Text>
+            <GlassCard style={{ paddingHorizontal: 6, paddingVertical: 6 }}>
+              <Input
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="Ton prénom"
+                autoCapitalize="words"
+                style={{ borderWidth: 0 } as never}
+              />
+            </GlassCard>
+          </View>
+        </FadeIn>
 
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Profil santé
-          </Text>
-          <View className="flex-row flex-wrap gap-3">
-            {OPTIONS.map(({ value, title, description, Icon }) => (
-              <View key={value} className="w-[48%]">
-                <SelectableCard
-                  title={title}
-                  description={description}
-                  selected={healthProfile === value}
-                  onPress={() => setHealthProfile(value)}
-                  icon={
-                    <Icon
-                      color={healthProfile === value ? Colors.sage : Colors.textMuted}
-                      size={22}
+        <FadeIn delay={160}>
+          <View style={{ gap: 8 }}>
+            <Text style={styles.sectionLabel}>Profil santé</Text>
+            <View style={styles.gridRow}>
+              {OPTIONS.map(({ value, title, description, Icon }) => {
+                const isActive = healthProfile === value;
+                return (
+                  <View key={value} style={{ width: '48%' }}>
+                    <TappableSelectableCard
+                      title={title}
+                      description={description}
+                      selected={isActive}
+                      onPress={() => setHealthProfile(value)}
+                      icon={
+                        <Icon
+                          color={isActive ? '#FFFFFF' : Colors.sage}
+                          size={22}
+                          strokeWidth={2.2}
+                        />
+                      }
                     />
-                  }
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={240}>
+          <View style={{ gap: 8 }}>
+            <Text style={styles.sectionLabel}>Allergies</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {ALLERGENS.map((a) => (
+                <TappableChip
+                  key={a}
+                  label={a}
+                  selected={allergies.includes(a)}
+                  onPress={() => setAllergies(toggle(allergies, a))}
                 />
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        </FadeIn>
 
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Allergies
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {ALLERGENS.map((a) => (
-              <Chip
-                key={a}
-                label={a}
-                selected={allergies.includes(a)}
-                onPress={() => setAllergies(toggle(allergies, a))}
-              />
-            ))}
+        <FadeIn delay={320}>
+          <View style={{ gap: 8 }}>
+            <Text style={styles.sectionLabel}>Intolérances</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {INTOLERANCES.map((i) => (
+                <TappableChip
+                  key={i.value}
+                  label={i.label}
+                  selected={intolerances.includes(i.value)}
+                  onPress={() => setIntolerances(toggle(intolerances, i.value))}
+                />
+              ))}
+            </View>
           </View>
-        </View>
+        </FadeIn>
 
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Intolérances
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {INTOLERANCES.map((i) => (
-              <Chip
-                key={i}
-                label={i.charAt(0).toUpperCase() + i.slice(1)}
-                selected={intolerances.includes(i)}
-                onPress={() => setIntolerances(toggle(intolerances, i))}
-              />
-            ))}
-          </View>
-        </View>
-
-        <Button label="Enregistrer" onPress={handleSave} loading={saving} />
+        <FadeIn delay={400}>
+          <PrimaryCTA
+            label={saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
+            onPress={handleSave}
+            icon={<Check color="#FFFFFF" size={18} strokeWidth={2.4} />}
+            disabled={saving}
+            accessibilityHint="Met à jour ton profil santé"
+          />
+        </FadeIn>
       </View>
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderWidth: 1,
+    borderColor: '#E2EBE2',
+    shadowColor: '#587858',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  sectionLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 11,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    paddingLeft: 4,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+});

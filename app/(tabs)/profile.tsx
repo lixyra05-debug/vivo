@@ -1,16 +1,29 @@
-import { Alert, Pressable, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ChevronRight,
   FileText,
   HeartPulse,
   LogOut,
   Sparkles,
   User as UserIcon,
 } from 'lucide-react-native';
-import { Button } from '@/src/components/ui/Button';
-import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
-import { Colors } from '@/src/constants/colors';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import { FadeIn } from '@/src/components/ui/FadeIn';
+import { GlassCard } from '@/src/components/ui/GlassCard';
+import { SettingsRow } from '@/src/components/profile/SettingsRow';
+import { Colors, scoreColor } from '@/src/constants/colors';
+import { useCountUp } from '@/src/hooks/useCountUp';
+import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { signOut } from '@/src/lib/api/auth';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
@@ -25,41 +38,37 @@ const HEALTH_LABELS = {
   intolerant: 'Intolérances',
 } as const;
 
-interface RowProps {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-}
-
-function SettingsRow({ icon, label, onPress }: RowProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center gap-3 rounded-vivo bg-white px-4 py-4 active:bg-cream-200"
-    >
-      <View className="h-9 w-9 items-center justify-center rounded-full bg-sage-50">
-        {icon}
-      </View>
-      <Text className="flex-1 text-base font-medium text-sage-800">{label}</Text>
-      <ChevronRight color={Colors.textMuted} size={20} />
-    </Pressable>
-  );
-}
-
 interface StatProps {
-  value: string | number;
+  value: number;
   label: string;
-  tone?: 'default' | 'warning';
+  color?: string;
 }
 
-function StatCard({ value, label, tone = 'default' }: StatProps) {
-  const valueColor = tone === 'warning' ? Colors.score.red : Colors.text;
+function StatCard({ value, label, color = Colors.text }: StatProps) {
+  const animated = useCountUp({ target: value });
   return (
-    <View className="flex-1 rounded-vivo bg-white p-4">
-      <Text className="font-display text-2xl font-bold" style={{ color: valueColor }}>
-        {value}
+    <View style={styles.statCard}>
+      <Text
+        style={{
+          fontFamily: 'BricolageGrotesque-Bold',
+          fontSize: 26,
+          color,
+          letterSpacing: -0.5,
+        }}
+      >
+        {animated}
       </Text>
-      <Text className="mt-1 text-xs uppercase tracking-wider text-sage-600">{label}</Text>
+      <Text
+        style={{
+          fontFamily: 'Inter-Medium',
+          fontSize: 11,
+          color: Colors.textMuted,
+          marginTop: 4,
+          letterSpacing: 0.6,
+        }}
+      >
+        {label.toUpperCase()}
+      </Text>
     </View>
   );
 }
@@ -69,6 +78,25 @@ export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
   const stats = useUserStats(user?.id);
+  const reduceMotion = useReduceMotion();
+  const rotation = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      rotation.value = 0;
+      return;
+    }
+    rotation.value = withRepeat(
+      withTiming(360, { duration: 16000, easing: Easing.linear }),
+      -1,
+      false,
+    );
+    return () => {
+      cancelAnimation(rotation);
+    };
+  }, [reduceMotion, rotation]);
+
+  const ringStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation.value}deg` }] }));
 
   const displayName = profile?.display_name?.trim() || user?.email?.split('@')[0] || 'Toi';
   const initials = displayName
@@ -87,99 +115,334 @@ export default function ProfileScreen() {
   }
 
   const allergies = profile?.allergies ?? [];
+  const intolerances = profile?.intolerances ?? [];
   const isPremium = profile?.subscription_tier === 'premium';
+  const avgValue = stats.data?.avg ?? 0;
+  const avgColor = avgValue > 0 ? scoreColor(avgValue) : Colors.text;
 
   return (
-    <ScreenContainer scroll>
-      <View className="gap-6">
-        <View className="items-center gap-3 pt-2">
-          <View className="h-20 w-20 items-center justify-center rounded-full bg-sage-400">
-            <Text className="font-display text-2xl font-bold text-white">{initials}</Text>
-          </View>
-          <View className="items-center">
-            <Text className="font-display text-2xl font-bold text-sage-800">{displayName}</Text>
-            <Text className="text-sage-700">{user?.email ?? ''}</Text>
-          </View>
-          <View
-            className={`rounded-full px-3 py-1 ${
-              isPremium ? 'bg-earth/20' : 'bg-sage-50'
-            }`}
-          >
-            <Text className={`text-xs font-semibold ${isPremium ? 'text-earth' : 'text-sage-700'}`}>
-              {isPremium ? '✨ Premium' : 'Gratuit'}
-            </Text>
-          </View>
-        </View>
-
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Mon profil santé
-          </Text>
-          <View className="gap-3 rounded-vivo bg-white p-4">
-            <View className="flex-row items-center justify-between">
-              <View>
-                <Text className="text-xs uppercase tracking-wider text-sage-600">Profil actif</Text>
-                <Text className="mt-0.5 text-lg font-semibold text-sage-800">
-                  {profile ? HEALTH_LABELS[profile.health_profile] : '—'}
+    <View style={{ flex: 1, backgroundColor: Colors.cream }}>
+      <View style={styles.headerRoot}>
+        <LinearGradient
+          colors={['#C6D8C6', '#E2EBE2', '#FAFAF7']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <SafeAreaView edges={['top']} style={{ paddingTop: 4 }}>
+          <FadeIn delay={0}>
+            <View style={{ alignItems: 'center', paddingTop: 16, paddingBottom: 28, gap: 10 }}>
+              <View style={styles.avatarWrap}>
+                <Animated.View style={[styles.avatarRing, ringStyle]} pointerEvents="none" />
+                <View style={styles.avatarInner}>
+                  <Text
+                    style={{
+                      fontFamily: 'BricolageGrotesque-Bold',
+                      fontSize: 28,
+                      color: Colors.textMuted,
+                      letterSpacing: -0.5,
+                    }}
+                  >
+                    {initials}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ alignItems: 'center', gap: 2 }}>
+                <Text
+                  style={{
+                    fontFamily: 'BricolageGrotesque-Bold',
+                    fontSize: 22,
+                    color: Colors.text,
+                    letterSpacing: -0.4,
+                  }}
+                >
+                  {displayName}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: Colors.textMuted,
+                  }}
+                >
+                  {user?.email ?? ''}
                 </Text>
               </View>
-              <HeartPulse color={Colors.sage} size={28} />
+              {isPremium ? (
+                <LinearGradient
+                  colors={['#709770', '#587858']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.planBadge}
+                >
+                  <Sparkles color="#FFFFFF" size={12} strokeWidth={2.4} />
+                  <Text
+                    style={{
+                      fontFamily: 'Inter-SemiBold',
+                      fontSize: 11,
+                      color: '#FFFFFF',
+                      letterSpacing: 1,
+                    }}
+                  >
+                    PREMIUM
+                  </Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.planBadge, styles.planBadgeFree]}>
+                  <Text
+                    style={{
+                      fontFamily: 'Inter-SemiBold',
+                      fontSize: 11,
+                      color: Colors.textMuted,
+                      letterSpacing: 1,
+                    }}
+                  >
+                    GRATUIT
+                  </Text>
+                </View>
+              )}
             </View>
-            <View className="h-px bg-cream-300" />
-            <View>
-              <Text className="text-xs uppercase tracking-wider text-sage-600">Allergies</Text>
-              <Text className="mt-1 text-sm text-sage-800">
-                {allergies.length > 0 ? allergies.join(', ') : 'Aucune'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Statistiques
-          </Text>
-          <View className="flex-row gap-3">
-            <StatCard value={stats.data?.total ?? 0} label="Scans" />
-            <StatCard value={stats.data?.avg ?? 0} label="Score moyen" />
-            <StatCard
-              value={stats.data?.bad ?? 0}
-              label="À éviter"
-              tone={(stats.data?.bad ?? 0) > 0 ? 'warning' : 'default'}
-            />
-          </View>
-        </View>
-
-        <View className="gap-2">
-          <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-sage-600">
-            Paramètres
-          </Text>
-          <View className="gap-2">
-            <SettingsRow
-              icon={<UserIcon color={Colors.sage} size={18} />}
-              label="Modifier mon profil"
-              onPress={() => router.push('/settings/health-profile')}
-            />
-            <SettingsRow
-              icon={<Sparkles color={Colors.sage} size={18} />}
-              label="Gérer mon abonnement"
-              onPress={() => router.push('/settings/subscription')}
-            />
-            <SettingsRow
-              icon={<FileText color={Colors.sage} size={18} />}
-              label="Mentions légales"
-              onPress={() => router.push('/settings/legal')}
-            />
-          </View>
-        </View>
-
-        <Button
-          label="Se déconnecter"
-          onPress={handleSignOut}
-          variant="outline"
-          icon={<LogOut color={Colors.sage} size={18} />}
-        />
+          </FadeIn>
+        </SafeAreaView>
       </View>
-    </ScreenContainer>
+
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 32, gap: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <FadeIn delay={120}>
+          <View style={{ gap: 10 }}>
+            <Text style={styles.sectionLabel}>Mon profil santé</Text>
+            <GlassCard style={{ padding: 16, gap: 14 }}>
+              <View style={styles.healthRow}>
+                <View style={styles.healthIconWrap}>
+                  <HeartPulse color={Colors.sage} size={20} strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.subLabel}>Profil actif</Text>
+                  <Text
+                    style={{
+                      fontFamily: 'BricolageGrotesque-SemiBold',
+                      fontSize: 17,
+                      color: Colors.text,
+                      marginTop: 2,
+                    }}
+                  >
+                    {profile ? HEALTH_LABELS[profile.health_profile] : '—'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View>
+                <Text style={styles.subLabel}>Allergies</Text>
+                {allergies.length > 0 ? (
+                  <View style={styles.chipWrap}>
+                    {allergies.map((a) => (
+                      <View key={a} style={styles.chip}>
+                        <Text style={styles.chipText}>{a}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text
+                    style={{
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: Colors.textMuted,
+                      marginTop: 6,
+                    }}
+                  >
+                    Aucune
+                  </Text>
+                )}
+              </View>
+              {intolerances.length > 0 ? (
+                <View>
+                  <Text style={styles.subLabel}>Intolérances</Text>
+                  <View style={styles.chipWrap}>
+                    {intolerances.map((a) => (
+                      <View key={a} style={styles.chip}>
+                        <Text style={styles.chipText}>{a}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </GlassCard>
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={200}>
+          <View style={{ gap: 10 }}>
+            <Text style={styles.sectionLabel}>Statistiques</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <StatCard value={stats.data?.total ?? 0} label="Scans" />
+              <StatCard
+                value={avgValue}
+                label="Score moyen"
+                color={avgColor}
+              />
+              <StatCard
+                value={stats.data?.bad ?? 0}
+                label="À éviter"
+                color={(stats.data?.bad ?? 0) > 0 ? Colors.score.red : Colors.text}
+              />
+            </View>
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={280}>
+          <View style={{ gap: 10 }}>
+            <Text style={styles.sectionLabel}>Paramètres</Text>
+            <GlassCard style={{ padding: 0, overflow: 'hidden' }}>
+              <SettingsRow
+                icon={<UserIcon color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Modifier mon profil"
+                description="Profil santé, allergies"
+                onPress={() => router.push('/settings/health-profile')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<Sparkles color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Mon abonnement"
+                description={isPremium ? 'Premium actif' : 'Plan gratuit'}
+                onPress={() => router.push('/settings/subscription')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<FileText color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Mentions légales"
+                onPress={() => router.push('/settings/legal')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<LogOut color={Colors.score.red} size={18} strokeWidth={2.2} />}
+                label="Se déconnecter"
+                onPress={handleSignOut}
+                tone="danger"
+                showChevron={false}
+              />
+            </GlassCard>
+          </View>
+        </FadeIn>
+
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: 11,
+            color: Colors.textMuted,
+            textAlign: 'center',
+            marginTop: 8,
+            opacity: 0.7,
+          }}
+        >
+          Vivo v1.0.0
+        </Text>
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  headerRoot: { overflow: 'hidden' },
+  avatarWrap: {
+    width: 96,
+    height: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarRing: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: 'rgba(88, 120, 88, 0.35)',
+    borderStyle: 'dashed',
+  },
+  avatarInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2EBE2',
+  },
+  planBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginTop: 2,
+  },
+  planBadgeFree: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1,
+    borderColor: '#C6D8C6',
+  },
+  sectionLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 11,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    paddingLeft: 4,
+  },
+  subLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 11,
+    color: Colors.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  healthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  healthIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: '#E7EFE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  divider: { height: 1, backgroundColor: '#E7E7DA' },
+  rowDivider: { height: 1, backgroundColor: '#ECECDF', marginLeft: 68 },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  chip: {
+    backgroundColor: '#E7EFE7',
+    borderWidth: 1,
+    borderColor: '#C6D8C6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  chipText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderWidth: 1,
+    borderColor: '#E2EBE2',
+    borderRadius: 20,
+    padding: 14,
+    shadowColor: '#587858',
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+});

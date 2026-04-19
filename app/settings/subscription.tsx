@@ -1,5 +1,6 @@
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
   BarChart3,
@@ -9,7 +10,9 @@ import {
   Sparkles,
   SwatchBook,
 } from 'lucide-react-native';
-import { Button } from '@/src/components/ui/Button';
+import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
+import { FadeIn } from '@/src/components/ui/FadeIn';
+import { GlassCard } from '@/src/components/ui/GlassCard';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { Colors } from '@/src/constants/colors';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
@@ -22,22 +25,22 @@ interface Benefit {
 
 const BENEFITS: Benefit[] = [
   {
-    icon: <SwatchBook color={Colors.earth} size={20} />,
+    icon: <SwatchBook color={Colors.earth} size={20} strokeWidth={2.2} />,
     title: 'Smart Swaps produits',
     description: 'Découvre des alternatives scannables avec leur score, dispo en rayon.',
   },
   {
-    icon: <CalendarRange color={Colors.earth} size={20} />,
+    icon: <CalendarRange color={Colors.earth} size={20} strokeWidth={2.2} />,
     title: 'Historique illimité',
-    description: 'Tous tes scans conservés, sans limite de 30 derniers.',
+    description: 'Tous tes scans conservés, sans limite des 30 derniers.',
   },
   {
-    icon: <BookOpen color={Colors.earth} size={20} />,
+    icon: <BookOpen color={Colors.earth} size={20} strokeWidth={2.2} />,
     title: 'Journal alimentaire',
     description: 'Suivi quotidien et score moyen de la journée.',
   },
   {
-    icon: <BarChart3 color={Colors.earth} size={20} />,
+    icon: <BarChart3 color={Colors.earth} size={20} strokeWidth={2.2} />,
     title: 'Comparateur',
     description: 'Compare deux produits côte à côte, pénalité par pénalité.',
   },
@@ -59,111 +62,277 @@ export default function SubscriptionScreen() {
   function handleUpgrade() {
     Alert.alert(
       'Bientôt disponible',
-      "Les abonnements Premium arrivent dans les prochaines semaines. Merci de ta patience !"
+      "Les abonnements Premium arrivent dans les prochaines semaines. Merci de ta patience !",
     );
   }
 
   return (
     <ScreenContainer scroll>
-      <View className="gap-6">
-        <View className="flex-row items-center gap-3">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            className="h-10 w-10 items-center justify-center rounded-full bg-white"
-          >
-            <ArrowLeft color={Colors.text} size={20} />
-          </Pressable>
-          <Text className="font-display text-2xl font-bold text-sage-800">Abonnement</Text>
-        </View>
-
-        <View
-          className="rounded-vivo bg-white p-5 gap-3"
-          style={{
-            shadowColor: '#8BAD8B',
-            shadowOpacity: 0.08,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 2,
-          }}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs uppercase tracking-wider text-sage-600">Plan actuel</Text>
-            <View
-              className={`rounded-full px-3 py-1 ${
-                isPremium ? 'bg-earth/20' : 'bg-sage-50'
-              }`}
+      <View style={{ gap: 22 }}>
+        <FadeIn delay={0}>
+          <View style={styles.topRow}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
+              style={styles.backButton}
             >
+              <ArrowLeft color={Colors.text} size={20} strokeWidth={2.2} />
+            </Pressable>
+            <Text
+              style={{
+                fontFamily: 'BricolageGrotesque-Bold',
+                fontSize: 22,
+                color: Colors.text,
+                letterSpacing: -0.4,
+                flex: 1,
+              }}
+            >
+              Abonnement
+            </Text>
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={80}>
+          <View style={styles.currentPlanWrap}>
+            <LinearGradient
+              colors={isPremium ? ['#E7EFE7', '#F6F3EB', '#FAFAF7'] : ['#F6F3EB', '#FAFAF7']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={{ padding: 20, gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={styles.sectionLabel}>Plan actuel</Text>
+                {isPremium ? (
+                  <LinearGradient
+                    colors={['#709770', '#587858']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.planBadge}
+                  >
+                    <Sparkles color="#FFFFFF" size={12} strokeWidth={2.4} />
+                    <Text
+                      style={{
+                        fontFamily: 'Inter-SemiBold',
+                        fontSize: 11,
+                        color: '#FFFFFF',
+                        letterSpacing: 1,
+                      }}
+                    >
+                      PREMIUM
+                    </Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={[styles.planBadge, styles.planBadgeFree]}>
+                    <Text
+                      style={{
+                        fontFamily: 'Inter-SemiBold',
+                        fontSize: 11,
+                        color: Colors.textMuted,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      GRATUIT
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text
-                className={`text-xs font-semibold ${
-                  isPremium ? 'text-earth' : 'text-sage-700'
-                }`}
+                style={{
+                  fontFamily: 'BricolageGrotesque-Bold',
+                  fontSize: 22,
+                  color: Colors.text,
+                  letterSpacing: -0.4,
+                }}
               >
-                {isPremium ? 'Premium actif' : 'Gratuit'}
+                {isPremium ? 'Merci pour ton soutien !' : 'Tu es sur le plan gratuit'}
               </Text>
+              <View style={{ gap: 8 }}>
+                {FREE_FEATURES.map((f) => (
+                  <View key={f} style={styles.featureRow}>
+                    <View style={styles.checkCircle}>
+                      <Check color={Colors.sage} size={12} strokeWidth={3} />
+                    </View>
+                    <Text
+                      style={{
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: Colors.text,
+                        flex: 1,
+                      }}
+                    >
+                      {f}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
-          <Text className="font-display text-2xl font-bold text-sage-800">
-            {isPremium ? 'Merci pour ton soutien !' : 'Tu es sur le plan gratuit'}
-          </Text>
-          <View className="gap-1">
-            {FREE_FEATURES.map((f) => (
-              <View key={f} className="flex-row items-center gap-2">
-                <Check color={Colors.sage} size={16} />
-                <Text className="text-sm text-sage-700">{f}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        </FadeIn>
 
-        <View className="gap-3">
-          <View className="flex-row items-center gap-2">
-            <Sparkles color={Colors.earth} size={20} />
-            <Text className="font-display text-xl font-bold text-sage-800">
-              Passe à Premium
-            </Text>
-          </View>
-          <Text className="text-sage-700">
-            Libère toutes les fonctionnalités pour 3,99 €/mois ou 29,99 €/an (~2,50 €/mois).
-          </Text>
-          <View className="gap-3">
-            {BENEFITS.map((b) => (
-              <View
-                key={b.title}
-                className="flex-row gap-3 rounded-vivo bg-white p-4"
+        <FadeIn delay={180}>
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Sparkles color={Colors.earth} size={20} strokeWidth={2.2} />
+              <Text
+                style={{
+                  fontFamily: 'BricolageGrotesque-Bold',
+                  fontSize: 22,
+                  color: Colors.text,
+                  letterSpacing: -0.4,
+                }}
               >
-                <View className="h-9 w-9 items-center justify-center rounded-full bg-earth/10">
-                  {b.icon}
-                </View>
-                <View className="flex-1">
-                  <Text className="font-semibold text-sage-800">{b.title}</Text>
-                  <Text className="mt-0.5 text-sm text-sage-700">{b.description}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {!isPremium ? (
-          <View className="gap-3">
-            <Button
-              label="Bientôt disponible"
-              onPress={handleUpgrade}
-              disabled
-              icon={<Sparkles color="#fff" size={18} />}
-            />
-            <Text className="text-center text-xs text-sage-600">
-              Le scan restera toujours gratuit et illimité.
+                Passe à Premium
+              </Text>
+            </View>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.textMuted,
+                lineHeight: 21,
+              }}
+            >
+              Débloque toutes les fonctionnalités pour 3,99 €/mois ou 29,99 €/an
+              (~2,50 €/mois).
             </Text>
           </View>
-        ) : (
-          <Button
-            label="Gérer l'abonnement"
-            variant="outline"
-            onPress={handleUpgrade}
-          />
-        )}
+        </FadeIn>
+
+        <View style={{ gap: 10 }}>
+          {BENEFITS.map((b, i) => (
+            <FadeIn key={b.title} delay={240 + i * 60}>
+              <GlassCard style={{ padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                <View style={styles.benefitIconWrap}>{b.icon}</View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontFamily: 'BricolageGrotesque-SemiBold',
+                      fontSize: 15,
+                      color: Colors.text,
+                      letterSpacing: -0.2,
+                    }}
+                  >
+                    {b.title}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: Colors.textMuted,
+                      lineHeight: 19,
+                      marginTop: 3,
+                    }}
+                  >
+                    {b.description}
+                  </Text>
+                </View>
+              </GlassCard>
+            </FadeIn>
+          ))}
+        </View>
+
+        <FadeIn delay={520}>
+          <View style={{ gap: 10 }}>
+            <PrimaryCTA
+              label={isPremium ? "Gérer l'abonnement" : 'Bientôt disponible'}
+              onPress={handleUpgrade}
+              disabled={!isPremium}
+              icon={<Sparkles color="#FFFFFF" size={18} strokeWidth={2.2} />}
+            />
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: Colors.textMuted,
+                textAlign: 'center',
+                fontStyle: 'italic',
+              }}
+            >
+              Le scan reste toujours gratuit et illimité.
+            </Text>
+          </View>
+        </FadeIn>
       </View>
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderWidth: 1,
+    borderColor: '#E2EBE2',
+    shadowColor: '#587858',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  sectionLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 11,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  currentPlanWrap: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2EBE2',
+    shadowColor: '#587858',
+    shadowOpacity: 0.1,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
+  },
+  planBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  planBadgeFree: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: '#C6D8C6',
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  checkCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    backgroundColor: '#E7EFE7',
+    borderWidth: 1,
+    borderColor: '#C6D8C6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    backgroundColor: 'rgba(196, 168, 130, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

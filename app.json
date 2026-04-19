@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lyxiria.vivo",
       "infoPlist": {
-        "NSCameraUsageDescription": "Vivo utilise la caméra pour scanner les codes-barres des produits alimentaires."
+        "NSCameraUsageDescription": "Vivo utilise la caméra pour scanner les codes-barres."
       }
     },
     "android": {
@@ -28,7 +28,9 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,15 +39,24 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
       [
         "react-native-vision-camera",
         {
           "cameraPermissionText": "Vivo utilise la caméra pour scanner les codes-barres."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2285b491-7a21-40c2-9829-852ee618e140"
+      }
+    },
+    "owner": "mah2005"
   }
 }
