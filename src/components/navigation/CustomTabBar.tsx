@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Circle, Clock, Heart, Home, ScanLine, User } from 'lucide-react-native';
+import { Circle, Clock, Compass, Heart, Home, ScanLine, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { Colors } from '@/src/constants/colors';
@@ -24,6 +24,7 @@ interface RouteMeta {
 const ROUTE_META: Record<string, RouteMeta> = {
   index: { label: 'Accueil', Icon: Home, hint: 'Onglet Accueil' },
   scan: { label: 'Scanner', Icon: ScanLine, hint: 'Onglet Scanner' },
+  explore: { label: 'Explorer', Icon: Compass, hint: 'Onglet Explorer' },
   history: { label: 'Historique', Icon: Clock, hint: 'Onglet Historique' },
   favorites: { label: 'Favoris', Icon: Heart, hint: 'Onglet Favoris' },
   profile: { label: 'Profil', Icon: User, hint: 'Onglet Profil' },

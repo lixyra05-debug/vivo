@@ -92,3 +92,75 @@ export interface Product {
   created_at: string;
   updated_at: string;
 }
+
+export interface CosmeticProduct {
+  barcode: string;
+  name: string | null;
+  brand: string | null;
+  image_url: string | null;
+  ingredients_inci: string;
+  ingredients_list: string[];
+  category: string | null;
+  image_ingredients_url: string | null;
+  obf_last_updated: string | null;
+  our_score: number | null;
+  our_score_computed_at: string | null;
+  scan_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryDef {
+  slug: string;
+  name: string;
+  emoji: string;
+  icon: string;
+  off_tag: string | null;
+  obf_tag: string | null;
+  type: 'food' | 'cosmetic';
+}
+
+export interface SearchResult {
+  barcode: string;
+  name: string | null;
+  brand: string | null;
+  image_url: string | null;
+  type: 'food' | 'cosmetic';
+}
+
+export interface SearchFilters {
+  query: string;
+  type: 'all' | 'food' | 'cosmetic';
+  category_slug?: string;
+}
+
+export type CosmeticIngredientRisk = 'safe' | 'caution' | 'warning' | 'danger';
+
+export interface CosmeticPenaltyDetail {
+  code: string;
+  label: string;
+  points: number;
+  category: 'endocrine' | 'irritant' | 'allergen' | 'silicone' | 'preservative' | 'profile';
+}
+
+export interface CosmeticScoringResult {
+  score_final: number;
+  score_color: ScoreColor;
+  penalties: CosmeticPenaltyDetail[];
+  blockers: string[];
+  risky_ingredients: Array<{
+    inci: string;
+    risk: CosmeticIngredientRisk;
+    reason: string | null;
+  }>;
+  profile_adjustments: string[];
+}
+
+export type CosmeticProfile = 'standard' | 'peau_sensible' | 'enceinte' | 'bebe';
+
+export interface CosmeticScoringInput {
+  barcode: string;
+  ingredients_inci: string;
+  ingredients_list: string[];
+  category: string | null;
+}

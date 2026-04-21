@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Heart, Leaf, Share2, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -26,9 +27,15 @@ import { ScoreComparison } from '@/src/components/product/ScoreComparison';
 import { ScoreBreakdownChart } from '@/src/components/product/ScoreBreakdownChart';
 import { NutrientBreakdown } from '@/src/components/product/NutrientBreakdown';
 import { IngredientRiskMap } from '@/src/components/product/IngredientRiskMap';
+import { CosmeticResultView } from '@/src/components/product/CosmeticResultView';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { productToScoringInput } from '@/src/lib/api/openfoodfacts';
+import {
+  cosmeticToScoringInput,
+  getOrFetchCosmetic,
+} from '@/src/lib/api/openbeautyfacts';
 import { calculateScore, findAdditive } from '@/src/lib/scoring/engine';
+import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
 import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
 import { supabase } from '@/src/lib/api/supabase';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
@@ -41,9 +48,28 @@ import {
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import type { UserProfile } from '@/src/lib/api/types';
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default function ProductScreen() {
+  const { barcode, type } = useLocalSearchParams<{
+    barcode: string;
+    type?: 'food' | 'cosmetic';
+  }>();
+  const isCosmetic = type === 'cosmetic';
+
+  if (isCosmetic) {
+    return <CosmeticProductScreen barcode={barcode} />;
+  }
+
+  return <FoodProductScreen barcode={barcode} />;
+}
+
+interface FoodProductScreenProps {
+  barcode: string;
+}
+
+function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const router = useRouter();
-  const { barcode } = useLocalSearchParams<{ barcode: string }>();
   const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
   const productQuery = useProduct(barcode ?? null);
@@ -544,3 +570,97 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
 });
+
+interface CosmeticProductScreenProps {
+  barcode: string;
+}
+
+function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
+  const router = useRouter();
+
+  const cosmeticQuery = useQuery({
+    queryKey: ['cosmetic', barcode] as const,
+    queryFn: () => (barcode ? getOrFetchCosmetic(barcode) : Promise.resolve(null)),
+    enabled: Boolean(barcode),
+    staleTime: SEVEN_DAYS_MS,
+    gcTime: SEVEN_DAYS_MS,
+  });
+
+  const result = useMemo(() => {
+    if (!cosmeticQuery.data) return null;
+    return calculateCosmeticScore(
+      cosmeticToScoringInput(cosmeticQuery.data),
+      'standard',
+    );
+  }, [cosmeticQuery.data]);
+
+  if (cosmeticQuery.isLoading) {
+    return (
+      <ScreenContainer scroll>
+        <View style={{ gap: 18 }}>
+          <View style={styles.topRow}>
+            <Skeleton width={44} height={44} radius={999} />
+          </View>
+          <View style={{ alignItems: 'center', gap: 10, marginTop: 8 }}>
+            <Skeleton width={180} height={180} radius={24} />
+            <Skeleton width={220} height={22} />
+            <Skeleton width={120} height={14} />
+          </View>
+          <View style={{ alignItems: 'center', gap: 10, marginTop: 10 }}>
+            <Skeleton width={200} height={200} radius={999} />
+            <Skeleton width={140} height={22} />
+          </View>
+          <Skeleton height={180} radius={20} />
+          <Skeleton height={120} radius={20} />
+          <Text
+            style={{
+              fontFamily: 'Inter',
+              fontSize: 14,
+              color: Colors.textMuted,
+              textAlign: 'center',
+              marginTop: 20,
+            }}
+          >
+            Analyse INCI en cours…
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (!cosmeticQuery.data || !result) {
+    return (
+      <ProductNotFound
+        barcode={barcode}
+        onRetry={() => cosmeticQuery.refetch()}
+        onBack={() => router.replace('/(tabs)/explore')}
+      />
+    );
+  }
+
+  // TODO: activer les favoris cosmétiques quand scan_history (ou une table dédiée) supportera type='cosmetic'.
+  return (
+    <ScreenContainer scroll>
+      <View style={{ gap: 22 }}>
+        <FadeIn delay={0}>
+          <View style={styles.topRow}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
+              style={styles.iconButton}
+            >
+              <ArrowLeft color={Colors.text} size={20} strokeWidth={2.2} />
+            </Pressable>
+          </View>
+        </FadeIn>
+        <CosmeticResultView
+          product={cosmeticQuery.data}
+          result={result}
+          profile="standard"
+        />
+      </View>
+    </ScreenContainer>
+  );
+}
