@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Heart, Leaf, Share2, Sparkles } from 'lucide-react-native';
-import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -23,9 +21,15 @@ import { SeedOilAlert } from '@/src/components/product/SeedOilAlert';
 import { IngredientsList } from '@/src/components/product/IngredientsList';
 import { PenaltyCard } from '@/src/components/product/PenaltyCard';
 import { ProductNotFound } from '@/src/components/product/ProductNotFound';
+import { ProductHeader } from '@/src/components/product/ProductHeader';
+import { ScoreComparison } from '@/src/components/product/ScoreComparison';
+import { ScoreBreakdownChart } from '@/src/components/product/ScoreBreakdownChart';
+import { NutrientBreakdown } from '@/src/components/product/NutrientBreakdown';
+import { IngredientRiskMap } from '@/src/components/product/IngredientRiskMap';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { productToScoringInput } from '@/src/lib/api/openfoodfacts';
 import { calculateScore, findAdditive } from '@/src/lib/scoring/engine';
+import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
 import { supabase } from '@/src/lib/api/supabase';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
@@ -36,20 +40,6 @@ import {
 } from '@/src/lib/stores/useProductStore';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import type { UserProfile } from '@/src/lib/api/types';
-
-const SCORE_LABEL = {
-  green: 'Bon',
-  yellow: 'Moyen',
-  orange: 'Mauvais',
-  red: 'À éviter',
-} as const;
-
-function labelFromScore(score: number): string {
-  if (score >= 70) return SCORE_LABEL.green;
-  if (score >= 50) return SCORE_LABEL.yellow;
-  if (score >= 25) return SCORE_LABEL.orange;
-  return SCORE_LABEL.red;
-}
 
 export default function ProductScreen() {
   const router = useRouter();
@@ -159,14 +149,20 @@ export default function ProductScreen() {
             </View>
           </View>
           <View style={{ alignItems: 'center', gap: 10, marginTop: 8 }}>
-            <Skeleton width={160} height={160} radius={28} />
+            <Skeleton width={180} height={180} radius={24} />
             <Skeleton width={220} height={22} />
             <Skeleton width={120} height={14} />
           </View>
-          <View style={{ alignItems: 'center', marginTop: 10 }}>
-            <Skeleton width={220} height={220} radius={999} />
+          <View style={{ alignItems: 'center', gap: 10, marginTop: 10 }}>
+            <Skeleton width={200} height={200} radius={999} />
+            <Skeleton width={140} height={22} />
+            <Skeleton width={260} height={16} />
           </View>
-          <View style={{ gap: 12, marginTop: 12 }}>
+          <Skeleton height={10} radius={5} />
+          <Skeleton height={180} radius={20} />
+          <Skeleton height={280} radius={24} />
+          <Skeleton height={120} radius={20} />
+          <View style={{ gap: 12 }}>
             <Skeleton height={80} radius={20} />
             <Skeleton height={80} radius={20} />
             <Skeleton height={80} radius={20} />
@@ -204,7 +200,7 @@ export default function ProductScreen() {
   );
   const hasPenalties = additivePenalties.length > 0 || otherPenalties.length > 0;
   const scoreHex = scoreColor(result.score_final);
-  const scoreLabel = labelFromScore(result.score_final);
+  const verdict = getScoreVerdict(result.score_final);
 
   return (
     <ScreenContainer scroll>
@@ -251,53 +247,21 @@ export default function ProductScreen() {
           </View>
         </FadeIn>
 
-        <FadeIn delay={80}>
-          <View style={{ alignItems: 'center', gap: 10 }}>
-            {product.image_url ? (
-              <ExpoImage
-                source={{ uri: product.image_url }}
-                style={styles.productImage}
-                contentFit="contain"
-                transition={300}
-                accessibilityLabel={`Image de ${product.name ?? 'produit'}`}
-              />
-            ) : (
-              <View style={[styles.productImage, styles.productImagePlaceholder]}>
-                <Leaf color={Colors.sage} size={48} strokeWidth={1.6} />
-              </View>
-            )}
-            <Text
-              style={{
-                fontFamily: 'BricolageGrotesque-Bold',
-                fontSize: 24,
-                color: Colors.text,
-                textAlign: 'center',
-                letterSpacing: -0.5,
-                paddingHorizontal: 16,
-              }}
-              numberOfLines={2}
-            >
-              {product.name ?? 'Produit'}
-            </Text>
-            {product.brand ? (
-              <Text
-                style={{
-                  fontFamily: 'Inter-Medium',
-                  fontSize: 14,
-                  color: Colors.textMuted,
-                  textAlign: 'center',
-                }}
-              >
-                {product.brand}
-              </Text>
-            ) : null}
-          </View>
+        <FadeIn delay={60}>
+          <ProductHeader
+            name={product.name}
+            brand={product.brand}
+            imageUrl={product.image_url}
+            score={result.score_final}
+            isOrganic={product.is_organic}
+            category={null}
+          />
         </FadeIn>
 
-        <FadeIn delay={180}>
-          <View style={{ alignItems: 'center', gap: 14 }}>
+        <FadeIn delay={140}>
+          <View style={{ alignItems: 'center', gap: 12 }}>
             <View style={styles.scoreHaloWrap}>
-              <View style={[styles.scoreHalo, { backgroundColor: `${scoreHex}18` }]} />
+              <View style={[styles.scoreHalo, { backgroundColor: `${scoreHex}14` }]} />
               <ScoreCircle score={result.score_final} size={200} strokeWidth={14} />
             </View>
             <Text
@@ -308,7 +272,19 @@ export default function ProductScreen() {
                 letterSpacing: -0.3,
               }}
             >
-              {scoreLabel}
+              {verdict.label}
+            </Text>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Colors.textMuted,
+                textAlign: 'center',
+                paddingHorizontal: 24,
+                lineHeight: 19,
+              }}
+            >
+              {verdict.description}
             </Text>
             {result.nova_group ? (
               <NovaBadge group={result.nova_group as 1 | 2 | 3 | 4} />
@@ -316,8 +292,12 @@ export default function ProductScreen() {
           </View>
         </FadeIn>
 
+        <FadeIn delay={220}>
+          <ScoreComparison score={result.score_final} delay={0} />
+        </FadeIn>
+
         {result.blockers.length > 0 ? (
-          <FadeIn delay={240}>
+          <FadeIn delay={280}>
             <GlassCard tone="danger" style={{ padding: 16, gap: 6 }}>
               <Text
                 style={{
@@ -340,8 +320,41 @@ export default function ProductScreen() {
           </FadeIn>
         ) : null}
 
+        {result.penalties.length > 0 ? (
+          <FadeIn delay={340}>
+            <ScoreBreakdownChart
+              penalties={result.penalties}
+              finalScore={result.score_final}
+              delay={0}
+            />
+          </FadeIn>
+        ) : null}
+
+        <FadeIn delay={420}>
+          <NutrientBreakdown
+            macros={{
+              sugars: product.sugars_100g ?? undefined,
+              saturated_fat: product.saturated_fat_100g ?? undefined,
+              salt: product.salt_100g ?? undefined,
+              proteins: product.proteins_100g ?? undefined,
+              fiber: product.fiber_100g ?? undefined,
+            }}
+            energyKcal={product.energy_kcal_100g ?? undefined}
+            portionGrams={product.portion_grams ?? 100}
+          />
+        </FadeIn>
+
+        {product.ingredients_raw ? (
+          <FadeIn delay={500}>
+            <IngredientRiskMap
+              ingredientsRaw={product.ingredients_raw ?? ''}
+              delay={0}
+            />
+          </FadeIn>
+        ) : null}
+
         {hasPenalties ? (
-          <FadeIn delay={280}>
+          <FadeIn delay={580}>
             <View style={{ gap: 12 }}>
               <View style={{ gap: 4 }}>
                 <Text
@@ -394,13 +407,13 @@ export default function ProductScreen() {
         ) : null}
 
         {result.seed_oils_detected.length > 0 ? (
-          <FadeIn delay={320}>
+          <FadeIn delay={640}>
             <SeedOilAlert oils={result.seed_oils_detected} />
           </FadeIn>
         ) : null}
 
         {result.clean_labeling_alerts.length > 0 ? (
-          <FadeIn delay={360}>
+          <FadeIn delay={700}>
             <GlassCard tone="info" style={{ padding: 16, gap: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Sparkles color="#B58900" size={18} strokeWidth={2.2} />
@@ -434,7 +447,7 @@ export default function ProductScreen() {
         ) : null}
 
         {result.profile_adjustments.length > 0 ? (
-          <FadeIn delay={400}>
+          <FadeIn delay={760}>
             <GlassCard style={{ padding: 16, gap: 6 }}>
               <Text
                 style={{
@@ -463,7 +476,7 @@ export default function ProductScreen() {
         ) : null}
 
         {product.ingredients_raw ? (
-          <FadeIn delay={440}>
+          <FadeIn delay={820}>
             <View style={{ gap: 8 }}>
               <Text
                 style={{
@@ -479,7 +492,7 @@ export default function ProductScreen() {
           </FadeIn>
         ) : null}
 
-        <FadeIn delay={480}>
+        <FadeIn delay={880}>
           <PrimaryCTA
             label="Voir les alternatives"
             onPress={() => router.push(`/swap/${product.barcode}`)}
@@ -517,23 +530,6 @@ const styles = StyleSheet.create({
   },
   iconButtonActive: {
     borderColor: 'rgba(244, 67, 54, 0.25)',
-  },
-  productImage: {
-    width: 160,
-    height: 160,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#587858',
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
-  },
-  productImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2EBE2',
   },
   scoreHaloWrap: {
     width: 260,
