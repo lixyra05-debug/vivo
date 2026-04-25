@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FileText,
   HeartPulse,
+  HelpCircle,
   LogOut,
   Sparkles,
   User as UserIcon,
@@ -21,13 +22,19 @@ import Animated, {
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { SettingsRow } from '@/src/components/profile/SettingsRow';
-import { Colors, scoreColor } from '@/src/constants/colors';
-import { useCountUp } from '@/src/hooks/useCountUp';
+import { ProfileStatsSection } from '@/src/components/stats/ProfileStatsSection';
+import { Colors } from '@/src/constants/colors';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { signOut } from '@/src/lib/api/auth';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
-import { useUserStats } from '@/src/lib/stores/useProductStore';
+import { useScanHistory } from '@/src/lib/stores/useProductStore';
+import { useUserBadges, useUserReportCount } from '@/src/lib/stores/useBadges';
+import {
+  checkBadges,
+  getUserStats,
+} from '@/src/lib/gamification/badge-engine';
+import type { ScanRecord } from '@/src/lib/gamification/types';
 
 const HEALTH_LABELS = {
   standard: 'Standard',
@@ -38,48 +45,39 @@ const HEALTH_LABELS = {
   intolerant: 'Intolérances',
 } as const;
 
-interface StatProps {
-  value: number;
-  label: string;
-  color?: string;
-}
-
-function StatCard({ value, label, color = Colors.text }: StatProps) {
-  const animated = useCountUp({ target: value });
-  return (
-    <View style={styles.statCard}>
-      <Text
-        style={{
-          fontFamily: 'BricolageGrotesque-Bold',
-          fontSize: 26,
-          color,
-          letterSpacing: -0.5,
-        }}
-      >
-        {animated}
-      </Text>
-      <Text
-        style={{
-          fontFamily: 'Inter-Medium',
-          fontSize: 11,
-          color: Colors.textMuted,
-          marginTop: 4,
-          letterSpacing: 0.6,
-        }}
-      >
-        {label.toUpperCase()}
-      </Text>
-    </View>
-  );
-}
-
 export default function ProfileScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
-  const stats = useUserStats(user?.id);
+  const scanHistoryQuery = useScanHistory({ userId: user?.id, limit: 500 });
+  const reportCountQuery = useUserReportCount(user?.id);
+  const userBadgesQuery = useUserBadges(user?.id);
   const reduceMotion = useReduceMotion();
   const rotation = useSharedValue(0);
+
+  const scans: ScanRecord[] = useMemo(
+    () =>
+      (scanHistoryQuery.data ?? []).map((row) => ({
+        barcode: row.barcode,
+        score_at_scan: row.score_at_scan,
+        scanned_at: row.scanned_at,
+        product_type:
+          (row as unknown as { product_type?: 'food' | 'cosmetic' }).product_type ??
+          'food',
+        is_favorite: row.is_favorite,
+        category_slug: null,
+      })),
+    [scanHistoryQuery.data],
+  );
+
+  const badges = useMemo(() => {
+    const stats = getUserStats(scans, reportCountQuery.data ?? 0, 1);
+    const alreadyEarned = (userBadgesQuery.data ?? []).map((row) => ({
+      badgeId: row.badge_id,
+      earnedAt: row.earned_at,
+    }));
+    return checkBadges(stats, alreadyEarned);
+  }, [scans, reportCountQuery.data, userBadgesQuery.data]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -117,8 +115,6 @@ export default function ProfileScreen() {
   const allergies = profile?.allergies ?? [];
   const intolerances = profile?.intolerances ?? [];
   const isPremium = profile?.subscription_tier === 'premium';
-  const avgValue = stats.data?.avg ?? 0;
-  const avgColor = avgValue > 0 ? scoreColor(avgValue) : Colors.text;
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.cream }}>
@@ -273,22 +269,13 @@ export default function ProfileScreen() {
         </FadeIn>
 
         <FadeIn delay={200}>
-          <View style={{ gap: 10 }}>
-            <Text style={styles.sectionLabel}>Statistiques</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <StatCard value={stats.data?.total ?? 0} label="Scans" />
-              <StatCard
-                value={avgValue}
-                label="Score moyen"
-                color={avgColor}
-              />
-              <StatCard
-                value={stats.data?.bad ?? 0}
-                label="À éviter"
-                color={(stats.data?.bad ?? 0) > 0 ? Colors.score.red : Colors.text}
-              />
-            </View>
-          </View>
+          <ProfileStatsSection
+            userId={user?.id ?? ''}
+            scans={scans}
+            reportCount={reportCountQuery.data ?? 0}
+            badges={{ earned: badges.earned, newlyEarned: [] }}
+            onSeeMethodology={() => router.push('/methodology')}
+          />
         </FadeIn>
 
         <FadeIn delay={280}>
@@ -307,6 +294,13 @@ export default function ProfileScreen() {
                 label="Mon abonnement"
                 description={isPremium ? 'Premium actif' : 'Plan gratuit'}
                 onPress={() => router.push('/settings/subscription')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<HelpCircle color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Comment Vivo note"
+                description="Méthodologie et sources scientifiques"
+                onPress={() => router.push('/methodology')}
               />
               <View style={styles.rowDivider} />
               <SettingsRow
@@ -431,18 +425,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     fontSize: 12,
     color: Colors.textMuted,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderWidth: 1,
-    borderColor: '#E2EBE2',
-    borderRadius: 20,
-    padding: 14,
-    shadowColor: '#587858',
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
   },
 });

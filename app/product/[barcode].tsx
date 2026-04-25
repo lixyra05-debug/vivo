@@ -31,6 +31,8 @@ import { CosmeticResultView } from '@/src/components/product/CosmeticResultView'
 import { ConfidenceBadge } from '@/src/components/product/ConfidenceBadge';
 import { CompatibilityBanner } from '@/src/components/product/CompatibilityBanner';
 import { ReportButton } from '@/src/components/product/ReportButton';
+import { EducationalCard } from '@/src/components/education/EducationalCard';
+import { BadgeUnlockedModal } from '@/src/components/gamification/BadgeUnlockedModal';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { productToScoringInput } from '@/src/lib/api/openfoodfacts';
 import {
@@ -46,16 +48,25 @@ import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
 import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
+import { findRelevantCards } from '@/src/lib/education/content-database';
+import { checkBadges, getUserStats } from '@/src/lib/gamification/badge-engine';
 import { supabase } from '@/src/lib/api/supabase';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import {
   useProduct,
   useRecordScan,
+  useScanHistory,
   useToggleFavorite,
 } from '@/src/lib/stores/useProductStore';
+import {
+  useGrantBadges,
+  useUserBadges,
+  useUserReportCount,
+} from '@/src/lib/stores/useBadges';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import type { UserProfile } from '@/src/lib/api/types';
+import type { BadgeDef, ScanRecord } from '@/src/lib/gamification/types';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -84,10 +95,16 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const productQuery = useProduct(barcode ?? null);
   const recordScan = useRecordScan(user?.id);
   const toggleFavorite = useToggleFavorite(user?.id);
+  const scanHistoryQuery = useScanHistory({ userId: user?.id, limit: 500 });
+  const reportCountQuery = useUserReportCount(user?.id);
+  const userBadgesQuery = useUserBadges(user?.id);
+  const grantBadges = useGrantBadges(user?.id);
 
   const toast = useToast();
   const [isFavorite, setIsFavorite] = useState(false);
   const [scanRecorded, setScanRecorded] = useState(false);
+  const [badgeQueue, setBadgeQueue] = useState<BadgeDef[]>([]);
+  const [unlockChecked, setUnlockChecked] = useState(false);
   const reduceMotion = useReduceMotion();
   const heartScale = useSharedValue(1);
 
@@ -108,13 +125,55 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   useEffect(() => {
     if (!user || !barcode || !result || scanRecorded) return;
     setScanRecorded(true);
-    recordScan.mutate({
-      barcode,
-      score: result.score_final,
-      profile: userProfile.type,
-      penalties: result.penalties,
-    });
-  }, [user, barcode, result, scanRecorded, recordScan, userProfile.type]);
+    recordScan.mutate(
+      {
+        barcode,
+        score: result.score_final,
+        profile: userProfile.type,
+        penalties: result.penalties,
+      },
+      {
+        onSuccess: () => {
+          // refetch scan_history pour évaluer les badges
+          void scanHistoryQuery.refetch();
+        },
+      },
+    );
+  }, [user, barcode, result, scanRecorded, recordScan, userProfile.type, scanHistoryQuery]);
+
+  // Check badges après l'enregistrement du scan
+  useEffect(() => {
+    if (!user || !scanRecorded || unlockChecked) return;
+    if (!scanHistoryQuery.data || !userBadgesQuery.data) return;
+    setUnlockChecked(true);
+    const scans: ScanRecord[] = scanHistoryQuery.data.map((row) => ({
+      barcode: row.barcode,
+      score_at_scan: row.score_at_scan,
+      scanned_at: row.scanned_at,
+      product_type:
+        (row as unknown as { product_type?: 'food' | 'cosmetic' }).product_type ?? 'food',
+      is_favorite: row.is_favorite,
+      category_slug: null,
+    }));
+    const stats = getUserStats(scans, reportCountQuery.data ?? 0, 1);
+    const alreadyEarned = userBadgesQuery.data.map((row) => ({
+      badgeId: row.badge_id,
+      earnedAt: row.earned_at,
+    }));
+    const { newlyEarned } = checkBadges(stats, alreadyEarned);
+    if (newlyEarned.length > 0) {
+      grantBadges.mutate(newlyEarned.map((b) => b.id));
+      setBadgeQueue(newlyEarned);
+    }
+  }, [
+    user,
+    scanRecorded,
+    unlockChecked,
+    scanHistoryQuery.data,
+    userBadgesQuery.data,
+    reportCountQuery.data,
+    grantBadges,
+  ]);
 
   useEffect(() => {
     if (!user || !barcode) return;
@@ -241,6 +300,16 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const compatibilityResult = compatProfile
     ? checkCompatibility(product, result, compatProfile)
     : null;
+  const educationalCards = findRelevantCards(
+    {
+      additives_tags: product.additives_tags ?? [],
+      ingredients_raw: product.ingredients_raw ?? null,
+      ingredients_inci: null,
+      category_slug: null,
+    },
+    { score_final: result.score_final },
+    2,
+  );
 
   return (
     <ScreenContainer scroll>
@@ -341,6 +410,16 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
             {result.nova_group ? (
               <NovaBadge group={result.nova_group as 1 | 2 | 3 | 4} />
             ) : null}
+            <Pressable
+              onPress={() => router.push('/methodology')}
+              accessibilityRole="link"
+              accessibilityLabel="Comment ce score est calculé"
+              hitSlop={6}
+            >
+              <Text style={styles.methodologyLink}>
+                Comment ce score est calculé ? →
+              </Text>
+            </Pressable>
           </View>
         </FadeIn>
 
@@ -404,6 +483,12 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
             />
           </FadeIn>
         ) : null}
+
+        {educationalCards.map((card, i) => (
+          <FadeIn key={card.id} delay={540 + i * 120}>
+            <EducationalCard card={card} />
+          </FadeIn>
+        ))}
 
         {hasPenalties ? (
           <FadeIn delay={580}>
@@ -559,6 +644,10 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
 
         <View style={{ height: 24 }} />
       </View>
+      <BadgeUnlockedModal
+        badge={badgeQueue[0] ?? null}
+        onClose={() => setBadgeQueue((q) => q.slice(1))}
+      />
     </ScreenContainer>
   );
 }
@@ -599,6 +688,13 @@ const styles = StyleSheet.create({
     height: 240,
     borderRadius: 999,
   },
+  methodologyLink: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
+    marginTop: 4,
+  },
 });
 
 interface CosmeticProductScreenProps {
@@ -636,6 +732,20 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
     if (!cosmeticQuery.data) return null;
     return getCosmeticConfidence(cosmeticQuery.data);
   }, [cosmeticQuery.data]);
+
+  const educationalCards = useMemo(() => {
+    if (!cosmeticQuery.data || !result) return [];
+    return findRelevantCards(
+      {
+        additives_tags: [],
+        ingredients_raw: null,
+        ingredients_inci: cosmeticQuery.data.ingredients_inci ?? null,
+        category_slug: null,
+      },
+      { score_final: result.score_final },
+      2,
+    );
+  }, [cosmeticQuery.data, result]);
 
   if (cosmeticQuery.isLoading) {
     return (
@@ -703,6 +813,20 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
           result={result}
           profile="standard"
         />
+        <FadeIn delay={80}>
+          <View style={{ alignItems: 'center' }}>
+            <Pressable
+              onPress={() => router.push('/methodology')}
+              accessibilityRole="link"
+              accessibilityLabel="Comment ce score est calculé"
+              hitSlop={6}
+            >
+              <Text style={styles.methodologyLink}>
+                Comment ce score est calculé ? →
+              </Text>
+            </Pressable>
+          </View>
+        </FadeIn>
         {confidence ? (
           <FadeIn delay={120}>
             <View style={{ alignItems: 'center' }}>
@@ -715,7 +839,12 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
             <CompatibilityBanner result={compatibilityResult} />
           </FadeIn>
         ) : null}
-        <FadeIn delay={200}>
+        {educationalCards.map((card, i) => (
+          <FadeIn key={card.id} delay={200 + i * 120}>
+            <EducationalCard card={card} />
+          </FadeIn>
+        ))}
+        <FadeIn delay={200 + educationalCards.length * 120}>
           <ReportButton barcode={cosmeticQuery.data.barcode} />
         </FadeIn>
         <View style={{ height: 24 }} />
