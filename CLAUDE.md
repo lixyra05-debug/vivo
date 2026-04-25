@@ -49,6 +49,24 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Transparence** : écran `app/methodology.tsx` (lien depuis ScoreCircle "Comment ce score est calculé ?" + SettingsRow profil), 6 sections (Mission, Food, Cosmetic, Sources, FAQ, CTA)
 - **Migration** : `010_gamification.sql` (colonne `product_type` sur scan_history + tables `user_badges` & `user_streaks` RLS)
 
+## Données médicales enrichies via NotebookLM (cross-référencées EFSA/ANSES/IARC)
+- **Méthode** : extraction des listes d'additifs Corinne Gouget depuis le notebook `medecine`, puis cross-référence systématique avec EFSA, ANSES (stratégie PE 2019) et IARC monographs. Retenu **uniquement** quand les agences officielles convergent avec Gouget sur le risque. Source citée = EFSA / ANSES / IARC / eur-lex **uniquement** ; **jamais** Gouget (test garde-fou dans `additives-db-enriched.test.ts`)
+- **35 additifs ajoutés à `additives-db.ts`** (avant : 22 entrées → après : 57) :
+  - Colorants (6) : E127, E131, E142, E161g, E173, E180
+  - Conservateurs blockers (4) : E216, E217 (parabènes interdits UE 2006/52), E230 (retrait UE 2014, règlement 1129/2011), E240 formaldéhyde (IARC groupe 1)
+  - Conservateurs surveillés (4) : E210 (benzène + vit. C), E211 (Southampton/McCann 2007 → blocker enfant), E214, E215 (parabènes PE potentiels)
+  - Sulfites (8) : E220-E228 (allergène EU listé, asthme → blocker enfant)
+  - Antioxydants (3) : E310 gallate de propyle, E320 BHA (IARC 2B + ANSES PE), E321 BHT
+  - Émulsifiants risque microbiote (3) : E407 carraghénanes, E433 polysorbate 80, E466 CMC (Chassaing/Gewirtz 2015 + Chassaing 2021)
+  - Aluminium (2) : E520, E541 (DHTP EFSA 2008 dépassée chez l'enfant)
+  - Nano/talc (2) : E551 SiO₂ (préoccupation nano EFSA 2018), E553b talc (IARC 2B périnée)
+  - Exhausteurs cocktail (2) : E627, E631 (low/10, surveillance E621)
+  - Édulcorant (1) : E952 cyclamate (blocker enceinte)
+- **Rétrogradation E954 saccharine** : high/40 → moderate/25, isBlocker=false (IARC reclassée groupe 3 en 1999, preuves humaines insuffisantes ; DJA EFSA 5 mg/kg pc/j conservée)
+- **Tests** : `src/lib/scoring/__tests__/additives-db-enriched.test.ts` → 40 tests, dont 1 garde global "aucune source ne cite Gouget"
+- **Total tests projet** : 288 → **328 verts** (aucune régression)
+- **Règle source** : tout ajout futur d'additif doit citer ≥ 1 URL publique EFSA / ANSES / IARC / eur-lex / DOI revue à comité de lecture. Jamais d'auteur militant, jamais de blog, jamais de TikTok
+
 ## Features Stores / Compatibilité / Confiance
 - **Listes par enseigne** : écran `app/store/[slug].tsx`, section "Enseignes" sur l'explore (2 colonnes), cache local 5min, fallback liste vide silencieux
 - **Mode "Ce que je peux manger"** : toggle 100g/Compatibles sur category + store screens (style `NutrientBreakdown`), banner sur fiche produit, compteur "X / Y compatibles"
