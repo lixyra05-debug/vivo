@@ -17,25 +17,16 @@ import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { CategoryRankCard, type Medal } from '@/src/components/explore/CategoryRankCard';
-import {
-  CompatibilityToggle,
-  type CompatibilityMode,
-} from '@/src/components/explore/CompatibilityToggle';
+import { CompatibilityToggle, type CompatibilityMode } from '@/src/components/explore/CompatibilityToggle';
 import { Colors } from '@/src/constants/colors';
-import { getCategoryBySlug } from '@/src/lib/api/categories';
-import { searchByCategory } from '@/src/lib/api/search';
+import { fetchStoreTopProducts, getStoreBySlug } from '@/src/lib/api/stores';
 import { getOrFetchProduct, productToScoringInput } from '@/src/lib/api/openfoodfacts';
-import { getOrFetchCosmetic, cosmeticToScoringInput } from '@/src/lib/api/openbeautyfacts';
-import { getProductConfidence, getCosmeticConfidence } from '@/src/lib/api/confidence';
+import { getProductConfidence } from '@/src/lib/api/confidence';
 import { calculateScore } from '@/src/lib/scoring/engine';
-import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
 import { isProductCompatible } from '@/src/lib/scoring/profile-filters';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import type {
-  CategoryDef,
-  CosmeticProduct,
-  CosmeticScoringResult,
   Product,
   ProductConfidence,
   ScoringResult,
@@ -48,13 +39,13 @@ const TEN_MIN_MS = 10 * 60 * 1000;
 
 interface RankedItem {
   result: SearchResult;
+  product: Product;
+  scoring: ScoringResult;
   score: number;
   confidence: ProductConfidence;
-  product: Product | CosmeticProduct;
-  scoring: ScoringResult | CosmeticScoringResult;
 }
 
-async function computeFoodScore(
+async function computeRankedItem(
   result: SearchResult,
   userProfile: UserProfile,
 ): Promise<RankedItem | null> {
@@ -64,27 +55,10 @@ async function computeFoodScore(
     const scoring = calculateScore(productToScoringInput(product), userProfile);
     return {
       result,
+      product,
+      scoring,
       score: scoring.score_final,
       confidence: getProductConfidence(product),
-      product,
-      scoring,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function computeCosmeticScore(result: SearchResult): Promise<RankedItem | null> {
-  try {
-    const product = await getOrFetchCosmetic(result.barcode);
-    if (!product) return null;
-    const scoring = calculateCosmeticScore(cosmeticToScoringInput(product), 'standard');
-    return {
-      result,
-      score: scoring.score_final,
-      confidence: getCosmeticConfidence(product),
-      product,
-      scoring,
     };
   } catch {
     return null;
@@ -92,15 +66,10 @@ async function computeCosmeticScore(result: SearchResult): Promise<RankedItem | 
 }
 
 async function rankResults(
-  category: CategoryDef,
   results: SearchResult[],
   userProfile: UserProfile,
 ): Promise<RankedItem[]> {
-  const tasks = results.map((r) =>
-    category.type === 'food'
-      ? computeFoodScore(r, userProfile)
-      : computeCosmeticScore(r),
-  );
+  const tasks = results.map((r) => computeRankedItem(r, userProfile));
   const settled = await Promise.all(tasks);
   const ranked = settled.filter((x): x is RankedItem => x !== null);
   ranked.sort((a, b) => b.score - a.score);
@@ -114,11 +83,13 @@ function medalForIndex(idx: number): Medal | undefined {
   return undefined;
 }
 
-export default function CategoryScreen() {
+export default function StoreScreen() {
   const router = useRouter();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const profile = useProfileStore((s) => s.profile);
-  const category = getCategoryBySlug(slug ?? '');
+  const store = getStoreBySlug(slug ?? '');
+
+  const [page, setPage] = useState<number>(1);
   const [mode, setMode] = useState<CompatibilityMode>('all');
 
   const userProfile: UserProfile = useMemo(
@@ -136,20 +107,37 @@ export default function CategoryScreen() {
   );
 
   const listQuery = useQuery({
-    queryKey: ['category', slug] as const,
+    queryKey: ['store', slug, page] as const,
     queryFn: () =>
-      category ? searchByCategory(category.slug, category.type) : Promise.resolve([]),
-    enabled: Boolean(category),
+      store ? fetchStoreTopProducts(store.slug, page) : Promise.resolve([]),
+    enabled: Boolean(store),
     staleTime: FIVE_MIN_MS,
   });
 
   const rankedQuery = useQuery({
-    queryKey: ['ranked', slug, userProfile.type] as const,
+    queryKey: ['store-ranked', slug, page, userProfile.type] as const,
     queryFn: () =>
-      category ? rankResults(category, listQuery.data ?? [], userProfile) : Promise.resolve([]),
-    enabled: Boolean(category) && Array.isArray(listQuery.data) && listQuery.data.length > 0,
+      store ? rankResults(listQuery.data ?? [], userProfile) : Promise.resolve([]),
+    enabled:
+      Boolean(store) && Array.isArray(listQuery.data) && listQuery.data.length > 0,
     staleTime: TEN_MIN_MS,
   });
+
+  const rankedData: RankedItem[] = rankedQuery.data ?? [];
+
+  const compatibleCount = useMemo(() => {
+    if (!compatProfile) return 0;
+    return rankedData.filter((r) =>
+      isProductCompatible(r.product, r.scoring, compatProfile),
+    ).length;
+  }, [rankedData, compatProfile]);
+
+  const visibleData: RankedItem[] = useMemo(() => {
+    if (mode === 'all' || !compatProfile) return rankedData;
+    return rankedData.filter((r) =>
+      isProductCompatible(r.product, r.scoring, compatProfile),
+    );
+  }, [rankedData, mode, compatProfile]);
 
   function handleBack() {
     if (Platform.OS !== 'web') {
@@ -166,11 +154,17 @@ export default function CategoryScreen() {
   }
 
   function handleItemPress(item: RankedItem) {
-    if (!category) return;
-    router.push(`/product/${item.result.barcode}?type=${category.type}`);
+    router.push(`/product/${item.result.barcode}?type=food`);
   }
 
-  if (!category) {
+  function handleLoadMore() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    setPage((p) => p + 1);
+  }
+
+  if (!store) {
     return (
       <ScreenContainer>
         <View style={{ gap: 18, flex: 1 }}>
@@ -192,7 +186,7 @@ export default function CategoryScreen() {
                 textAlign: 'center',
               }}
             >
-              Catégorie introuvable
+              Enseigne introuvable
             </Text>
             <Text
               style={{
@@ -202,7 +196,7 @@ export default function CategoryScreen() {
                 textAlign: 'center',
               }}
             >
-              Cette catégorie n'existe pas ou n'est plus disponible.
+              Cette enseigne n'existe pas ou n'est plus disponible.
             </Text>
           </View>
         </View>
@@ -212,17 +206,6 @@ export default function CategoryScreen() {
 
   const isLoading = listQuery.isLoading || rankedQuery.isLoading || rankedQuery.isFetching;
   const isRefreshing = listQuery.isRefetching || rankedQuery.isRefetching;
-  const rankedData: RankedItem[] = rankedQuery.data ?? [];
-
-  const compatibleCount = compatProfile
-    ? rankedData.filter((r) => isProductCompatible(r.product, r.scoring, compatProfile)).length
-    : 0;
-
-  const visibleData: RankedItem[] =
-    mode === 'profile' && compatProfile
-      ? rankedData.filter((r) => isProductCompatible(r.product, r.scoring, compatProfile))
-      : rankedData;
-
   const hasItems = visibleData.length > 0;
 
   const podium = visibleData.slice(0, 3);
@@ -246,11 +229,11 @@ export default function CategoryScreen() {
         <FadeIn delay={80}>
           <View style={styles.header}>
             <Text style={styles.emoji} allowFontScaling={false}>
-              {category.emoji}
+              {store.emoji}
             </Text>
             <View style={{ gap: 2, flex: 1 }}>
-              <Text style={styles.title}>{category.name}</Text>
-              <Text style={styles.subtitle}>Top des meilleurs produits</Text>
+              <Text style={styles.title}>{store.nameFr}</Text>
+              <Text style={styles.subtitle}>Les meilleurs produits</Text>
             </View>
           </View>
         </FadeIn>
@@ -265,7 +248,7 @@ export default function CategoryScreen() {
           />
         </FadeIn>
 
-        {isLoading && !hasItems ? (
+        {isLoading && rankedData.length === 0 ? (
           <View style={{ gap: 10 }}>
             {[0, 1, 2, 3, 4].map((i) => (
               <Skeleton key={i} height={88} radius={20} />
@@ -276,7 +259,9 @@ export default function CategoryScreen() {
           <GlassCard style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Aucun produit trouvé</Text>
             <Text style={styles.emptyText}>
-              Aucun produit n'a pu être analysé dans cette catégorie pour le moment.
+              {mode === 'profile'
+                ? 'Aucun produit compatible avec votre profil dans cette enseigne.'
+                : 'Aucun produit n\'a pu être analysé dans cette enseigne pour le moment.'}
             </Text>
           </GlassCard>
         ) : (
@@ -292,6 +277,18 @@ export default function CategoryScreen() {
                 tintColor={Colors.sage}
                 colors={[Colors.sage]}
               />
+            }
+            ListFooterComponent={
+              visibleData.length > 0 ? (
+                <Pressable
+                  onPress={handleLoadMore}
+                  accessibilityRole="button"
+                  accessibilityLabel="Charger plus de produits"
+                  style={styles.loadMore}
+                >
+                  <Text style={styles.loadMoreText}>Voir plus</Text>
+                </Pressable>
+              ) : null
             }
             renderItem={({ item, index }) => {
               const medal = medalForIndex(index);
@@ -373,5 +370,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textMuted,
     textAlign: 'center',
+  },
+  loadMore: {
+    alignSelf: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: '#F3F3EC',
+    marginTop: 12,
+  },
+  loadMoreText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: Colors.text,
   },
 });

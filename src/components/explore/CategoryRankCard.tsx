@@ -4,8 +4,9 @@ import { Leaf } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { MiniScoreCircle } from '@/src/components/product/MiniScoreCircle';
+import { ConfidenceBadge } from '@/src/components/product/ConfidenceBadge';
 import { Colors } from '@/src/constants/colors';
-import type { SearchResult } from '@/src/lib/api/types';
+import type { ProductConfidence, SearchResult } from '@/src/lib/api/types';
 
 export type Medal = 'gold' | 'silver' | 'bronze';
 
@@ -14,6 +15,7 @@ interface CategoryRankCardProps {
   score: number;
   rank: number;
   medal?: Medal;
+  confidence?: ProductConfidence;
   onPress: () => void;
 }
 
@@ -28,6 +30,7 @@ export function CategoryRankCard({
   score,
   rank,
   medal,
+  confidence,
   onPress,
 }: CategoryRankCardProps) {
   const displayName = result.name && result.name.trim().length > 0 ? result.name : 'Produit';
@@ -81,6 +84,11 @@ export function CategoryRankCard({
             <Text style={styles.brand} numberOfLines={1}>
               {result.brand}
             </Text>
+          ) : null}
+          {confidence ? (
+            <View style={styles.confidenceRow}>
+              <ConfidenceBadge confidence={confidence} size="small" />
+            </View>
           ) : null}
         </View>
 
@@ -154,5 +162,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 12,
     color: Colors.textMuted,
+  },
+  confidenceRow: {
+    marginTop: 4,
+    flexDirection: 'row',
   },
 });

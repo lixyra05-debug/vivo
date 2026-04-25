@@ -10,10 +10,12 @@ import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { SearchResultCard } from '@/src/components/explore/SearchResultCard';
 import { CategoryCard } from '@/src/components/explore/CategoryCard';
+import { StoreCard } from '@/src/components/explore/StoreCard';
 import { Colors } from '@/src/constants/colors';
 import { CATEGORIES } from '@/src/lib/api/categories';
 import { searchProducts } from '@/src/lib/api/search';
-import type { SearchResult } from '@/src/lib/api/types';
+import { getAllStores } from '@/src/lib/api/stores';
+import type { SearchResult, StoreDef } from '@/src/lib/api/types';
 
 type FilterType = 'all' | 'food' | 'cosmetic';
 
@@ -67,6 +69,10 @@ export default function ExploreScreen() {
 
   function handleCategoryPress(slug: string) {
     router.push(`/category/${slug}`);
+  }
+
+  function handleStorePress(slug: string) {
+    router.push(`/store/${slug}`);
   }
 
   return (
@@ -141,10 +147,13 @@ export default function ExploreScreen() {
             onPress={handleResultPress}
           />
         ) : (
-          <CategoriesSection
-            categories={filteredCategories}
-            onPress={handleCategoryPress}
-          />
+          <>
+            <CategoriesSection
+              categories={filteredCategories}
+              onPress={handleCategoryPress}
+            />
+            <StoresSection stores={getAllStores()} onPress={handleStorePress} />
+          </>
         )}
       </View>
     </ScreenContainer>
@@ -215,6 +224,31 @@ function CategoriesSection({ categories, onPress }: CategoriesSectionProps) {
   );
 }
 
+interface StoresSectionProps {
+  stores: StoreDef[];
+  onPress: (slug: string) => void;
+}
+
+function StoresSection({ stores, onPress }: StoresSectionProps) {
+  return (
+    <View style={{ gap: 12 }}>
+      <FadeIn delay={200}>
+        <View style={{ gap: 2 }}>
+          <Text style={styles.sectionTitle}>Enseignes</Text>
+          <Text style={styles.sectionSubtitle}>Top produits par magasin</Text>
+        </View>
+      </FadeIn>
+      <View style={styles.grid}>
+        {stores.map((store, index) => (
+          <FadeIn key={store.slug} delay={Math.min(240 + index * 40, 720)} style={styles.gridCell}>
+            <StoreCard store={store} onPress={() => onPress(store.slug)} />
+          </FadeIn>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row',
@@ -256,10 +290,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   sectionTitle: {
-    fontFamily: 'BricolageGrotesque-Bold',
+    fontFamily: 'BricolageGrotesque-SemiBold',
     fontSize: 18,
     color: Colors.text,
     letterSpacing: -0.3,
+  },
+  sectionSubtitle: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   grid: {
     flexDirection: 'row',

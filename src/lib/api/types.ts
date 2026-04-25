@@ -164,3 +164,74 @@ export interface CosmeticScoringInput {
   ingredients_list: string[];
   category: string | null;
 }
+
+// === Stores (Feature A) ===
+export interface StoreDef {
+  slug: string;
+  nameFr: string;
+  emoji: string;
+  country: 'FR';
+  offStoreTag: string; // value used in OFF stores_tags param
+  displayOrder: number;
+}
+
+// === Confidence (Feature C) ===
+export type ConfidenceLevel = 'verified' | 'community' | 'unverified';
+
+export interface ProductConfidence {
+  level: ConfidenceLevel;
+  labelFr: string;
+  color: string; // hex string from Colors.* or sage/earth/orange
+  reasons: string[]; // FR explanations
+}
+
+// === Reports (Feature C) ===
+export type ReportType =
+  | 'wrong_name'
+  | 'wrong_photo'
+  | 'wrong_ingredients'
+  | 'wrong_nutrition'
+  | 'other';
+
+export type ReportStatus = 'pending' | 'reviewed' | 'resolved' | 'rejected';
+
+export interface ProductReport {
+  id: string;
+  barcode: string;
+  user_id: string;
+  report_type: ReportType;
+  description: string | null;
+  photo_url: string | null;
+  status: ReportStatus;
+  created_at: string;
+}
+
+// === Compatibility (Feature B) ===
+export interface CompatibilityProfile {
+  allergies: string[];
+  // ['gluten','lactose','arachides','fruits_a_coque','soja','oeufs','poisson',
+  // 'crustaces','celeri','moutarde','sesame','sulfites','lupin','mollusques']
+  dietary: string[];
+  // ['vegan','vegetarien','halal','casher','sans_porc']
+  conditions: string[];
+  // ['diabete','enceinte','bebe','coeliaque','ibs_fodmap','hypertension','cholesterol']
+  avoid: string[];
+  // ['seed_oils','additifs_controverses','colorants','edulcorants','huile_palme']
+  minScore: number;
+  // default 50
+}
+
+export type IncompatibilitySeverity = 'blocker' | 'warning';
+
+export interface IncompatibilityReason {
+  type: 'allergy' | 'dietary' | 'condition' | 'avoid' | 'score';
+  labelFr: string;
+  severity: IncompatibilitySeverity;
+}
+
+export interface CompatibilityResult {
+  isCompatible: boolean;
+  score: number; // pass-through from scoring result
+  incompatibilities: IncompatibilityReason[];
+  compatibilityPercentage: number; // 0-100, % of criteria passed
+}

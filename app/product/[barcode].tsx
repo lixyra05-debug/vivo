@@ -28,14 +28,23 @@ import { ScoreBreakdownChart } from '@/src/components/product/ScoreBreakdownChar
 import { NutrientBreakdown } from '@/src/components/product/NutrientBreakdown';
 import { IngredientRiskMap } from '@/src/components/product/IngredientRiskMap';
 import { CosmeticResultView } from '@/src/components/product/CosmeticResultView';
+import { ConfidenceBadge } from '@/src/components/product/ConfidenceBadge';
+import { CompatibilityBanner } from '@/src/components/product/CompatibilityBanner';
+import { ReportButton } from '@/src/components/product/ReportButton';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { productToScoringInput } from '@/src/lib/api/openfoodfacts';
 import {
   cosmeticToScoringInput,
   getOrFetchCosmetic,
 } from '@/src/lib/api/openbeautyfacts';
+import {
+  getProductConfidence,
+  getCosmeticConfidence,
+} from '@/src/lib/api/confidence';
 import { calculateScore, findAdditive } from '@/src/lib/scoring/engine';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
+import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
+import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
 import { supabase } from '@/src/lib/api/supabase';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
@@ -227,6 +236,11 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const hasPenalties = additivePenalties.length > 0 || otherPenalties.length > 0;
   const scoreHex = scoreColor(result.score_final);
   const verdict = getScoreVerdict(result.score_final);
+  const confidence = getProductConfidence(product);
+  const compatProfile = userProfileToCompatibilityProfile(profile);
+  const compatibilityResult = compatProfile
+    ? checkCompatibility(product, result, compatProfile)
+    : null;
 
   return (
     <ScreenContainer scroll>
@@ -283,6 +297,18 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
             category={null}
           />
         </FadeIn>
+
+        <FadeIn delay={100}>
+          <View style={{ alignItems: 'center' }}>
+            <ConfidenceBadge confidence={confidence} size="small" />
+          </View>
+        </FadeIn>
+
+        {compatibilityResult ? (
+          <FadeIn delay={120}>
+            <CompatibilityBanner result={compatibilityResult} />
+          </FadeIn>
+        ) : null}
 
         <FadeIn delay={140}>
           <View style={{ alignItems: 'center', gap: 12 }}>
@@ -527,6 +553,10 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
           />
         </FadeIn>
 
+        <FadeIn delay={940}>
+          <ReportButton barcode={product.barcode} />
+        </FadeIn>
+
         <View style={{ height: 24 }} />
       </View>
     </ScreenContainer>
@@ -577,6 +607,7 @@ interface CosmeticProductScreenProps {
 
 function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
   const router = useRouter();
+  const profile = useProfileStore((s) => s.profile);
 
   const cosmeticQuery = useQuery({
     queryKey: ['cosmetic', barcode] as const,
@@ -592,6 +623,18 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
       cosmeticToScoringInput(cosmeticQuery.data),
       'standard',
     );
+  }, [cosmeticQuery.data]);
+
+  const compatibilityResult = useMemo(() => {
+    if (!cosmeticQuery.data || !result) return null;
+    const compat = userProfileToCompatibilityProfile(profile);
+    if (!compat) return null;
+    return checkCompatibility(cosmeticQuery.data, result, compat);
+  }, [cosmeticQuery.data, result, profile]);
+
+  const confidence = useMemo(() => {
+    if (!cosmeticQuery.data) return null;
+    return getCosmeticConfidence(cosmeticQuery.data);
   }, [cosmeticQuery.data]);
 
   if (cosmeticQuery.isLoading) {
@@ -660,6 +703,22 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
           result={result}
           profile="standard"
         />
+        {confidence ? (
+          <FadeIn delay={120}>
+            <View style={{ alignItems: 'center' }}>
+              <ConfidenceBadge confidence={confidence} size="small" />
+            </View>
+          </FadeIn>
+        ) : null}
+        {compatibilityResult ? (
+          <FadeIn delay={160}>
+            <CompatibilityBanner result={compatibilityResult} />
+          </FadeIn>
+        ) : null}
+        <FadeIn delay={200}>
+          <ReportButton barcode={cosmeticQuery.data.barcode} />
+        </FadeIn>
+        <View style={{ height: 24 }} />
       </View>
     </ScreenContainer>
   );
