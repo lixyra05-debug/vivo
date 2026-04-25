@@ -1,17 +1,20 @@
-import { Platform, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScanLine } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
+import { FadeIn } from '@/src/components/ui/FadeIn';
 import { Greeting } from '@/src/components/home/Greeting';
 import { OrganicBlob } from '@/src/components/home/OrganicBlob';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { StatsRow } from '@/src/components/home/StatsRow';
 import { StreakCounter } from '@/src/components/gamification/StreakCounter';
 import { WeeklyProgressBar } from '@/src/components/gamification/WeeklyProgressBar';
+import { Colors } from '@/src/constants/colors';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useScanHistory } from '@/src/lib/stores/useProductStore';
 import { calculateStreak } from '@/src/lib/gamification/streak-engine';
 import { calculateProfileStats } from '@/src/lib/stats/profile-stats-engine';
+import { getTimeBasedTagline } from '@/src/lib/home/tagline';
 import type { ScanRecord } from '@/src/lib/gamification/types';
 
 const BLOB_SIZE = 320;
@@ -35,6 +38,7 @@ export default function HomeScreen() {
   const streak = scans.length > 0 ? calculateStreak(scans).currentStreak : 0;
   const stats = scans.length > 0 ? calculateProfileStats(scans) : null;
   const last7 = stats ? stats.scansByDay.slice(-7) : [];
+  const tagline = getTimeBasedTagline();
 
   return (
     <ScreenContainer scroll>
@@ -49,6 +53,24 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </View>
+
+        <FadeIn delay={100}>
+          <Text
+            accessibilityRole="text"
+            style={{
+              fontFamily: 'Inter',
+              fontSize: 14,
+              color: Colors.textMuted,
+              textAlign: 'center',
+              marginBottom: 8,
+              marginTop: -16,
+              paddingHorizontal: 12,
+              lineHeight: 20,
+            }}
+          >
+            {tagline}
+          </Text>
+        </FadeIn>
 
         <View
           className="items-center justify-center"

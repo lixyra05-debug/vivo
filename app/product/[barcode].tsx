@@ -18,6 +18,7 @@ import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { useToast } from '@/src/components/common/ToastProvider';
 import { ScoreCircle } from '@/src/components/product/ScoreCircle';
 import { NovaBadge } from '@/src/components/product/NovaBadge';
+import { UltraTransformedTag } from '@/src/components/product/UltraTransformedTag';
 import { SeedOilAlert } from '@/src/components/product/SeedOilAlert';
 import { IngredientsList } from '@/src/components/product/IngredientsList';
 import { PenaltyCard } from '@/src/components/product/PenaltyCard';
@@ -31,6 +32,7 @@ import { CosmeticResultView } from '@/src/components/product/CosmeticResultView'
 import { ConfidenceBadge } from '@/src/components/product/ConfidenceBadge';
 import { CompatibilityBanner } from '@/src/components/product/CompatibilityBanner';
 import { ReportButton } from '@/src/components/product/ReportButton';
+import { SourceLink } from '@/src/components/product/SourceLink';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
 import { BadgeUnlockedModal } from '@/src/components/gamification/BadgeUnlockedModal';
 import { Colors, scoreColor } from '@/src/constants/colors';
@@ -408,7 +410,22 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
               {verdict.description}
             </Text>
             {result.nova_group ? (
-              <NovaBadge group={result.nova_group as 1 | 2 | 3 | 4} />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  justifyContent: 'center',
+                }}
+              >
+                <NovaBadge group={result.nova_group as 1 | 2 | 3 | 4} />
+                {result.nova_group === 4 ? (
+                  <FadeIn delay={300}>
+                    <UltraTransformedTag novaGroup={result.nova_group} />
+                  </FadeIn>
+                ) : null}
+              </View>
             ) : null}
             <Pressable
               onPress={() => router.push('/methodology')}
@@ -427,18 +444,33 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
           <ScoreComparison score={result.score_final} delay={0} />
         </FadeIn>
 
-        {result.blockers.length > 0 ? (
+        {result.blockers.length > 0 ||
+        (result.nova_group === 4 && additivePenalties.length > 0) ? (
           <FadeIn delay={280}>
             <GlassCard tone="danger" style={{ padding: 16, gap: 6 }}>
-              <Text
-                style={{
-                  fontFamily: 'BricolageGrotesque-SemiBold',
-                  fontSize: 15,
-                  color: Colors.score.red,
-                }}
-              >
-                Bloquants détectés
-              </Text>
+              {result.blockers.length > 0 ? (
+                <Text
+                  style={{
+                    fontFamily: 'BricolageGrotesque-SemiBold',
+                    fontSize: 15,
+                    color: Colors.score.red,
+                  }}
+                >
+                  Bloquants détectés
+                </Text>
+              ) : null}
+              {result.nova_group === 4 && additivePenalties.length > 0 ? (
+                <Text
+                  style={{
+                    fontFamily: 'Inter-SemiBold',
+                    fontSize: 13,
+                    color: Colors.score.red,
+                  }}
+                >
+                  Ultra-transformé + {additivePenalties.length} additif
+                  {additivePenalties.length > 1 ? 's' : ''} à risque
+                </Text>
+              ) : null}
               {result.blockers.map((b) => (
                 <Text
                   key={b}
@@ -640,6 +672,14 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
 
         <FadeIn delay={940}>
           <ReportButton barcode={product.barcode} />
+        </FadeIn>
+
+        <FadeIn delay={980}>
+          <SourceLink
+            barcode={product.barcode}
+            source="off"
+            lastUpdated={product.off_last_updated ?? product.updated_at}
+          />
         </FadeIn>
 
         <View style={{ height: 24 }} />
@@ -846,6 +886,15 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
         ))}
         <FadeIn delay={200 + educationalCards.length * 120}>
           <ReportButton barcode={cosmeticQuery.data.barcode} />
+        </FadeIn>
+        <FadeIn delay={240 + educationalCards.length * 120}>
+          <SourceLink
+            barcode={cosmeticQuery.data.barcode}
+            source="obf"
+            lastUpdated={
+              cosmeticQuery.data.obf_last_updated ?? cosmeticQuery.data.updated_at
+            }
+          />
         </FadeIn>
         <View style={{ height: 24 }} />
       </View>

@@ -21,6 +21,9 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Flame,
+  Layers,
+  Leaf,
   Scale,
   ShieldCheck,
   Sparkles,
@@ -217,6 +220,70 @@ export default function MethodologyScreen() {
           </GlassCard>
         </FadeIn>
 
+        <FadeIn delay={300}>
+          <GlassCard style={styles.sectionCard}>
+            <Text style={styles.cardTitle}>
+              Pourquoi Vivo ne se contente pas du Nutri-Score
+            </Text>
+            <Text style={styles.body}>
+              Le Nutri-Score regarde uniquement les nutriments (énergie, sucres, sel, gras saturés,
+              fibres, protéines). Il ignore le degré de transformation et les additifs. Vivo
+              combine ces trois dimensions sans compensation possible.
+            </Text>
+
+            <View style={styles.axisGrid}>
+              <View style={styles.axisCard}>
+                <View style={[styles.axisIconWrap, { backgroundColor: 'rgba(76,175,80,0.12)' }]}>
+                  <Leaf color={Colors.score.green} size={16} strokeWidth={2.4} />
+                </View>
+                <Text style={styles.axisTitle}>Nutrition</Text>
+                <Text style={styles.axisBody}>
+                  Sucres, sel, gras saturés, fibres, protéines. Comme le Nutri-Score, mais
+                  pondéré différemment selon le profil.
+                </Text>
+              </View>
+
+              <View style={styles.axisCard}>
+                <View style={[styles.axisIconWrap, { backgroundColor: 'rgba(196,168,130,0.18)' }]}>
+                  <Layers color={Colors.earth} size={16} strokeWidth={2.4} />
+                </View>
+                <Text style={styles.axisTitle}>Transformation</Text>
+                <Text style={styles.axisBody}>
+                  Classification NOVA 1 à 4. Un produit ultra-transformé (NOVA 4) écope d'une
+                  pénalité dédiée — quoi qu'en dise la grille nutritionnelle.
+                </Text>
+              </View>
+
+              <View style={styles.axisCard}>
+                <View style={[styles.axisIconWrap, { backgroundColor: 'rgba(244,67,54,0.10)' }]}>
+                  <Flame color={Colors.score.red} size={16} strokeWidth={2.4} />
+                </View>
+                <Text style={styles.axisTitle}>Additifs</Text>
+                <Text style={styles.axisBody}>
+                  700+ additifs notés par toxicité. Émulsifiants intestinaux, nitrites, dioxyde de
+                  titane : chacun ajoute sa pénalité, sans compensation.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.exampleBox}>
+              <Text style={styles.exampleTitle}>Exemple concret</Text>
+              <Text style={styles.exampleBody}>
+                Une pizza végétarienne surgelée peut afficher un{' '}
+                <Text style={styles.exampleStrong}>Nutri-Score A</Text> (riche en fibres, peu de
+                gras saturés) tout en étant{' '}
+                <Text style={styles.exampleStrong}>NOVA 4 avec 8 additifs</Text>. Vivo lui attribue
+                un score de <Text style={styles.exampleStrong}>42/100</Text> — la transformation et
+                les additifs ne se compensent pas avec quelques fibres.
+              </Text>
+            </View>
+
+            <Text style={styles.exampleSource}>
+              Sources : Monteiro et al., 2019 (NOVA) — EFSA, 2023 (additifs alimentaires).
+            </Text>
+          </GlassCard>
+        </FadeIn>
+
         <FadeIn delay={340}>
           <View style={{ gap: 10 }}>
             <Text style={styles.sectionLabel}>Questions fréquentes</Text>
@@ -396,6 +463,73 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  axisGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
+  },
+  axisCard: {
+    flexBasis: '31%',
+    flexGrow: 1,
+    minWidth: 96,
+    backgroundColor: '#FBFBF4',
+    borderColor: '#EFEFE2',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    gap: 6,
+  },
+  axisIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  axisTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 13,
+    color: Colors.text,
+  },
+  axisBody: {
+    fontFamily: 'Inter',
+    fontSize: 11.5,
+    color: Colors.textMuted,
+    lineHeight: 16,
+  },
+  exampleBox: {
+    backgroundColor: 'rgba(139,173,139,0.08)',
+    borderColor: 'rgba(139,173,139,0.25)',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 4,
+    marginTop: 4,
+  },
+  exampleTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 11,
+    color: Colors.sage,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  exampleBody: {
+    fontFamily: 'Inter',
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 19,
+  },
+  exampleStrong: {
+    fontFamily: 'Inter-SemiBold',
+    color: Colors.text,
+  },
+  exampleSource: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   sourceRow: {
     flexDirection: 'row',

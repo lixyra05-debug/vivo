@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Lock, Search, X } from 'lucide-react-native';
+import { Lock, Search, TrendingDown, TrendingUp, X } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
@@ -11,6 +11,8 @@ import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { ScanHistoryCard } from '@/src/components/product/ScanHistoryCard';
 import { EmptyBasket } from '@/src/components/illustrations/EmptyBasket';
 import { Colors } from '@/src/constants/colors';
+import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
+import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import {
@@ -19,9 +21,18 @@ import {
   useToggleFavorite,
   type ScanHistoryRow,
 } from '@/src/lib/stores/useProductStore';
+import type { PenaltyDetail, ScoringResult } from '@/src/lib/api/types';
 import { ScanLine } from 'lucide-react-native';
 
 const FREE_LIMIT = 30;
+
+type FilterKey = 'all' | 'avoid' | 'excellent' | 'incompatible';
+
+interface ChipDef {
+  key: FilterKey;
+  label: string;
+  count: number;
+}
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -29,6 +40,7 @@ export default function HistoryScreen() {
   const profile = useProfileStore((s) => s.profile);
   const isPremium = profile?.subscription_tier === 'premium';
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<FilterKey>('all');
 
   const query = useScanHistory({
     userId: user?.id,
@@ -36,22 +48,94 @@ export default function HistoryScreen() {
   });
   const toggleFavorite = useToggleFavorite(user?.id);
 
-  const { rows, filtered, reachedLimit } = useMemo(() => {
+  const compatProfile = useMemo(
+    () => userProfileToCompatibilityProfile(profile),
+    [profile],
+  );
+
+  const incompatibleBarcodes = useMemo(() => {
+    if (!compatProfile) return new Set<string>();
+    const set = new Set<string>();
+    for (const row of query.data ?? []) {
+      if (!row.product) continue;
+      const fakeResult: ScoringResult = {
+        score_final: row.score_at_scan,
+        score_color:
+          row.score_at_scan >= 70
+            ? 'green'
+            : row.score_at_scan >= 50
+              ? 'yellow'
+              : row.score_at_scan >= 25
+                ? 'orange'
+                : 'red',
+        nova_group: row.product.nova_group ?? 0,
+        penalties: Array.isArray(row.penalties_snapshot)
+          ? (row.penalties_snapshot as PenaltyDetail[])
+          : [],
+        blockers: [],
+        seed_oils_detected: [],
+        clean_labeling_alerts: [],
+        profile_adjustments: [],
+      };
+      const compat = checkCompatibility(row.product, fakeResult, compatProfile);
+      if (!compat.isCompatible) set.add(row.barcode);
+    }
+    return set;
+  }, [query.data, compatProfile]);
+
+  const { rows, filtered, reachedLimit, counts, insight } = useMemo(() => {
     const allRows = dedupeByBarcode(query.data ?? []);
     const q = search.trim().toLowerCase();
-    const filteredRows = q
+    const searched = q
       ? allRows.filter((r) => {
           const name = r.product?.name?.toLowerCase() ?? '';
           const brand = r.product?.brand?.toLowerCase() ?? '';
           return name.includes(q) || brand.includes(q);
         })
       : allRows;
+
+    const counters = {
+      all: searched.length,
+      avoid: searched.filter((r) => r.score_at_scan < 30).length,
+      excellent: searched.filter((r) => r.score_at_scan > 80).length,
+      incompatible: searched.filter((r) => incompatibleBarcodes.has(r.barcode)).length,
+    };
+
+    const filteredRows = searched.filter((r) => {
+      if (filter === 'all') return true;
+      if (filter === 'avoid') return r.score_at_scan < 30;
+      if (filter === 'excellent') return r.score_at_scan > 80;
+      if (filter === 'incompatible') return incompatibleBarcodes.has(r.barcode);
+      return true;
+    });
+
+    const total = searched.length;
+    const insightData =
+      total > 0
+        ? {
+            total,
+            excellentPct: Math.round((counters.excellent / total) * 100),
+            avoidPct: Math.round((counters.avoid / total) * 100),
+          }
+        : null;
+
     return {
       rows: allRows,
       filtered: filteredRows,
       reachedLimit: !isPremium && allRows.length >= FREE_LIMIT,
+      counts: counters,
+      insight: insightData,
     };
-  }, [query.data, search, isPremium]);
+  }, [query.data, search, filter, isPremium, incompatibleBarcodes]);
+
+  const chips: ChipDef[] = [
+    { key: 'all', label: 'Tous', count: counts.all },
+    { key: 'avoid', label: 'À éviter', count: counts.avoid },
+    { key: 'excellent', label: 'Excellents', count: counts.excellent },
+    ...(compatProfile
+      ? ([{ key: 'incompatible', label: 'Incompatibles', count: counts.incompatible }] as const)
+      : []),
+  ];
 
   function renderItem({ item, index }: { item: ScanHistoryRow; index: number }) {
     return (
@@ -130,6 +214,85 @@ export default function HistoryScreen() {
           </GlassCard>
         </FadeIn>
 
+        {rows.length > 0 ? (
+          <FadeIn delay={140}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+              accessibilityRole="tablist"
+              accessibilityLabel="Filtres rapides"
+            >
+              {chips.map((chip) => {
+                const active = filter === chip.key;
+                return (
+                  <Pressable
+                    key={chip.key}
+                    onPress={() => setFilter(chip.key)}
+                    accessibilityRole="tab"
+                    accessibilityLabel={`${chip.label} (${chip.count})`}
+                    accessibilityState={{ selected: active }}
+                    hitSlop={6}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      backgroundColor: active ? Colors.sage : '#F3F3EC',
+                      borderColor: active ? Colors.sage : '#D6DECC',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: 'Inter-SemiBold',
+                        fontSize: 12,
+                        color: active ? '#FFFFFF' : Colors.textMuted,
+                      }}
+                    >
+                      {chip.label}
+                      {chip.count > 0 ? ` (${chip.count})` : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </FadeIn>
+        ) : null}
+
+        {insight ? (
+          <FadeIn delay={180}>
+            <GlassCard
+              style={{
+                padding: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              {insight.excellentPct >= insight.avoidPct ? (
+                <TrendingUp color={Colors.score.green} size={16} strokeWidth={2.4} />
+              ) : (
+                <TrendingDown color={Colors.score.orange} size={16} strokeWidth={2.4} />
+              )}
+              <Text
+                style={{
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: Colors.textMuted,
+                  flex: 1,
+                  lineHeight: 17,
+                }}
+              >
+                Sur tes {insight.total} derniers scans : {insight.excellentPct}% excellents,{' '}
+                {insight.avoidPct}% à éviter
+              </Text>
+            </GlassCard>
+          </FadeIn>
+        ) : null}
+
         {query.isLoading ? (
           <View style={{ gap: 10, marginTop: 4 }}>
             {[0, 1, 2, 3, 4].map((i) => (
@@ -197,6 +360,28 @@ export default function HistoryScreen() {
               }}
             >
               Aucun produit ne correspond à « {search.trim()} ».
+            </Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={{ marginTop: 24, alignItems: 'center', gap: 6 }}>
+            <Text
+              style={{
+                fontFamily: 'BricolageGrotesque-SemiBold',
+                fontSize: 16,
+                color: Colors.text,
+              }}
+            >
+              Aucun scan dans ce filtre
+            </Text>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Colors.textMuted,
+                textAlign: 'center',
+              }}
+            >
+              Choisis un autre filtre pour voir d'autres scans.
             </Text>
           </View>
         ) : (
