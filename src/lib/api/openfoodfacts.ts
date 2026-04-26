@@ -32,6 +32,30 @@ export async function fetchProductByBarcode(barcode: string): Promise<OFFProduct
   return data.product as OFFProduct;
 }
 
+/**
+ * Récupère le tag de catégorie principal d'un produit (le plus précis disponible).
+ * Utilisé par smart-alternatives pour limiter la recherche à la même catégorie.
+ */
+export async function fetchProductCategoryTag(
+  barcode: string,
+): Promise<string | null> {
+  try {
+    const url = `${OFF_BASE}/product/${barcode}.json?fields=categories_tags`;
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 1) return null;
+    const tags: string[] = Array.isArray(data.product?.categories_tags)
+      ? data.product.categories_tags
+      : [];
+    if (tags.length === 0) return null;
+    // Le dernier tag est généralement le plus spécifique chez OFF.
+    return tags[tags.length - 1];
+  } catch {
+    return null;
+  }
+}
+
 function parsePortionGrams(servingSize?: string): number {
   if (!servingSize) return 100;
   const match = servingSize.match(/(\d+(?:[.,]\d+)?)\s*(g|ml)/i);

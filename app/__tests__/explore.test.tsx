@@ -105,6 +105,16 @@ describe('ExploreScreen', () => {
     expect(await findByText('Coca-Cola')).toBeTruthy();
   });
 
+  it("Trophy button navigue vers /store-ranking au tap", () => {
+    const { getByLabelText } = render(
+      <Wrapper>
+        <ExploreScreen />
+      </Wrapper>,
+    );
+    fireEvent.press(getByLabelText('Voir le classement des supermarchés'));
+    expect(mockPush).toHaveBeenCalledWith('/store-ranking');
+  });
+
   it('filtre les catégories selon le chip actif', () => {
     const { getByLabelText, queryByText } = render(
       <Wrapper>

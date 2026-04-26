@@ -35,8 +35,12 @@ import { ReportButton } from '@/src/components/product/ReportButton';
 import { SourceLink } from '@/src/components/product/SourceLink';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
 import { BadgeUnlockedModal } from '@/src/components/gamification/BadgeUnlockedModal';
+import { AlternativesSection } from '@/src/components/premium/AlternativesSection';
 import { Colors, scoreColor } from '@/src/constants/colors';
-import { productToScoringInput } from '@/src/lib/api/openfoodfacts';
+import {
+  productToScoringInput,
+  fetchProductCategoryTag,
+} from '@/src/lib/api/openfoodfacts';
 import {
   cosmeticToScoringInput,
   getOrFetchCosmetic,
@@ -67,6 +71,7 @@ import {
   useUserReportCount,
 } from '@/src/lib/stores/useBadges';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
+import { usePremium } from '@/src/lib/hooks/usePremium';
 import type { UserProfile } from '@/src/lib/api/types';
 import type { BadgeDef, ScanRecord } from '@/src/lib/gamification/types';
 
@@ -101,6 +106,14 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const reportCountQuery = useUserReportCount(user?.id);
   const userBadgesQuery = useUserBadges(user?.id);
   const grantBadges = useGrantBadges(user?.id);
+  const { isPremium } = usePremium(user?.id ?? null);
+
+  const categoryTagQuery = useQuery({
+    queryKey: ['product-category-tag', barcode] as const,
+    queryFn: () => fetchProductCategoryTag(barcode),
+    enabled: Boolean(barcode),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
 
   const toast = useToast();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -574,6 +587,17 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
             </View>
           </FadeIn>
         ) : null}
+
+        <FadeIn delay={620}>
+          <AlternativesSection
+            scannedBarcode={barcode}
+            categoryTag={categoryTagQuery.data ?? null}
+            currentScore={result.score_final}
+            isPremium={isPremium}
+            onUnlock={() => router.push('/profile')}
+            onPressAlt={(bc) => router.push(`/product/${bc}?type=food`)}
+          />
+        </FadeIn>
 
         {result.seed_oils_detected.length > 0 ? (
           <FadeIn delay={640}>

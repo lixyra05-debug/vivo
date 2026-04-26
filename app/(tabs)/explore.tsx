@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react-native';
+import { Search, Trophy } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -73,6 +73,13 @@ export default function ExploreScreen() {
 
   function handleStorePress(slug: string) {
     router.push(`/store/${slug}`);
+  }
+
+  function handleStoreRankingPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/store-ranking');
   }
 
   return (
@@ -152,7 +159,11 @@ export default function ExploreScreen() {
               categories={filteredCategories}
               onPress={handleCategoryPress}
             />
-            <StoresSection stores={getAllStores()} onPress={handleStorePress} />
+            <StoresSection
+              stores={getAllStores()}
+              onPress={handleStorePress}
+              onRankingPress={handleStoreRankingPress}
+            />
           </>
         )}
       </View>
@@ -227,15 +238,30 @@ function CategoriesSection({ categories, onPress }: CategoriesSectionProps) {
 interface StoresSectionProps {
   stores: StoreDef[];
   onPress: (slug: string) => void;
+  onRankingPress: () => void;
 }
 
-function StoresSection({ stores, onPress }: StoresSectionProps) {
+function StoresSection({ stores, onPress, onRankingPress }: StoresSectionProps) {
   return (
     <View style={{ gap: 12 }}>
       <FadeIn delay={200}>
-        <View style={{ gap: 2 }}>
-          <Text style={styles.sectionTitle}>Enseignes</Text>
-          <Text style={styles.sectionSubtitle}>Top produits par magasin</Text>
+        <View style={styles.storesHeader}>
+          <View style={{ gap: 2, flex: 1 }}>
+            <Text style={styles.sectionTitle}>Enseignes</Text>
+            <Text style={styles.sectionSubtitle}>Top produits par magasin</Text>
+          </View>
+          <Pressable
+            onPress={onRankingPress}
+            accessibilityRole="button"
+            accessibilityLabel="Voir le classement des supermarchés"
+            style={({ pressed }) => [
+              styles.rankingButton,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Trophy color={Colors.sage} size={16} strokeWidth={2.4} />
+            <Text style={styles.rankingButtonText}>Classement</Text>
+          </Pressable>
         </View>
       </FadeIn>
       <View style={styles.grid}>
@@ -324,5 +350,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textMuted,
     textAlign: 'center',
+  },
+  storesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rankingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(139, 173, 139, 0.14)',
+  },
+  rankingButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 12,
+    color: Colors.sage,
+    letterSpacing: 0.2,
   },
 });
