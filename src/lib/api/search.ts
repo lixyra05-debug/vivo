@@ -1,6 +1,6 @@
 import type { SearchFilters, SearchResult } from './types';
 
-const OFF_SEARCH_BASE = 'https://world.openfoodfacts.org/api/v2/search';
+const OFF_SEARCH_BASE = 'https://fr.openfoodfacts.org/api/v2/search';
 const OBF_SEARCH_BASE = 'https://world.openbeautyfacts.org/api/v2/search';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
 

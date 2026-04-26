@@ -40,7 +40,7 @@ describe('search', () => {
     const res = await searchProducts({ query: 'coca', type: 'food' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0][0] as string;
-    expect(url).toContain('https://world.openfoodfacts.org/api/v2/search');
+    expect(url).toContain('https://fr.openfoodfacts.org/api/v2/search');
     expect(url).toContain('search_terms=coca');
     expect(url).toContain('page_size=24');
     expect(res).toHaveLength(1);

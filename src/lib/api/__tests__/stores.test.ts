@@ -54,7 +54,7 @@ describe('stores', () => {
     const res = await fetchStoreTopProducts('carrefour', 1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0][0] as string;
-    expect(url).toContain('https://world.openfoodfacts.org/api/v2/search');
+    expect(url).toContain('https://fr.openfoodfacts.org/api/v2/search');
     expect(url).toContain('stores_tags=carrefour');
     expect(url).toContain('countries_tags=france');
     expect(url).toContain('page_size=24');

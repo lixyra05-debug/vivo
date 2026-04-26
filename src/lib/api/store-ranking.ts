@@ -9,7 +9,7 @@
 import { STORES } from './stores';
 import type { ScoreColor } from './types';
 
-const OFF_SEARCH_BASE = 'https://world.openfoodfacts.org/api/v2/search';
+const OFF_SEARCH_BASE = 'https://fr.openfoodfacts.org/api/v2/search';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
 const PAGE_SIZE = 50;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour

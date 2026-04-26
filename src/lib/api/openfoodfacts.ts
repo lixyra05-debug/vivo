@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { Product } from './types';
 
-const OFF_BASE = 'https://world.openfoodfacts.org/api/v2';
+const OFF_BASE = 'https://fr.openfoodfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
