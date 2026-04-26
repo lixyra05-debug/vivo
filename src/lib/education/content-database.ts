@@ -300,6 +300,132 @@ export const EDUCATIONAL_CARDS: EducationalCard[] = [
     sourceUrl: 'https://rspo.org/',
     tone: 'informative',
   },
+
+  // ─── Ingrédients bénéfiques (4 positives) ─────────────────────────────────
+  {
+    id: 'garlic_cardio',
+    trigger: { type: 'ingredient', keywords: ['ail'] },
+    titleFr: 'Ail : un allié cardiovasculaire modeste',
+    bodyFr:
+      "Méta-analyses Cochrane : effet léger sur la pression artérielle et le cholestérol grâce aux composés soufrés (allicine). Bénéfice modeste, à intégrer dans une alimentation variée — pas un substitut au traitement.",
+    source: 'Cochrane',
+    sourceUrl:
+      'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD007653.pub2/full',
+    tone: 'positive',
+  },
+  {
+    id: 'cruciferous',
+    trigger: {
+      type: 'ingredient',
+      keywords: ['brocoli', 'chou', 'cresson', 'chou-fleur', 'chou kale'],
+    },
+    titleFr: 'Légumes crucifères : riches en sulforaphane',
+    bodyFr:
+      "Brocoli, chou, cresson… Ces légumes apportent fibres, vitamines et glucosinolates (sulforaphane). L'EFSA confirme leur intérêt nutritionnel. PNNS : viser 5 fruits et légumes par jour, dont des crucifères régulièrement.",
+    source: 'EFSA',
+    sourceUrl: 'https://www.efsa.europa.eu/fr/topics/topic/food-based-dietary-guidelines',
+    tone: 'positive',
+  },
+  {
+    id: 'berries_antioxidant',
+    trigger: {
+      type: 'ingredient',
+      keywords: ['myrtille', 'cassis', 'fraise', 'framboise', 'mûre'],
+    },
+    titleFr: 'Fruits rouges : anthocyanes et fibres',
+    bodyFr:
+      "Myrtilles, cassis, fraises, framboises sont riches en anthocyanes (antioxydants) et en fibres. L'EFSA reconnaît leur valeur nutritionnelle. Frais ou surgelés — privilégier les versions sans sucre ajouté.",
+    source: 'EFSA',
+    sourceUrl: 'https://www.efsa.europa.eu/fr',
+    tone: 'positive',
+  },
+  {
+    id: 'calming_herbs',
+    trigger: {
+      type: 'ingredient',
+      keywords: ['camomille', 'tilleul', 'mélisse', 'melisse'],
+    },
+    titleFr: 'Camomille, tilleul, mélisse : effet apaisant léger',
+    bodyFr:
+      "Les monographies de l'EMA reconnaissent un usage traditionnel pour favoriser le sommeil et apaiser la nervosité légère. Effet modeste, bonne tolérance. Demander conseil pendant la grossesse.",
+    source: 'EMA',
+    sourceUrl: 'https://www.ema.europa.eu/en/medicines/herbal',
+    tone: 'positive',
+  },
+
+  // ─── Mises en garde (5 warnings) ──────────────────────────────────────────
+  {
+    id: 'honey_infant_warning',
+    trigger: { type: 'ingredient', keywords: ['miel'] },
+    titleFr: 'Miel : interdit avant 1 an (botulisme)',
+    bodyFr:
+      "L'ANSES rappelle de ne pas donner de miel aux nourrissons de moins d'un an : risque de botulisme infantile. Au-delà, méta-analyse Cochrane : utile pour calmer la toux nocturne (>1 an).",
+    source: 'Cochrane',
+    sourceUrl:
+      'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD007094.pub5/full',
+    tone: 'warning',
+  },
+  {
+    id: 'licorice_bp',
+    trigger: {
+      type: 'ingredient',
+      keywords: ['réglisse', 'reglisse', 'glycyrrhizine', 'glycyrrhizinique'],
+    },
+    titleFr: 'Réglisse : risque d\'hypertension',
+    bodyFr:
+      "L'EFSA (avis 2008) limite l'apport en glycyrrhizine à 100 mg/jour : au-delà, risque d'hypertension, rétention d'eau et hypokaliémie. À éviter en cas d'HTA, grossesse, ou traitement cardiovasculaire.",
+    source: 'EFSA',
+    sourceUrl: 'https://www.efsa.europa.eu/en/efsajournal/pub/728',
+    tone: 'warning',
+  },
+  {
+    id: 'st_johns_wort_interactions',
+    trigger: {
+      type: 'ingredient',
+      keywords: ['mille-pertuis', 'millepertuis', 'hypericum'],
+    },
+    titleFr: 'Mille-pertuis : interactions médicamenteuses majeures',
+    bodyFr:
+      "L'ANSM met en garde : le mille-pertuis interagit avec contraceptifs oraux, antidépresseurs, anticoagulants, immunosuppresseurs et antirétroviraux. Demander conseil au médecin ou pharmacien avant tout usage.",
+    source: 'ANSM',
+    sourceUrl:
+      'https://ansm.sante.fr/dossiers-thematiques/medicaments-a-base-de-plantes',
+    tone: 'warning',
+  },
+  {
+    id: 'wild_mushrooms',
+    trigger: {
+      type: 'ingredient',
+      keywords: [
+        'cèpe',
+        'cepe',
+        'girolle',
+        'morille',
+        'champignon sauvage',
+        'champignon des bois',
+      ],
+    },
+    titleFr: 'Champignons sauvages : risque d\'intoxication',
+    bodyFr:
+      "L'ANSES rappelle que les champignons sauvages sont la 1ʳᵉ cause d'intoxication alimentaire en France à l'automne. À ne consommer qu'après identification formelle par un mycologue ou un pharmacien.",
+    source: 'ANSES',
+    sourceUrl: 'https://www.anses.fr/fr/content/champignons-soyez-vigilants',
+    tone: 'warning',
+  },
+  {
+    id: 'ultra_processed_risk',
+    trigger: {
+      type: 'ingredient',
+      keywords: ['ultra-transformé', 'ultra-transforme', 'ultratransformé'],
+    },
+    titleFr: 'Ultra-transformés : risque cardiométabolique',
+    bodyFr:
+      "L'ANSES et plusieurs cohortes européennes (NutriNet-Santé) associent une consommation élevée d'ultra-transformés (NOVA 4) à un sur-risque cardiovasculaire, métabolique et de cancer. À limiter au quotidien.",
+    source: 'ANSES',
+    sourceUrl:
+      'https://www.anses.fr/fr/content/aliments-ultra-transform%C3%A9s-de-quoi-parle-t-on',
+    tone: 'warning',
+  },
 ];
 
 /**

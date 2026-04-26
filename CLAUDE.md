@@ -34,7 +34,7 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - `src/lib/gamification/streak-engine.ts` — Calcul streak en jours civils Europe/Paris (`calculateStreak`, `isStreakActive`)
 - `src/lib/gamification/badge-engine.ts` — Catalogue 12 badges + évaluation (`BADGES`, `getUserStats`, `checkBadges`)
 - `src/lib/gamification/weekly-summary.ts` — Synthèse hebdo ISO (lun→dim Paris, DST-safe)
-- `src/lib/education/content-database.ts` — 22 cartes éducatives (additifs/ingrédients/score/cosmétique/général) + `findRelevantCards`
+- `src/lib/education/content-database.ts` — 31 cartes éducatives (additifs/ingrédients/score/cosmétique/général + 9 cartes Beauvillard cross-référencées) + `findRelevantCards`
 - `src/lib/education/transparency.ts` — `SCORING_METHODOLOGY` (poids food/cosmetic + 5 FAQ + sources EFSA/ANSES/OMS/CIRC)
 - `src/lib/stats/profile-stats-engine.ts` — `calculateProfileStats` (totaux, top 3 catégories, scansByDay 28j, week-over-week) — seuils <30/>80
 - `src/lib/stats/sparkline-data.ts` — Génération points + couleur trend (sage/orange/earth) pour `WeeklySparkline`
@@ -66,6 +66,10 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Tests** : `src/lib/scoring/__tests__/additives-db-enriched.test.ts` → 40 tests, dont 1 garde global "aucune source ne cite Gouget"
 - **Total tests projet** : 288 → **328 verts** (aucune régression)
 - **Règle source** : tout ajout futur d'additif doit citer ≥ 1 URL publique EFSA / ANSES / IARC / eur-lex / DOI revue à comité de lecture. Jamais d'auteur militant, jamais de blog, jamais de TikTok
+- **Cartes éducatives Beauvillard cross-référencées** : 9 cartes ajoutées à `content-database.ts` (22 → 31) après extraction du livre *Le médecin des pauvres* (1912). Sources retenues = Cochrane, EFSA, ANSES, ANSM, EMA — **jamais Beauvillard** (test garde-fou anti-Beauvillard dans `content-database-enriched.test.ts`).
+  - Positives (4) : `garlic_cardio` (Cochrane), `cruciferous` (EFSA), `berries_antioxidant` (EFSA), `calming_herbs` (EMA)
+  - Warnings (5) : `honey_infant_warning` (Cochrane + ANSES botulisme <1an), `licorice_bp` (EFSA 2008 hypertension), `st_johns_wort_interactions` (ANSM interactions médicamenteuses), `wild_mushrooms` (ANSES), `ultra_processed_risk` (ANSES + NutriNet-Santé)
+  - **Total tests projet** : 328 → **370 verts** (+42 dans `content-database-enriched.test.ts`)
 
 ## Features Stores / Compatibilité / Confiance
 - **Listes par enseigne** : écran `app/store/[slug].tsx`, section "Enseignes" sur l'explore (2 colonnes), cache local 5min, fallback liste vide silencieux
