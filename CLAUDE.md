@@ -4,10 +4,10 @@
 App mobile React Native/Expo de scanning nutritionnel pour le marché français. Score de santé 0-100 basé sur un algorithme de pénalités toxicologiques (pas le Nutri-Score). Détecte les additifs dangereux, les huiles de graines, le clean labeling, et adapte le score au profil santé de l'utilisateur. Concurrent direct de Yuka avec une approche scientifiquement plus rigoureuse.
 
 ## Stack
-- **Mobile** : React Native + Expo SDK 52+ (TypeScript strict)
+- **Mobile** : React Native + Expo SDK 54 (TypeScript strict)
 - **Navigation** : Expo Router (file-based)
 - **UI** : NativeWind (Tailwind pour RN) + React Native Paper
-- **Scanner** : react-native-vision-camera + ML Kit Barcode
+- **Scanner** : `expo-camera` (vision-camera retiré Sprint 1)
 - **State** : Zustand + React Query (TanStack)
 - **Backend** : Supabase (West EU Ireland) — Auth, PostgreSQL, Storage, Edge Functions
 - **BDD Produits** : Open Food Facts API v2 (cache local 7 jours)
@@ -77,6 +77,30 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Confiance & signalement** : `ConfidenceBadge` sous le header produit, `ReportButton` discret avec modal slide (5 raisons FR + description optionnelle), pas de photo MVP
 - **Adapter user→compat** : `userProfileToCompatibilityProfile` mappe `diabetic→diabete`, `pregnant→enceinte`, `child→bebe` ; renvoie `null` si standard sans allergie pour masquer le toggle
 - **Migration** : `009_stores_confidence_reports.sql` (table `product_reports` RLS + table `stores` seedée idempotente)
+
+## Sprint 1 — Corrections audit (avril 2026)
+Audit global a remonté score 62/100 → corrections livrées : **score cible ~80/100**, débloque TestFlight.
+
+- **Migration `012_security_fixes.sql`** (idempotente) :
+  - C-001 : RLS activée sur `products` / `additives` / `swap_categories` / `swap_rules` (advisor `rls_disabled_in_public` éliminé)
+  - Policy `products` : SELECT public + INSERT/UPDATE pour `authenticated` (cache OFF côté client préservé)
+  - C-002 : drop FK `scan_history_barcode_fkey → products` (bloquait les barcodes cosmétiques absents de products)
+  - C-003 : DELETE policy `scan_history` (RGPD art. 17 — droit à l'effacement)
+  - C-004 : colonnes `consent_at` + `cgu_version` sur `user_profiles` (RGPD art. 7 — preuve consentement)
+- **API OFF** : tous les appels passent par `fr.openfoodfacts.org` (le sous-domaine `world.` bloque les requêtes anonymes en 503/429). `SourceLink` / `ProductNotFound` gardent `world.` (liens canoniques SEO visibles user).
+- **Scanner cosmétique (C-007)** : helper `fetchProductMultiSource(barcode)` dans `src/lib/api/openfoodfacts.ts` cascade OFF→OBF, route `/product/{code}?type=food|cosmetic`. `app/(tabs)/scan.tsx` utilise désormais `expo-camera`.
+- **Premium gate (C-005)** :
+  - Hook `usePremium()` dans `src/lib/premium/premium-gate.ts` lit la table `subscriptions` (`plan='premium' AND status IN ('active','trialing')`)
+  - Flag `__DEV_UNLOCK_PREMIUM__ = false` exporté du même fichier — pour tester en local comme premium, flipper à `true` (NE JAMAIS commit à `true`)
+  - 3 lectures `subscription_tier` remplacées dans `app/settings/subscription.tsx`, `app/(tabs)/profile.tsx`, `app/(tabs)/history.tsx`
+  - `app/settings/subscription.tsx` converti en écran info (plus de bouton "S'abonner" — App Store Guideline 3.1.1). RevenueCat deferred Sprint 2
+- **Sécurité / RGPD** :
+  - `SUPABASE_SERVICE_ROLE_KEY` retirée de `.env.local` (n'était pas utilisée côté client)
+  - Checkbox CGU obligatoire dans `app/auth/register.tsx` (constante `CGU_VERSION = '1.0'` exportée de `auth.ts`, helper `saveConsentForUser` pour différé)
+- **Scoring word boundaries (B-002)** : `compatibility-engine.ts` utilise désormais des lookarounds Unicode `(?<!\p{L})…(?!\p{L})` au lieu de `\b` ASCII (gère "blé"/"céleri"/"sésame"). Helper `escapeRegExp` + `matchesWord`.
+- **Polish** : `ErrorBoundary` (class component) wrap le `<Stack>` racine, `useReduceMotion` dans `ScoreCircle`, fontes normalisées `'Inter-Regular'` → `'Inter'` (6 occurrences), 3 composants morts supprimés (`BarcodeScanner`, `ScanOverlay`, `AdditiveCard`).
+- **Cleanup deps** : `react-native-vision-camera` désinstallé + plugin retiré d'`app.json` (le scanner utilise `expo-camera`).
+- **Tests** : 417 → **444 verts** (+27 nouveaux : 3 useProductStore product_type, 3 fetchProductMultiSource, 3 ErrorBoundary, 6 CGU register, 5 word boundaries, 7 usePremium).
 
 ## Conventions
 - TypeScript strict (`strict: true`)

@@ -15,6 +15,7 @@ import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
+import { usePremium } from '@/src/lib/premium/premium-gate';
 import {
   dedupeByBarcode,
   useScanHistory,
@@ -38,7 +39,7 @@ export default function HistoryScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
-  const isPremium = profile?.subscription_tier === 'premium';
+  const { isPremium } = usePremium();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
 

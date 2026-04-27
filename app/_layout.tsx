@@ -21,6 +21,7 @@ import {
 } from '@expo-google-fonts/bricolage-grotesque';
 
 import { AuthGuard } from '@/src/components/common/AuthGuard';
+import { ErrorBoundary } from '@/src/components/common/ErrorBoundary';
 import { ToastProvider } from '@/src/components/common/ToastProvider';
 
 SplashScreen.preventAutoHideAsync();
@@ -57,23 +58,25 @@ export default function RootLayout() {
           <PaperProvider>
             <ToastProvider>
               <AuthGuard>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    animation: 'slide_from_right',
-                    contentStyle: { backgroundColor: '#FAFAF7' },
-                  }}
-                >
-                  <Stack.Screen name="landing" options={{ animation: 'fade' }} />
-                  <Stack.Screen
-                    name="product/[barcode]"
-                    options={{ animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen
-                    name="swap/[barcode]"
-                    options={{ animation: 'slide_from_bottom' }}
-                  />
-                </Stack>
+                <ErrorBoundary>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      animation: 'slide_from_right',
+                      contentStyle: { backgroundColor: '#FAFAF7' },
+                    }}
+                  >
+                    <Stack.Screen name="landing" options={{ animation: 'fade' }} />
+                    <Stack.Screen
+                      name="product/[barcode]"
+                      options={{ animation: 'slide_from_bottom' }}
+                    />
+                    <Stack.Screen
+                      name="swap/[barcode]"
+                      options={{ animation: 'slide_from_bottom' }}
+                    />
+                  </Stack>
+                </ErrorBoundary>
               </AuthGuard>
             </ToastProvider>
           </PaperProvider>

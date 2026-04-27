@@ -1,9 +1,18 @@
 import { supabase } from './supabase';
 import type { Product } from './types';
+import { fetchCosmeticByBarcode, type OBFProduct } from './openbeautyfacts';
 
 const OFF_BASE = 'https://fr.openfoodfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Résultat d'une recherche multi-source : tape OFF puis fallback OBF.
+ * Permet au scanner de router vers la fiche food ou cosmetic.
+ */
+export type MultiSourceProduct =
+  | { type: 'food'; product: OFFProduct }
+  | { type: 'cosmetic'; product: OBFProduct };
 
 export interface OFFProduct {
   code: string;
@@ -139,6 +148,24 @@ async function writeProductToCache(product: Product): Promise<Product> {
     .maybeSingle();
   if (error) return product;
   return (data as Product) ?? product;
+}
+
+/**
+ * Recherche un produit en cascade : Open Food Facts (alimentaire) puis
+ * Open Beauty Facts (cosmétique) en fallback. Retourne null si aucune source
+ * ne trouve le code-barres. Utilisé par le scanner pour router automatiquement
+ * vers la bonne fiche produit.
+ */
+export async function fetchProductMultiSource(
+  barcode: string,
+): Promise<MultiSourceProduct | null> {
+  const off = await fetchProductByBarcode(barcode);
+  if (off) return { type: 'food', product: off };
+
+  const obf = await fetchCosmeticByBarcode(barcode);
+  if (obf) return { type: 'cosmetic', product: obf };
+
+  return null;
 }
 
 export async function getOrFetchProduct(barcode: string): Promise<Product | null> {

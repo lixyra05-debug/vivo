@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   subtitle: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter',
     fontSize: 13,
     color: Colors.textMuted,
     lineHeight: 18,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   emptyText: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter',
     fontSize: 13,
     color: Colors.textMuted,
     textAlign: 'center',

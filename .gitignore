@@ -45,3 +45,6 @@ yarn-error.*
 .env.local
 dist/
 coverage/
+
+# Claude Code agent state
+.claude/

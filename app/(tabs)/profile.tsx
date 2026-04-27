@@ -30,6 +30,7 @@ import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import { useScanHistory } from '@/src/lib/stores/useProductStore';
 import { useUserBadges, useUserReportCount } from '@/src/lib/stores/useBadges';
+import { usePremium } from '@/src/lib/premium/premium-gate';
 import {
   checkBadges,
   getUserStats,
@@ -114,7 +115,7 @@ export default function ProfileScreen() {
 
   const allergies = profile?.allergies ?? [];
   const intolerances = profile?.intolerances ?? [];
-  const isPremium = profile?.subscription_tier === 'premium';
+  const { isPremium } = usePremium();
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.cream }}>

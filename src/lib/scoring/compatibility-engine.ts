@@ -210,6 +210,29 @@ function normalize(text: string): string {
   return text.toLowerCase();
 }
 
+/**
+ * Échappe les caractères spéciaux RegExp pour pouvoir les utiliser comme
+ * littéral dans une expression régulière. Référence : MDN — Regular_Expressions.
+ */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Match d'un mot-clé sur frontière de mots Unicode. Évite "amande" matchant
+ * "amandine" ou "gluten" matchant "glutenfree". On ne peut pas utiliser
+ * `\b…\b` natif : il est ASCII-only et casserait les mots accentués
+ * ("blé", "céleri", "sésame"). On utilise donc des lookarounds Unicode
+ * (`\p{L}` : toute lettre).
+ */
+function matchesWord(text: string, keyword: string): boolean {
+  if (!keyword) return false;
+  return new RegExp(
+    `(?<!\\p{L})${escapeRegExp(keyword)}(?!\\p{L})`,
+    'iu',
+  ).test(text);
+}
+
 /** Type guard : produit cosmétique vs alimentaire. */
 function isCosmetic(p: Product | CosmeticProduct): p is CosmeticProduct {
   return 'ingredients_inci' in p;
@@ -220,10 +243,9 @@ function isCosmetic(p: Product | CosmeticProduct): p is CosmeticProduct {
  * et tolérant aux variations de ponctuation.
  */
 function textContainsAny(text: string, keywords: string[]): string | null {
-  const lower = normalize(text);
   for (const kw of keywords) {
     if (!kw) continue;
-    if (lower.includes(kw.toLowerCase())) return kw;
+    if (matchesWord(text, kw)) return kw;
   }
   return null;
 }
@@ -471,11 +493,11 @@ export function checkCompatibility(
         flagInsufficientData();
         continue;
       }
-      const lower = normalize(ingredientText);
       // Une incompatibilité par déclencheur trouvé (déduplication par token).
+      // Utilise frontières de mots pour éviter "ail" matchant "ailerons".
       const matched = new Set<string>();
       for (const trig of FODMAP_TRIGGERS) {
-        if (lower.includes(trig.toLowerCase()) && !matched.has(trig)) {
+        if (matchesWord(ingredientText, trig) && !matched.has(trig)) {
           matched.add(trig);
           incompatibilities.push({
             type: 'condition',

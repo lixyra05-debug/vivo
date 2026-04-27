@@ -13,16 +13,72 @@ export async function signInWithEmail(email: string, password: string): Promise<
   if (error) throw error;
 }
 
+/** Version courante des CGU acceptée à l'inscription (RGPD art. 7). */
+export const CGU_VERSION = '1.0';
+
+export interface SignUpOptions {
+  /** Date ISO de consentement aux CGU/Politique de confidentialité. */
+  consentAt: string;
+  /** Version des CGU acceptée (ex. '1.0'). */
+  cguVersion: string;
+}
+
 export async function signUpWithEmail(
   email: string,
-  password: string
+  password: string,
+  options?: SignUpOptions,
 ): Promise<{ needsConfirmation: boolean }> {
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
   });
   if (error) throw error;
+
+  // Si on a une session immédiate (confirmation email désactivée) ET un
+  // consentement explicite, on stocke la preuve dans user_profiles.
+  // Sinon, le consentement sera persisté après la première connexion via
+  // saveConsentForUser().
+  if (data.session && data.user && options) {
+    const consentPayload = {
+      id: data.user.id,
+      consent_at: options.consentAt,
+      cgu_version: options.cguVersion,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .upsert(consentPayload, { onConflict: 'id' });
+    if (profileError) {
+      // Non-bloquant : on logge mais on ne fait pas échouer l'inscription.
+      // eslint-disable-next-line no-console
+      console.error('[signUpWithEmail] consent upsert failed', profileError);
+    }
+  }
+
   return { needsConfirmation: !data.session };
+}
+
+/**
+ * Persiste la preuve de consentement après confirmation email
+ * (cas où data.session est null au moment du signUp).
+ */
+export async function saveConsentForUser(
+  userId: string,
+  consentAt: string,
+  cguVersion: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_profiles')
+    .upsert(
+      {
+        id: userId,
+        consent_at: consentAt,
+        cgu_version: cguVersion,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    );
+  if (error) throw error;
 }
 
 function parseTokensFromUrl(url: string): {

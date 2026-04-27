@@ -40,12 +40,6 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
-      [
-        "react-native-vision-camera",
-        {
-          "cameraPermissionText": "Vivo utilise la caméra pour scanner les codes-barres."
-        }
-      ],
       "expo-asset"
     ],
     "experiments": {

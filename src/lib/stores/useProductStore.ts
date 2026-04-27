@@ -113,11 +113,43 @@ export function useToggleFavorite(userId: string | undefined) {
   });
 }
 
+export type ScanProductType = 'food' | 'cosmetic';
+
 export interface RecordScanInput {
   barcode: string;
   score: number;
   profile: string;
   penalties: unknown;
+  /** Type de produit scanné. Défaut 'food' pour rétrocompatibilité. */
+  productType?: ScanProductType;
+}
+
+export interface ScanInsertPayload {
+  user_id: string;
+  barcode: string;
+  score_at_scan: number;
+  profile_used: string;
+  penalties_snapshot: unknown;
+  product_type: ScanProductType;
+}
+
+/**
+ * Construit le payload d'insertion scan_history.
+ * Extrait pour testabilité — la colonne `product_type` est NOT NULL côté DB
+ * (migration 010_gamification.sql), donc défaut 'food' obligatoire.
+ */
+export function buildScanInsertPayload(
+  userId: string,
+  input: RecordScanInput,
+): ScanInsertPayload {
+  return {
+    user_id: userId,
+    barcode: input.barcode,
+    score_at_scan: input.score,
+    profile_used: input.profile,
+    penalties_snapshot: input.penalties,
+    product_type: input.productType ?? 'food',
+  };
 }
 
 export function useRecordScan(userId: string | undefined) {
@@ -125,13 +157,9 @@ export function useRecordScan(userId: string | undefined) {
   return useMutation({
     mutationFn: async (input: RecordScanInput) => {
       if (!userId) return null;
-      const { error } = await supabase.from('scan_history').insert({
-        user_id: userId,
-        barcode: input.barcode,
-        score_at_scan: input.score,
-        profile_used: input.profile,
-        penalties_snapshot: input.penalties,
-      });
+      const { error } = await supabase
+        .from('scan_history')
+        .insert(buildScanInsertPayload(userId, input));
       if (error) throw error;
       return true;
     },

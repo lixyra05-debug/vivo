@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { scoreColor } from '@/src/constants/colors';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -38,13 +39,20 @@ export function ScoreCircle({ score, size = 160, strokeWidth = 12 }: Props) {
   const color = scoreColor(clamped);
   const colorKey = getColorKey(clamped);
   const progress = useSharedValue(0);
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
-    progress.value = withTiming(clamped / 100, {
+    const target = clamped / 100;
+    // Accessibilité : respecte la préférence "Réduire les animations" iOS/Android.
+    if (reduceMotion) {
+      progress.value = target;
+      return;
+    }
+    progress.value = withTiming(target, {
       duration: 900,
       easing: Easing.out(Easing.cubic),
     });
-  }, [clamped, progress]);
+  }, [clamped, progress, reduceMotion]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - progress.value),

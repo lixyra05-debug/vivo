@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   brand: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter',
     fontSize: 11,
     color: Colors.textMuted,
   },

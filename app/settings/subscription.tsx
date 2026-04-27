@@ -1,4 +1,4 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -10,12 +10,11 @@ import {
   Sparkles,
   SwatchBook,
 } from 'lucide-react-native';
-import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { Colors } from '@/src/constants/colors';
-import { useProfileStore } from '@/src/lib/stores/useProfileStore';
+import { usePremium } from '@/src/lib/premium/premium-gate';
 
 interface Benefit {
   icon: React.ReactNode;
@@ -56,15 +55,7 @@ const FREE_FEATURES = [
 
 export default function SubscriptionScreen() {
   const router = useRouter();
-  const profile = useProfileStore((s) => s.profile);
-  const isPremium = profile?.subscription_tier === 'premium';
-
-  function handleUpgrade() {
-    Alert.alert(
-      'Bientôt disponible',
-      "Les abonnements Premium arrivent dans les prochaines semaines. Merci de ta patience !",
-    );
-  }
+  const { isPremium } = usePremium();
 
   return (
     <ScreenContainer scroll>
@@ -147,7 +138,7 @@ export default function SubscriptionScreen() {
                   letterSpacing: -0.4,
                 }}
               >
-                {isPremium ? 'Merci pour ton soutien !' : 'Tu es sur le plan gratuit'}
+                {isPremium ? 'Tu es Premium, merci pour ton soutien !' : 'Tu es sur le plan gratuit'}
               </Text>
               <View style={{ gap: 8 }}>
                 {FREE_FEATURES.map((f) => (
@@ -172,89 +163,115 @@ export default function SubscriptionScreen() {
           </View>
         </FadeIn>
 
-        <FadeIn delay={180}>
-          <View style={{ gap: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Sparkles color={Colors.earth} size={20} strokeWidth={2.2} />
-              <Text
-                style={{
-                  fontFamily: 'BricolageGrotesque-Bold',
-                  fontSize: 22,
-                  color: Colors.text,
-                  letterSpacing: -0.4,
-                }}
-              >
-                Passe à Premium
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.textMuted,
-                lineHeight: 21,
-              }}
-            >
-              Débloque toutes les fonctionnalités pour 3,99 €/mois ou 29,99 €/an
-              (~2,50 €/mois).
-            </Text>
-          </View>
-        </FadeIn>
-
-        <View style={{ gap: 10 }}>
-          {BENEFITS.map((b, i) => (
-            <FadeIn key={b.title} delay={240 + i * 60}>
-              <GlassCard style={{ padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-                <View style={styles.benefitIconWrap}>{b.icon}</View>
-                <View style={{ flex: 1 }}>
+        {!isPremium ? (
+          <>
+            <FadeIn delay={180}>
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Sparkles color={Colors.earth} size={20} strokeWidth={2.2} />
                   <Text
                     style={{
-                      fontFamily: 'BricolageGrotesque-SemiBold',
-                      fontSize: 15,
+                      fontFamily: 'BricolageGrotesque-Bold',
+                      fontSize: 22,
                       color: Colors.text,
-                      letterSpacing: -0.2,
+                      letterSpacing: -0.4,
                     }}
                   >
-                    {b.title}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: Colors.textMuted,
-                      lineHeight: 19,
-                      marginTop: 3,
-                    }}
-                  >
-                    {b.description}
+                    Vivo Premium
                   </Text>
                 </View>
-              </GlassCard>
+                <Text
+                  style={{
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.textMuted,
+                    lineHeight: 21,
+                  }}
+                >
+                  Le scan reste gratuit et illimité. L'abonnement Premium arrive
+                  prochainement et débloquera : alternatives intelligentes,
+                  historique enrichi, swaps personnalisés. Reste connecté !
+                </Text>
+              </View>
             </FadeIn>
-          ))}
-        </View>
 
-        <FadeIn delay={520}>
-          <View style={{ gap: 10 }}>
-            <PrimaryCTA
-              label={isPremium ? "Gérer l'abonnement" : 'Bientôt disponible'}
-              onPress={handleUpgrade}
-              disabled={!isPremium}
-              icon={<Sparkles color="#FFFFFF" size={18} strokeWidth={2.2} />}
-            />
-            <Text
-              style={{
-                fontFamily: 'Inter',
-                fontSize: 12,
-                color: Colors.textMuted,
-                textAlign: 'center',
-                fontStyle: 'italic',
-              }}
-            >
-              Le scan reste toujours gratuit et illimité.
-            </Text>
-          </View>
-        </FadeIn>
+            <View style={{ gap: 10 }}>
+              {BENEFITS.map((b, i) => (
+                <FadeIn key={b.title} delay={240 + i * 60}>
+                  <GlassCard style={{ padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                    <View style={styles.benefitIconWrap}>{b.icon}</View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontFamily: 'BricolageGrotesque-SemiBold',
+                          fontSize: 15,
+                          color: Colors.text,
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        {b.title}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: Colors.textMuted,
+                          lineHeight: 19,
+                          marginTop: 3,
+                        }}
+                      >
+                        {b.description}
+                      </Text>
+                    </View>
+                  </GlassCard>
+                </FadeIn>
+              ))}
+            </View>
+
+            <FadeIn delay={520}>
+              <Text
+                style={{
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: Colors.textMuted,
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                }}
+              >
+                Le scan reste toujours gratuit et illimité.
+              </Text>
+            </FadeIn>
+          </>
+        ) : (
+          <FadeIn delay={180}>
+            <GlassCard style={{ padding: 18, gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Sparkles color={Colors.sage} size={20} strokeWidth={2.2} />
+                <Text
+                  style={{
+                    fontFamily: 'BricolageGrotesque-Bold',
+                    fontSize: 18,
+                    color: Colors.text,
+                    letterSpacing: -0.3,
+                  }}
+                >
+                  Tu es Premium
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  color: Colors.textMuted,
+                  lineHeight: 21,
+                }}
+              >
+                Toutes les fonctionnalités sont déjà débloquées. La gestion de
+                l'abonnement (annulation, facturation) sera disponible bientôt.
+              </Text>
+            </GlassCard>
+          </FadeIn>
+        )}
       </View>
     </ScreenContainer>
   );

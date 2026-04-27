@@ -36,6 +36,7 @@ import { Skeleton } from '@/src/components/ui/Skeleton';
 import { SearchNotFound } from '@/src/components/illustrations/SearchNotFound';
 import { useToast } from '@/src/components/common/ToastProvider';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
+import { fetchProductMultiSource } from '@/src/lib/api/openfoodfacts';
 import { Colors } from '@/src/constants/colors';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
@@ -87,6 +88,18 @@ export default function ScanScreen() {
     }, []),
   );
 
+  async function routeBarcode(code: string): Promise<void> {
+    // Cascade OFF → OBF pour router automatiquement vers food ou cosmetic.
+    // En cas d'erreur réseau, on laisse la fiche produit gérer le 404.
+    try {
+      const result = await fetchProductMultiSource(code);
+      const type = result?.type ?? 'food';
+      router.push(`/product/${code}?type=${type}`);
+    } catch {
+      router.push(`/product/${code}?type=food`);
+    }
+  }
+
   function handleBarcode({ data }: { data: string }) {
     if (!data) return;
     const now = Date.now();
@@ -101,7 +114,7 @@ export default function ScanScreen() {
       );
     }
     toast.show('Code-barres détecté — analyse en cours');
-    router.push(`/product/${data}`);
+    void routeBarcode(data);
   }
 
   function submitManual() {
@@ -111,7 +124,7 @@ export default function ScanScreen() {
       Alert.alert('Code invalide', 'Saisis un code-barres EAN/UPC (6 à 14 chiffres).');
       return;
     }
-    router.push(`/product/${code}`);
+    void routeBarcode(code);
   }
 
   function toggleTorch() {

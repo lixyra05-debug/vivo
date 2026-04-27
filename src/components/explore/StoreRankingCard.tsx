@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   subtitle: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter',
     fontSize: 12,
     color: Colors.textMuted,
   },

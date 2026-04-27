@@ -146,6 +146,7 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
         score: result.score_final,
         profile: userProfile.type,
         penalties: result.penalties,
+        productType: 'food',
       },
       {
         onSuccess: () => {

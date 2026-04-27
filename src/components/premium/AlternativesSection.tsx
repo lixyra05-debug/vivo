@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   subtitle: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter',
     fontSize: 13,
     color: Colors.textMuted,
     lineHeight: 18,

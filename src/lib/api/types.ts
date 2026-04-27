@@ -64,6 +64,9 @@ export interface UserProfileRow {
   scan_count: number;
   created_at: string;
   updated_at: string;
+  // RGPD art. 7 — preuve consentement (migration 012)
+  consent_at?: string | null;
+  cgu_version?: string | null;
 }
 
 export interface Product {
