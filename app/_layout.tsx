@@ -23,6 +23,11 @@ import {
 import { AuthGuard } from '@/src/components/common/AuthGuard';
 import { ErrorBoundary } from '@/src/components/common/ErrorBoundary';
 import { ToastProvider } from '@/src/components/common/ToastProvider';
+import { initSentry } from '@/src/lib/monitoring/sentry';
+
+// Init Sentry au chargement du module (avant que React monte les écrans).
+// No-op silencieux si EXPO_PUBLIC_SENTRY_DSN absent (graceful degradation).
+initSentry();
 
 SplashScreen.preventAutoHideAsync();
 

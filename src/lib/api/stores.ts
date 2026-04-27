@@ -1,4 +1,5 @@
 import type { SearchResult, StoreDef } from './types';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 
 const OFF_SEARCH_BASE = 'https://fr.openfoodfacts.org/api/v2/search';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
@@ -88,6 +89,11 @@ function buildStoreUrl(offStoreTag: string, page: number): string {
   return `${OFF_SEARCH_BASE}?${params.toString()}`;
 }
 
+function cacheGetStale(key: string): SearchResult[] | null {
+  const entry = cache.get(key);
+  return entry ? entry.data : null;
+}
+
 export async function fetchStoreTopProducts(
   storeSlug: string,
   page: number = 1
@@ -101,10 +107,11 @@ export async function fetchStoreTopProducts(
 
   try {
     const url = buildStoreUrl(store.offStoreTag, page);
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
     if (!res.ok) {
-      console.warn('[stores] fetch non OK', res.status);
-      return [];
+      return cacheGetStale(cacheKey) ?? [];
     }
     const data = await res.json();
     const products: RawItem[] = Array.isArray(data?.products) ? data.products : [];
@@ -116,7 +123,9 @@ export async function fetchStoreTopProducts(
     cacheSet(cacheKey, results);
     return results;
   } catch (err) {
-    console.warn('[stores] fetch failed', err);
-    return [];
+    if (err instanceof FetchTimeoutError) {
+      return cacheGetStale(cacheKey) ?? [];
+    }
+    return cacheGetStale(cacheKey) ?? [];
   }
 }

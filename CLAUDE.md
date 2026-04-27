@@ -102,6 +102,26 @@ Audit global a remonté score 62/100 → corrections livrées : **score cible ~8
 - **Cleanup deps** : `react-native-vision-camera` désinstallé + plugin retiré d'`app.json` (le scanner utilise `expo-camera`).
 - **Tests** : 417 → **444 verts** (+27 nouveaux : 3 useProductStore product_type, 3 fetchProductMultiSource, 3 ErrorBoundary, 6 CGU register, 5 word boundaries, 7 usePremium).
 
+## Sprint 2 — Allégé (avril 2026)
+Score audit 80 → cible ~88/100. 5 items livrés en parallèle (Agents A+B), Sentry séquentiel (Agent C).
+
+- **Wrapper réseau résilient (B-005)** : `src/lib/api/fetch-with-timeout.ts` (timeout 8s + 2 retries + backoff exponentiel + 429/Retry-After + listener manuel sur AbortSignal externe — `AbortSignal.any` non garanti en Hermes). `FetchTimeoutError` exporté avec `attempts`. 5 fichiers API migrés (`openfoodfacts.ts`, `openbeautyfacts.ts`, `search.ts`, `stores.ts`, `smart-alternatives.ts`) — `console.warn` retirés, fallback silencieux (cache stale pour stores).
+- **Store ranking parallélisé (B-006)** : helper `promiseAllWithConcurrency` dans `src/lib/api/store-ranking.ts` (Promise.allSettled par batches de 3, ordre préservé, fallback `[]` sur rejet).
+- **Split product screen (B-012)** : `app/product/[barcode].tsx` 927 → 546 lignes (-41%). Routeur garde toutes les data hooks + effects. Nouveaux purs : `src/components/product/FoodProductView.tsx` (394 lignes) et `CosmeticProductView.tsx` (88 lignes). FadeIn delays préservés exactement (140/220/280/340/420/500/540/580/620/640/700/760/820/880/940/980 pour food).
+- **FlatList anti-patterns (B-015)** :
+  - `app/(tabs)/explore.tsx` : `FlatList scrollEnabled={false}` dans ScrollView remplacé par `<View>{results.map(...)}</View>`
+  - `app/(tabs)/history.tsx` : `HISTORY_ITEM_HEIGHT = 90`, `getItemLayout` + `windowSize=5` + `removeClippedSubviews` + `maxToRenderPerBatch=10` + `initialNumToRender=15`
+  - `app/(tabs)/favorites.tsx` : `FAVORITE_ITEM_HEIGHT = 232`, `getItemLayout` adapté à `numColumns=2` (offset = `HEIGHT * Math.floor(index/2)`)
+- **Sentry + logger (M-001)** :
+  - `src/lib/monitoring/sentry.ts` : `initSentry()` (DSN via `EXPO_PUBLIC_SENTRY_DSN`, bail silencieux si manquant, `tracesSampleRate: 0.2`, `sendDefaultPii: false`), `captureError()` (forward uniquement si `!__DEV__`), `addBreadcrumb()`
+  - **R8 — filtre PII strict** : `beforeSend` strip `event.user.email`/`ip_address`/`username` (garde `id` UUID), drop tout event/breadcrumb dont `message` ou `data.url` contient `barcode` ; `beforeBreadcrumb` drop navigation vers `/health-profile`, `/auth`, `/onboarding`
+  - `src/lib/utils/logger.ts` : `debug`/`info`/`warn`/`error` — wrappers fins sur `addBreadcrumb` + `captureError`. JAMAIS de `console.*` (R5)
+  - `__mocks__/@sentry/react-native.ts` : mock manuel Jest, `jest.mock('@sentry/react-native')` activé dans `jest.setup.js`
+  - `app.json` : plugin `["@sentry/react-native/expo", { "organization": "lyxiria", "project": "vivo" }]`
+  - `app/_layout.tsx` : `initSentry()` au boot. `ErrorBoundary.tsx` : `captureError` dans `componentDidCatch` (avant le `console.error` fallback). `fetch-with-timeout.ts` : `addBreadcrumb` avant le throw final (sans URL — R8)
+- **Tests** : 444 → **465 verts** (+21 nouveaux : 7 fetch-with-timeout, 3 store-ranking-parallel, 2 FoodProductView, 1 CosmeticProductView, 5 sentry, 3 logger).
+- **Items reportés Sprint 3+** : RevenueCat (paywall masqué côté UI), PostHog, GDPR export/portabilité, OTA updates, robustesse mot de passe.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

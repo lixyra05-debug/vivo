@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { Product } from './types';
 import { fetchCosmeticByBarcode, type OBFProduct } from './openbeautyfacts';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 
 const OFF_BASE = 'https://fr.openfoodfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
@@ -32,13 +33,18 @@ export interface OFFProduct {
 }
 
 export async function fetchProductByBarcode(barcode: string): Promise<OFFProduct | null> {
-  const res = await fetch(`${OFF_BASE}/product/${barcode}.json`, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (data.status !== 1) return null;
-  return data.product as OFFProduct;
+  try {
+    const res = await fetchWithTimeout(`${OFF_BASE}/product/${barcode}.json`, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 1) return null;
+    return data.product as OFFProduct;
+  } catch (err) {
+    if (err instanceof FetchTimeoutError) return null;
+    throw err;
+  }
 }
 
 /**
@@ -50,7 +56,9 @@ export async function fetchProductCategoryTag(
 ): Promise<string | null> {
   try {
     const url = `${OFF_BASE}/product/${barcode}.json?fields=categories_tags`;
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
     if (!res.ok) return null;
     const data = await res.json();
     if (data.status !== 1) return null;

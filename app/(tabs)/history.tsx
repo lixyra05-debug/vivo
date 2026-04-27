@@ -26,6 +26,7 @@ import type { PenaltyDetail, ScoringResult } from '@/src/lib/api/types';
 import { ScanLine } from 'lucide-react-native';
 
 const FREE_LIMIT = 30;
+const HISTORY_ITEM_HEIGHT = 90;
 
 type FilterKey = 'all' | 'avoid' | 'excellent' | 'incompatible';
 
@@ -392,6 +393,15 @@ export default function HistoryScreen() {
             renderItem={renderItem}
             contentContainerStyle={{ gap: 10, paddingBottom: 24 }}
             showsVerticalScrollIndicator={false}
+            getItemLayout={(_, index) => ({
+              length: HISTORY_ITEM_HEIGHT,
+              offset: HISTORY_ITEM_HEIGHT * index,
+              index,
+            })}
+            windowSize={5}
+            removeClippedSubviews
+            maxToRenderPerBatch={10}
+            initialNumToRender={15}
             refreshControl={
               <RefreshControl
                 refreshing={query.isRefetching}

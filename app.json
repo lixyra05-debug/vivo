@@ -40,7 +40,8 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
-      "expo-asset"
+      "expo-asset",
+      ["@sentry/react-native/expo", { "organization": "lyxiria", "project": "vivo" }]
     ],
     "experiments": {
       "typedRoutes": true

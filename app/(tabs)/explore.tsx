@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Trophy } from 'lucide-react-native';
@@ -197,17 +197,13 @@ function SearchResultsSection({ isLoading, results, onPress }: SearchResultsSect
           </Text>
         </GlassCard>
       ) : (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => `${item.type}-${item.barcode}`}
-          scrollEnabled={false}
-          contentContainerStyle={{ gap: 10 }}
-          renderItem={({ item, index }) => (
-            <FadeIn delay={Math.min(index * 40, 280)}>
+        <View style={{ gap: 10 }}>
+          {results.map((item, index) => (
+            <FadeIn key={`${item.type}-${item.barcode}`} delay={Math.min(index * 40, 280)}>
               <SearchResultCard result={item} onPress={() => onPress(item)} />
             </FadeIn>
-          )}
-        />
+          ))}
+        </View>
       )}
     </View>
   );

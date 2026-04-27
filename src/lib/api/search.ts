@@ -1,4 +1,5 @@
 import type { SearchFilters, SearchResult } from './types';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 
 const OFF_SEARCH_BASE = 'https://fr.openfoodfacts.org/api/v2/search';
 const OBF_SEARCH_BASE = 'https://world.openbeautyfacts.org/api/v2/search';
@@ -61,7 +62,9 @@ async function queryEndpoint(
   type: 'food' | 'cosmetic'
 ): Promise<SearchResult[]> {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
     if (!res.ok) return [];
     const data = await res.json();
     const products: RawItem[] = Array.isArray(data?.products) ? data.products : [];
@@ -72,7 +75,7 @@ async function queryEndpoint(
     }
     return results;
   } catch (err) {
-    console.warn('[search] fetch failed', err);
+    if (err instanceof FetchTimeoutError) return [];
     return [];
   }
 }

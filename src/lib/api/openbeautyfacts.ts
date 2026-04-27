@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { CosmeticProduct, CosmeticScoringInput } from './types';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 
 const OBF_BASE = 'https://world.openbeautyfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
@@ -16,13 +17,18 @@ export interface OBFProduct {
 }
 
 export async function fetchCosmeticByBarcode(barcode: string): Promise<OBFProduct | null> {
-  const res = await fetch(`${OBF_BASE}/product/${barcode}.json`, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (data.status !== 1) return null;
-  return data.product as OBFProduct;
+  try {
+    const res = await fetchWithTimeout(`${OBF_BASE}/product/${barcode}.json`, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 1) return null;
+    return data.product as OBFProduct;
+  } catch (err) {
+    if (err instanceof FetchTimeoutError) return null;
+    throw err;
+  }
 }
 
 function parseIngredientsList(inci: string): string[] {

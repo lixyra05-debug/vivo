@@ -8,6 +8,7 @@
  */
 
 import { nutriScoreToProxy } from './store-ranking';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 
 const OFF_SEARCH_BASE = 'https://fr.openfoodfacts.org/api/v2/search';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
@@ -89,13 +90,14 @@ export async function findAlternatives(
 
   let products: RawProduct[] = [];
   try {
-    const res = await fetch(buildUrl(categoryTag), {
+    const res = await fetchWithTimeout(buildUrl(categoryTag), {
       headers: { 'User-Agent': USER_AGENT },
     });
     if (!res.ok) return [];
     const data = await res.json();
     products = Array.isArray(data?.products) ? data.products : [];
-  } catch {
+  } catch (err) {
+    if (err instanceof FetchTimeoutError) return [];
     return [];
   }
 

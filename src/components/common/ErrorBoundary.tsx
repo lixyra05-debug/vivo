@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '@/src/constants/colors';
+import { captureError } from '@/src/lib/monitoring/sentry';
 
 interface Props {
   children: ReactNode;
@@ -27,8 +28,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Sentry à brancher dans une PR ultérieure (R5 : pas de console.log,
-    // mais console.error reste autorisé pour les erreurs réelles).
+    // Forward à Sentry en prod (no-op en dev — voir captureError).
+    captureError(error, { componentStack: info.componentStack });
+    // Fallback dev local — R5 autorise console.error explicitement ici.
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info);
   }

@@ -17,6 +17,8 @@ import {
   type ScanHistoryRow,
 } from '@/src/lib/stores/useProductStore';
 
+const FAVORITE_ITEM_HEIGHT = 232;
+
 export default function FavoritesScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -145,6 +147,15 @@ export default function FavoritesScreen() {
             columnWrapperStyle={{ gap: 12 }}
             contentContainerStyle={{ gap: 12, paddingBottom: 24 }}
             showsVerticalScrollIndicator={false}
+            getItemLayout={(_, index) => ({
+              length: FAVORITE_ITEM_HEIGHT,
+              offset: FAVORITE_ITEM_HEIGHT * Math.floor(index / 2),
+              index,
+            })}
+            windowSize={5}
+            removeClippedSubviews
+            maxToRenderPerBatch={10}
+            initialNumToRender={15}
             refreshControl={
               <RefreshControl
                 refreshing={query.isRefetching}

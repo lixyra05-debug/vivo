@@ -8,11 +8,37 @@
 
 import { STORES } from './stores';
 import type { ScoreColor } from './types';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 
 const OFF_SEARCH_BASE = 'https://fr.openfoodfacts.org/api/v2/search';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
 const PAGE_SIZE = 50;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CONCURRENCY = 3;
+
+/**
+ * Exécute `fn` sur chaque item avec une concurrence maximale `concurrency`.
+ * Préserve l'ordre d'origine. Les rejets passent en valeur "fallback" (R par défaut).
+ * Implémentation : batches via Promise.allSettled (simplicité maximale, pas de worker pool).
+ */
+async function promiseAllWithConcurrency<T, R>(
+  concurrency: number,
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  fallback: R,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(batch.map((item) => fn(item)));
+    settled.forEach((res, idx) => {
+      const absoluteIdx = i + idx;
+      results[absoluteIdx] =
+        res.status === 'fulfilled' ? res.value : fallback;
+    });
+  }
+  return results;
+}
 
 export interface StoreRanking {
   slug: string;
@@ -72,14 +98,17 @@ async function fetchStoreGrades(offStoreTag: string): Promise<string[]> {
   });
   const url = `${OFF_SEARCH_BASE}?${params.toString()}`;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
     if (!res.ok) return [];
     const data = await res.json();
     const products: RawProduct[] = Array.isArray(data?.products)
       ? data.products
       : [];
     return products.map((p) => p.nutrition_grades ?? '');
-  } catch {
+  } catch (err) {
+    if (err instanceof FetchTimeoutError) return [];
     return [];
   }
 }
@@ -101,19 +130,25 @@ export async function calculateStoreRanking(): Promise<StoreRanking[]> {
     return rankingCache.data;
   }
 
-  const rows: StoreRanking[] = [];
-  for (const store of STORES) {
-    const grades = await fetchStoreGrades(store.offStoreTag);
-    const { avgScore, productCount } = aggregate(grades);
-    rows.push({
+  // Parallélisation bornée à 3 (4G safe — divise ~3x le temps total).
+  const allGrades = await promiseAllWithConcurrency<typeof STORES[number], string[]>(
+    CONCURRENCY,
+    [...STORES],
+    (store) => fetchStoreGrades(store.offStoreTag),
+    [],
+  );
+
+  const rows: StoreRanking[] = STORES.map((store, i) => {
+    const { avgScore, productCount } = aggregate(allGrades[i]);
+    return {
       slug: store.slug,
       nameFr: store.nameFr,
       emoji: store.emoji,
       avgScore,
       productCount,
       color: scoreToColor(avgScore),
-    });
-  }
+    };
+  });
 
   rows.sort((a, b) => b.avgScore - a.avgScore);
   rankingCache = { ts: Date.now(), data: rows };
