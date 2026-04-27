@@ -2,6 +2,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Store } from 'lucide-react-native';
 import { GlassCard } from '@/src/components/ui/GlassCard';
+import { StoreLogo } from '@/src/components/explore/StoreLogo';
 import { Colors } from '@/src/constants/colors';
 import type { StoreDef } from '@/src/lib/api/types';
 
@@ -30,9 +31,7 @@ export function StoreCard({ store, onPress }: StoreCardProps) {
           <Store color={Colors.sage} size={48} strokeWidth={1.8} />
         </View>
         <View style={styles.topRow}>
-          <Text style={styles.emoji} allowFontScaling={false}>
-            {store.emoji}
-          </Text>
+          <StoreLogo slug={store.slug} emoji={store.emoji} variant="card" />
         </View>
         <View style={styles.bottom}>
           <Text style={styles.name} numberOfLines={2}>
@@ -65,10 +64,6 @@ const styles = StyleSheet.create({
   },
   topRow: {
     alignItems: 'flex-start',
-  },
-  emoji: {
-    fontSize: 36,
-    lineHeight: 42,
   },
   bottom: {
     position: 'absolute',

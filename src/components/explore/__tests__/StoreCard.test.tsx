@@ -17,10 +17,16 @@ const store: StoreDef = {
 };
 
 describe('StoreCard', () => {
-  it("affiche l'emoji et le nom de l'enseigne", () => {
-    const { getByText } = render(<StoreCard store={store} onPress={() => {}} />);
+  it("affiche le logo (image) et le nom de l'enseigne pour un slug mappé", () => {
+    const { getByText, getByLabelText } = render(<StoreCard store={store} onPress={() => {}} />);
     expect(getByText('Carrefour')).toBeTruthy();
-    expect(getByText('🟥')).toBeTruthy();
+    expect(getByLabelText('Logo carrefour')).toBeTruthy();
+  });
+
+  it("affiche l'emoji fallback pour un slug non mappé", () => {
+    const unmapped: StoreDef = { ...store, slug: 'inconnu', nameFr: 'Inconnu', emoji: '🛒' };
+    const { getByText } = render(<StoreCard store={unmapped} onPress={() => {}} />);
+    expect(getByText('🛒')).toBeTruthy();
   });
 
   it('appelle onPress au tap', () => {

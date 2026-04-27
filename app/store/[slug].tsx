@@ -18,6 +18,7 @@ import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { CategoryRankCard, type Medal } from '@/src/components/explore/CategoryRankCard';
 import { CompatibilityToggle, type CompatibilityMode } from '@/src/components/explore/CompatibilityToggle';
+import { StoreLogo } from '@/src/components/explore/StoreLogo';
 import { PremiumPaywall } from '@/src/components/premium/PremiumPaywall';
 import { Colors } from '@/src/constants/colors';
 import { fetchStoreTopProducts, getStoreBySlug } from '@/src/lib/api/stores';
@@ -244,9 +245,7 @@ export default function StoreScreen() {
 
         <FadeIn delay={80}>
           <View style={styles.header}>
-            <Text style={styles.emoji} allowFontScaling={false}>
-              {store.emoji}
-            </Text>
+            <StoreLogo slug={store.slug} emoji={store.emoji} variant="header" />
             <View style={{ gap: 2, flex: 1 }}>
               <Text style={styles.title}>{store.nameFr}</Text>
               <Text style={styles.subtitle}>Les meilleurs produits</Text>
@@ -358,10 +357,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-  },
-  emoji: {
-    fontSize: 48,
-    lineHeight: 54,
   },
   title: {
     fontFamily: 'BricolageGrotesque-Bold',
