@@ -122,6 +122,26 @@ Score audit 80 → cible ~88/100. 5 items livrés en parallèle (Agents A+B), Se
 - **Tests** : 444 → **465 verts** (+21 nouveaux : 7 fetch-with-timeout, 3 store-ranking-parallel, 2 FoodProductView, 1 CosmeticProductView, 5 sentry, 3 logger).
 - **Items reportés Sprint 3+** : RevenueCat (paywall masqué côté UI), PostHog, GDPR export/portabilité, OTA updates, robustesse mot de passe.
 
+## Alternatives Premium dynamiques (avril 2026)
+Refonte de la section "Meilleures alternatives" sur la fiche produit : du statique vers une vraie reco OFF avec cascade hiérarchique + NOVA + additifs. 488 → **508 tests verts** (+20).
+
+- **Backend** :
+  - `src/lib/api/smart-alternatives.ts` rewrite — type `Alternative` enrichi (`score`, `scoreDelta`, `category`, `novaGroup`, `additivesCount`), suppression de `AlternativeProduct`/`grade`/`proxyScore`. Signature `findAlternatives(barcode, categoriesTags: string[], currentScore)`.
+  - **Cascade hiérarchique** (max 3 tentatives) : essai du tag le plus spécifique → fallback parent si <5 valides → parent du parent. Court-circuit dès qu'une tentative ≥5. Best-effort sur la plus longue tentative isolée si jamais ≥5 (pas d'agrégation cross-tag — préserve la cohérence sémantique).
+  - **Filtres OFF** : `page_size=30 sort_by=popularity_key fields=code,product_name,brands,image_url,nutrition_grades,nova_group,additives_n countries_tags=france`. Suppression du filtre serveur `nutrition_grades_tags=a,b,c` (trop excluant) — filtrage client (a..e + delta strict positif + image_url + product_name non vides).
+  - **Coercions** : `nova_group` peut arriver en string OFF → `Number()` + `Number.isFinite`. `additives_n` absent → 0.
+  - **Tri final** : `score` desc puis `additivesCount` asc (égalité → moins d'additifs gagne). Slice 5.
+  - **Cache** LRU 10min/100 entrées, clé `${barcode}::${categoriesTags.join(',')}::${currentScore}`.
+  - `getAlternativesTitle(score)` : <50 "🔄 Des alternatives bien meilleures existent" / <80 "🔄 Des alternatives plus saines existent" / ≥80 "🔄 Alternatives dans cette catégorie".
+  - `src/lib/api/openfoodfacts.ts` : ajout `fetchProductCategoriesTags(barcode): Promise<string[]>` (ancien `fetchProductCategoryTag` conservé inchangé).
+- **Frontend** :
+  - `src/components/premium/AlternativeCard.tsx` refonte — layout horizontal compact (max 85px), image 64×64 (`expo-image` fallback `<Leaf>` sage). Badges row : `MiniScoreCircle` 32px + delta pill `+X` + **NOVA badge contextuel** (1-2 sage, 3 orange `#B96B00`, 4 rouge `#B5311E`) + **compteur additifs tri-état** (0=`✅ 0 additif` sage, 1-3=`X additif(s)` neutre, 4+=`⚠️ X additifs` orange). Accessibility label enrichi.
+  - `src/components/premium/AlternativesSection.tsx` refonte — props pures (plus de fetch interne), nouveau hook `useAlternatives` orchestre. Skeleton 3 cards 85px en `isLoading`. Empty array → `null`. Premium = 5 cards en stack vertical (FadeIn cascade `100*index`). Free = 1 card opacity 0.25 + teaser pluriel adaptatif `"et X autres alternative(s) premium…"` + `<PremiumPaywall>`. Suppression du seuil dur `score < 70` — la section reste visible quand des alternatives existent à tout score.
+  - `src/lib/api/use-alternatives.ts` nouveau — hook cancellable `(barcode, categoriesTags, currentScore) → { alternatives, isLoading }`.
+  - `src/components/product/FoodProductView.tsx` : prop `categoryTag: string | null` → `categoriesTags: string[]`, branche `useAlternatives`. **Suppression** du `<PrimaryCTA "Voir les alternatives">` (devenu redondant) et de `onPressSwap`.
+  - `app/product/[barcode].tsx` : switch `fetchProductCategoryTag` → `fetchProductCategoriesTags`, pass `categoriesTags={categoryTagsQuery.data ?? []}`.
+- **Tests** : 488 → **508 verts** (+20 : 19 smart-alternatives complets, +2 openfoodfacts/fetchProductCategoriesTags, 4 AlternativeCard, 8 AlternativesSection, 2 FoodProductView adaptés). Aucune régression.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

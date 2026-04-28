@@ -56,31 +56,29 @@ describe('FoodProductView', () => {
         product={baseProduct}
         result={baseResult}
         educationalCards={[]}
-        categoryTag={null}
+        categoriesTags={[]}
         isPremium={false}
         onUnlockPremium={() => undefined}
         onPressAlternative={() => undefined}
         onPressMethodology={() => undefined}
-        onPressSwap={() => undefined}
       />,
     );
     expect(getByText('Comment ce score est calculé ? →')).toBeTruthy();
   });
 
-  it('affiche le label "Voir les alternatives"', () => {
-    const { getByText } = render(
+  it('n\'affiche plus le bouton "Voir les alternatives" (CTA supprimé)', () => {
+    const { queryByText } = render(
       <FoodProductView
         product={baseProduct}
         result={{ ...baseResult, score_final: 35 }}
         educationalCards={[]}
-        categoryTag={null}
+        categoriesTags={[]}
         isPremium={false}
         onUnlockPremium={() => undefined}
         onPressAlternative={() => undefined}
         onPressMethodology={() => undefined}
-        onPressSwap={() => undefined}
       />,
     );
-    expect(getByText('Voir les alternatives')).toBeTruthy();
+    expect(queryByText('Voir les alternatives')).toBeNull();
   });
 });

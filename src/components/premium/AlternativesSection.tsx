@@ -1,95 +1,107 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Leaf } from 'lucide-react-native';
 import { AlternativeCard } from './AlternativeCard';
 import { PremiumPaywall } from './PremiumPaywall';
+import { FadeIn } from '@/src/components/ui/FadeIn';
 import {
-  findAlternatives,
-  type AlternativeProduct,
+  getAlternativesTitle,
+  type Alternative,
 } from '@/src/lib/api/smart-alternatives';
 import { Colors } from '@/src/constants/colors';
 
 interface AlternativesSectionProps {
-  scannedBarcode: string;
-  categoryTag: string | null | undefined;
-  currentScore: number;
+  alternatives: Alternative[];
   isPremium: boolean;
+  currentScore: number;
+  isLoading: boolean;
   onUnlock: () => void;
   onPressAlt: (barcode: string) => void;
 }
 
-const SCORE_THRESHOLD = 70;
+const SKELETON_LINES = 3;
 
 export function AlternativesSection({
-  scannedBarcode,
-  categoryTag,
-  currentScore,
+  alternatives,
   isPremium,
+  currentScore,
+  isLoading,
   onUnlock,
   onPressAlt,
 }: AlternativesSectionProps) {
-  const [alts, setAlts] = useState<AlternativeProduct[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Header currentScore={currentScore} />
+        <View testID="alternatives-skeleton" style={styles.list}>
+          {Array.from({ length: SKELETON_LINES }).map((_, i) => (
+            <View key={i} style={styles.skeletonCard} />
+          ))}
+        </View>
+      </View>
+    );
+  }
 
-  const shouldFetch = currentScore < SCORE_THRESHOLD && Boolean(categoryTag);
+  if (alternatives.length === 0) {
+    return null;
+  }
 
-  useEffect(() => {
-    if (!shouldFetch) {
-      setAlts([]);
-      setLoaded(true);
-      return;
-    }
-    let cancelled = false;
-    setLoaded(false);
-    findAlternatives(scannedBarcode, categoryTag, currentScore)
-      .then((res) => {
-        if (cancelled) return;
-        setAlts(res);
-        setLoaded(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setAlts([]);
-        setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [shouldFetch, scannedBarcode, categoryTag, currentScore]);
+  if (isPremium) {
+    return (
+      <View style={styles.container}>
+        <Header currentScore={currentScore} />
+        <View style={styles.list}>
+          {alternatives.map((alt, index) => (
+            <FadeIn key={alt.barcode} delay={100 * index}>
+              <AlternativeCard alt={alt} onPress={onPressAlt} />
+            </FadeIn>
+          ))}
+        </View>
+      </View>
+    );
+  }
 
-  if (currentScore >= SCORE_THRESHOLD) return null;
-  if (!loaded) return null;
-  if (alts.length === 0) return null;
-
-  const visibleAlts = isPremium ? alts.slice(0, 3) : alts.slice(0, 1);
-
+  // Free
+  const teaser = alternatives[0];
+  const remaining = alternatives.length - 1;
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <Header currentScore={currentScore} />
+      <View
+        testID="alternatives-free-preview"
+        pointerEvents="none"
+        style={styles.freePreview}
+      >
+        <AlternativeCard alt={teaser} onPress={onPressAlt} />
+      </View>
+      {remaining > 0 ? (
+        <Text style={styles.teaser}>
+          et {remaining} autre{remaining > 1 ? 's' : ''} alternative
+          {remaining > 1 ? 's' : ''} premium…
+        </Text>
+      ) : null}
+      <PremiumPaywall
+        title="Voir toutes les alternatives"
+        description="Accédez aux 5 produits classés par score, NOVA et additifs, mis à jour en continu via Open Food Facts."
+        onUnlock={onUnlock}
+      />
+    </View>
+  );
+}
+
+interface HeaderProps {
+  currentScore: number;
+}
+
+function Header({ currentScore }: HeaderProps) {
+  return (
+    <View>
+      <View style={styles.headerRow}>
         <Leaf color={Colors.sage} size={18} strokeWidth={2.4} />
-        <Text style={styles.title}>Meilleures alternatives</Text>
+        <Text style={styles.title}>{getAlternativesTitle(currentScore)}</Text>
       </View>
       <Text style={styles.subtitle}>
         Des produits similaires mieux notés que celui-ci.
       </Text>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {visibleAlts.map((alt) => (
-          <AlternativeCard key={alt.barcode} alt={alt} onPress={onPressAlt} />
-        ))}
-      </ScrollView>
-
-      {!isPremium ? (
-        <PremiumPaywall
-          title="Voir toutes les alternatives"
-          description="Accédez aux 3 produits classés par delta de score, mis à jour en continu via Open Food Facts."
-          onUnlock={onUnlock}
-        />
-      ) : null}
     </View>
   );
 }
@@ -98,7 +110,7 @@ const styles = StyleSheet.create({
   container: {
     gap: 12,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -113,9 +125,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textMuted,
     lineHeight: 18,
+    marginTop: 4,
   },
-  scrollContent: {
-    gap: 12,
-    paddingVertical: 4,
+  list: {
+    gap: 10,
+  },
+  skeletonCard: {
+    height: 85,
+    backgroundColor: '#EAEDE3',
+    borderRadius: 18,
+  },
+  freePreview: {
+    opacity: 0.25,
+  },
+  teaser: {
+    fontFamily: 'Inter',
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
   },
 });

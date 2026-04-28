@@ -73,6 +73,34 @@ export async function fetchProductCategoryTag(
   }
 }
 
+/**
+ * Récupère le chemin complet de catégories OFF (ordre racine → spécifique).
+ * Utilisé par la cascade hiérarchique de `findAlternatives` qui peut remonter
+ * vers un parent quand le tag le plus spécifique livre trop peu de résultats.
+ *
+ * Retourne `[]` si le produit est introuvable, si `categories_tags` est absent,
+ * ou si la requête échoue (timeout / réseau).
+ */
+export async function fetchProductCategoriesTags(
+  barcode: string,
+): Promise<string[]> {
+  try {
+    const url = `${OFF_BASE}/product/${barcode}.json?fields=categories_tags`;
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.status !== 1) return [];
+    const tags: string[] = Array.isArray(data.product?.categories_tags)
+      ? data.product.categories_tags
+      : [];
+    return tags;
+  } catch {
+    return [];
+  }
+}
+
 function parsePortionGrams(servingSize?: string): number {
   if (!servingSize) return 100;
   const match = servingSize.match(/(\d+(?:[.,]\d+)?)\s*(g|ml)/i);

@@ -1,137 +1,229 @@
 /**
- * AlternativesSection — section "Meilleures alternatives" sur la fiche produit.
+ * AlternativesSection — section "Alternatives" sur la fiche produit.
  *
  * Règles :
- *   • Ne s'affiche que si currentScore < 70 (R3 du brief : preview avant gate)
- *   • Free : preview 1 carte floue + paywall non-aggressif
- *   • Premium : 3 cartes complètes
- *   • Loading skeleton pendant fetch, null si zéro résultat
+ *   • Affichage piloté par les props (plus de fetch interne)
+ *   • Free : preview 1 carte opacity 0.25 + paywall + teaser
+ *   • Premium : 5 cartes en stack vertical
+ *   • Loading : skeleton, sans paywall
+ *   • alternatives === [] && !isLoading → null
+ *   • Titre dynamique selon currentScore (3 seuils)
  */
 
-import { render, waitFor } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 import { AlternativesSection } from '../AlternativesSection';
-import type { AlternativeProduct } from '@/src/lib/api/smart-alternatives';
+import type { Alternative } from '@/src/lib/api/smart-alternatives';
 
 jest.mock('@/src/lib/api/smart-alternatives', () => ({
-  findAlternatives: jest.fn(),
+  __esModule: true,
+  getAlternativesTitle: (score: number): string => {
+    if (score < 50) return 'Des alternatives bien meilleures existent';
+    if (score < 80) return 'Alternatives plus saines';
+    return 'Alternatives dans cette catégorie';
+  },
 }));
+
+jest.mock('expo-image', () => {
+  const { View } = require('react-native');
+  return { Image: View };
+});
 
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
   ImpactFeedbackStyle: { Light: 'light' },
 }));
 
-import { findAlternatives } from '@/src/lib/api/smart-alternatives';
-
-const samples: AlternativeProduct[] = [
+const samples: Alternative[] = [
   {
     barcode: 'a1',
     name: 'Bio A',
     brand: 'BX',
     imageUrl: 'https://img/a',
-    grade: 'a',
-    proxyScore: 90,
+    score: 90,
     scoreDelta: 50,
+    category: 'en:cookies',
+    novaGroup: 1,
+    additivesCount: 0,
   },
   {
     barcode: 'b1',
     name: 'Bio B',
     brand: 'BY',
     imageUrl: 'https://img/b',
-    grade: 'b',
-    proxyScore: 70,
-    scoreDelta: 30,
+    score: 85,
+    scoreDelta: 45,
+    category: 'en:cookies',
+    novaGroup: 2,
+    additivesCount: 1,
   },
   {
     barcode: 'c1',
     name: 'Bio C',
     brand: 'BZ',
     imageUrl: 'https://img/c',
-    grade: 'b',
-    proxyScore: 70,
+    score: 80,
+    scoreDelta: 40,
+    category: 'en:cookies',
+    novaGroup: 3,
+    additivesCount: 2,
+  },
+  {
+    barcode: 'd1',
+    name: 'Bio D',
+    brand: 'BW',
+    imageUrl: 'https://img/d',
+    score: 75,
+    scoreDelta: 35,
+    category: 'en:cookies',
+    novaGroup: 3,
+    additivesCount: 3,
+  },
+  {
+    barcode: 'e1',
+    name: 'Bio E',
+    brand: 'BV',
+    imageUrl: 'https://img/e',
+    score: 70,
     scoreDelta: 30,
+    category: 'en:cookies',
+    novaGroup: 4,
+    additivesCount: 5,
   },
 ];
 
 describe('AlternativesSection', () => {
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("ne s'affiche pas si currentScore >= 70 (produit déjà bon)", async () => {
-    (findAlternatives as jest.Mock).mockResolvedValue(samples);
-    const { queryByText } = render(
+  it('Premium : affiche les 5 cartes sans paywall', () => {
+    const { getByText, queryByText } = render(
       <AlternativesSection
-        scannedBarcode="orig"
-        categoryTag="en:cookies"
-        currentScore={75}
-        isPremium={false}
-        onUnlock={() => undefined}
-        onPressAlt={() => undefined}
-      />,
-    );
-    await waitFor(() => {
-      expect(queryByText(/Meilleures alternatives/i)).toBeNull();
-    });
-    expect(findAlternatives).not.toHaveBeenCalled();
-  });
-
-  it('Premium : affiche les 3 cartes sans paywall', async () => {
-    (findAlternatives as jest.Mock).mockResolvedValue(samples);
-    const { findByText, queryByText } = render(
-      <AlternativesSection
-        scannedBarcode="orig"
-        categoryTag="en:cookies"
-        currentScore={40}
+        alternatives={samples}
         isPremium={true}
+        currentScore={40}
+        isLoading={false}
         onUnlock={() => undefined}
         onPressAlt={() => undefined}
       />,
     );
-    expect(await findByText(/Meilleures alternatives/i)).toBeTruthy();
-    expect(await findByText('Bio A')).toBeTruthy();
-    expect(await findByText('Bio B')).toBeTruthy();
-    expect(await findByText('Bio C')).toBeTruthy();
+    expect(getByText('Bio A')).toBeTruthy();
+    expect(getByText('Bio B')).toBeTruthy();
+    expect(getByText('Bio C')).toBeTruthy();
+    expect(getByText('Bio D')).toBeTruthy();
+    expect(getByText('Bio E')).toBeTruthy();
     expect(queryByText(/Débloquer/i)).toBeNull();
   });
 
-  it('Free : preview 1 carte + paywall (R3 : preview avant paywall)', async () => {
-    (findAlternatives as jest.Mock).mockResolvedValue(samples);
-    const { findByText, queryByText } = render(
+  it('Free : preview 1 carte (opacity 0.25) + paywall + teaser', () => {
+    const { getByText, getByTestId, queryByText } = render(
       <AlternativesSection
-        scannedBarcode="orig"
-        categoryTag="en:cookies"
-        currentScore={40}
+        alternatives={samples}
         isPremium={false}
+        currentScore={40}
+        isLoading={false}
         onUnlock={() => undefined}
         onPressAlt={() => undefined}
       />,
     );
-    expect(await findByText(/Meilleures alternatives/i)).toBeTruthy();
-    expect(await findByText('Bio A')).toBeTruthy();
-    // 2 et 3 cachés derrière paywall
+    expect(getByText('Bio A')).toBeTruthy();
+    // Cartes 2-5 cachées derrière le paywall
     expect(queryByText('Bio B')).toBeNull();
     expect(queryByText('Bio C')).toBeNull();
-    expect(await findByText(/29,99€\s*\/\s*an/)).toBeTruthy();
+    expect(queryByText('Bio D')).toBeNull();
+    expect(queryByText('Bio E')).toBeNull();
+    // Teaser
+    expect(getByText(/4 autres alternatives premium/i)).toBeTruthy();
+    // Wrapper opacity 0.25 (testID)
+    const teaserWrap = getByTestId('alternatives-free-preview');
+    expect(teaserWrap.props.style).toEqual(
+      expect.objectContaining({ opacity: 0.25 }),
+    );
+    // Paywall
+    expect(getByText(/Débloquer/)).toBeTruthy();
   });
 
-  it("ne s'affiche pas si findAlternatives renvoie un tableau vide", async () => {
-    (findAlternatives as jest.Mock).mockResolvedValue([]);
-    const { queryByText } = render(
+  it('Titre dynamique : score < 50 → "bien meilleures"', () => {
+    const { getByText } = render(
       <AlternativesSection
-        scannedBarcode="orig"
-        categoryTag="en:cookies"
-        currentScore={40}
+        alternatives={samples}
         isPremium={true}
+        currentScore={30}
+        isLoading={false}
         onUnlock={() => undefined}
         onPressAlt={() => undefined}
       />,
     );
-    await waitFor(() => {
-      expect(findAlternatives).toHaveBeenCalled();
-    });
-    await waitFor(() => {
-      expect(queryByText(/Meilleures alternatives/i)).toBeNull();
-    });
+    expect(getByText(/bien meilleures/i)).toBeTruthy();
+  });
+
+  it('Titre dynamique : 50 ≤ score < 80 → "plus saines"', () => {
+    const { getByText } = render(
+      <AlternativesSection
+        alternatives={samples}
+        isPremium={true}
+        currentScore={65}
+        isLoading={false}
+        onUnlock={() => undefined}
+        onPressAlt={() => undefined}
+      />,
+    );
+    expect(getByText(/plus saines/i)).toBeTruthy();
+  });
+
+  it('Titre dynamique : score ≥ 80 → "dans cette catégorie"', () => {
+    const { getByText } = render(
+      <AlternativesSection
+        alternatives={samples}
+        isPremium={true}
+        currentScore={85}
+        isLoading={false}
+        onUnlock={() => undefined}
+        onPressAlt={() => undefined}
+      />,
+    );
+    expect(getByText(/dans cette catégorie/i)).toBeTruthy();
+  });
+
+  it('isLoading=true : rend skeleton, aucune carte visible, pas de paywall', () => {
+    const { queryByText, getByTestId } = render(
+      <AlternativesSection
+        alternatives={[]}
+        isPremium={false}
+        currentScore={40}
+        isLoading={true}
+        onUnlock={() => undefined}
+        onPressAlt={() => undefined}
+      />,
+    );
+    expect(queryByText('Bio A')).toBeNull();
+    expect(queryByText(/Débloquer/i)).toBeNull();
+    // Skeleton testID
+    expect(getByTestId('alternatives-skeleton')).toBeTruthy();
+  });
+
+  it('alternatives vides && !isLoading → renvoie null', () => {
+    const { toJSON } = render(
+      <AlternativesSection
+        alternatives={[]}
+        isPremium={false}
+        currentScore={40}
+        isLoading={false}
+        onUnlock={() => undefined}
+        onPressAlt={() => undefined}
+      />,
+    );
+    expect(toJSON()).toBeNull();
+  });
+
+  it('Free avec une seule alternative : pas de teaser pluriel "et 0 autres"', () => {
+    const { getByText, queryByText } = render(
+      <AlternativesSection
+        alternatives={[samples[0]]}
+        isPremium={false}
+        currentScore={40}
+        isLoading={false}
+        onUnlock={() => undefined}
+        onPressAlt={() => undefined}
+      />,
+    );
+    expect(getByText('Bio A')).toBeTruthy();
+    expect(queryByText(/0 autres/)).toBeNull();
   });
 });

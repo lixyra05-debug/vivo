@@ -24,7 +24,7 @@ import { BadgeUnlockedModal } from '@/src/components/gamification/BadgeUnlockedM
 import { Colors } from '@/src/constants/colors';
 import {
   productToScoringInput,
-  fetchProductCategoryTag,
+  fetchProductCategoriesTags,
 } from '@/src/lib/api/openfoodfacts';
 import {
   cosmeticToScoringInput,
@@ -92,9 +92,9 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const grantBadges = useGrantBadges(user?.id);
   const { isPremium } = usePremium(user?.id ?? null);
 
-  const categoryTagQuery = useQuery({
-    queryKey: ['product-category-tag', barcode] as const,
-    queryFn: () => fetchProductCategoryTag(barcode),
+  const categoryTagsQuery = useQuery({
+    queryKey: ['product-categories-tags', barcode] as const,
+    queryFn: () => fetchProductCategoriesTags(barcode),
     enabled: Boolean(barcode),
     staleTime: 24 * 60 * 60 * 1000,
   });
@@ -376,12 +376,11 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
           product={product}
           result={result}
           educationalCards={educationalCards}
-          categoryTag={categoryTagQuery.data ?? null}
+          categoriesTags={categoryTagsQuery.data ?? []}
           isPremium={isPremium}
           onUnlockPremium={() => router.push('/profile')}
           onPressAlternative={(bc) => router.push(`/product/${bc}?type=food`)}
           onPressMethodology={() => router.push('/methodology')}
-          onPressSwap={() => router.push(`/swap/${product.barcode}`)}
         />
 
         <View style={{ height: 24 }} />

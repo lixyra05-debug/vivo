@@ -1,8 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Leaf, Sparkles } from 'lucide-react-native';
+import { Sparkles } from 'lucide-react-native';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
-import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { ScoreCircle } from './ScoreCircle';
 import { NovaBadge } from './NovaBadge';
 import { UltraTransformedTag } from './UltraTransformedTag';
@@ -20,6 +19,7 @@ import { AlternativesSection } from '@/src/components/premium/AlternativesSectio
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { findAdditive } from '@/src/lib/scoring/engine';
 import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
+import { useAlternatives } from '@/src/lib/api/use-alternatives';
 import type { Product, ScoringResult } from '@/src/lib/api/types';
 import type { EducationalCard as EducationalCardType } from '@/src/lib/gamification/types';
 
@@ -27,25 +27,28 @@ export interface FoodProductViewProps {
   product: Product;
   result: ScoringResult;
   educationalCards: EducationalCardType[];
-  categoryTag: string | null;
+  categoriesTags: string[];
   isPremium: boolean;
   onUnlockPremium: () => void;
   onPressAlternative: (barcode: string) => void;
   onPressMethodology: () => void;
-  onPressSwap: () => void;
 }
 
 export function FoodProductView({
   product,
   result,
   educationalCards,
-  categoryTag,
+  categoriesTags,
   isPremium,
   onUnlockPremium,
   onPressAlternative,
   onPressMethodology,
-  onPressSwap,
 }: FoodProductViewProps) {
+  const { alternatives, isLoading: alternativesLoading } = useAlternatives(
+    product.barcode,
+    categoriesTags,
+    result.score_final,
+  );
   const additivePenalties = result.penalties.filter((p) => p.category === 'additive');
   const otherPenalties = result.penalties.filter(
     (p) => p.category !== 'additive' && p.points > 0,
@@ -252,10 +255,10 @@ export function FoodProductView({
 
       <FadeIn delay={620}>
         <AlternativesSection
-          scannedBarcode={product.barcode}
-          categoryTag={categoryTag}
-          currentScore={result.score_final}
+          alternatives={alternatives}
           isPremium={isPremium}
+          currentScore={result.score_final}
+          isLoading={alternativesLoading}
           onUnlock={onUnlockPremium}
           onPressAlt={onPressAlternative}
         />
@@ -346,15 +349,6 @@ export function FoodProductView({
           </View>
         </FadeIn>
       ) : null}
-
-      <FadeIn delay={880}>
-        <PrimaryCTA
-          label="Voir les alternatives"
-          onPress={onPressSwap}
-          icon={<Leaf color="#FFFFFF" size={18} strokeWidth={2.2} />}
-          accessibilityHint="Découvre des produits mieux notés dans la même catégorie"
-        />
-      </FadeIn>
 
       <FadeIn delay={940}>
         <ReportButton barcode={product.barcode} />
