@@ -10,6 +10,7 @@ function row(barcode: string, scannedAt: string, isFavorite = false): ScanHistor
     penalties_snapshot: null,
     is_favorite: isFavorite,
     scanned_at: scannedAt,
+    product_type: 'food',
     product: null,
   };
 }

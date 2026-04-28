@@ -20,8 +20,10 @@ const CONCURRENCY = 3;
  * Exécute `fn` sur chaque item avec une concurrence maximale `concurrency`.
  * Préserve l'ordre d'origine. Les rejets passent en valeur "fallback" (R par défaut).
  * Implémentation : batches via Promise.allSettled (simplicité maximale, pas de worker pool).
+ *
+ * Exporté pour être réutilisé par d'autres services (top-by-category, etc.).
  */
-async function promiseAllWithConcurrency<T, R>(
+export async function promiseAllWithConcurrency<T, R>(
   concurrency: number,
   items: T[],
   fn: (item: T) => Promise<R>,

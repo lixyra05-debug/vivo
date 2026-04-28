@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { ScanLine } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -7,15 +9,22 @@ import { Greeting } from '@/src/components/home/Greeting';
 import { OrganicBlob } from '@/src/components/home/OrganicBlob';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { StatsRow } from '@/src/components/home/StatsRow';
+import { TopByCategorySection } from '@/src/components/home/TopByCategorySection';
 import { StreakCounter } from '@/src/components/gamification/StreakCounter';
 import { WeeklyProgressBar } from '@/src/components/gamification/WeeklyProgressBar';
 import { Colors } from '@/src/constants/colors';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useScanHistory } from '@/src/lib/stores/useProductStore';
+import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import { calculateStreak } from '@/src/lib/gamification/streak-engine';
 import { calculateProfileStats } from '@/src/lib/stats/profile-stats-engine';
 import { getTimeBasedTagline } from '@/src/lib/home/tagline';
+import { fetchTopByCategoryHome } from '@/src/lib/api/top-by-category';
 import type { ScanRecord } from '@/src/lib/gamification/types';
+import type { UserProfile } from '@/src/lib/api/types';
+
+const TOP_BY_CATEGORY_STALE_MS = 30 * 60 * 1000;
+const TOP_BY_CATEGORY_GC_MS = 60 * 60 * 1000;
 
 const BLOB_SIZE = 320;
 const HALO_SIZE = 360;
@@ -23,6 +32,7 @@ const HALO_SIZE = 360;
 export default function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const profile = useProfileStore((s) => s.profile);
   const { data: rawScans } = useScanHistory({ userId: user?.id, limit: 100 });
 
   const scans: ScanRecord[] = (rawScans ?? []).map((row) => ({
@@ -39,6 +49,22 @@ export default function HomeScreen() {
   const stats = scans.length > 0 ? calculateProfileStats(scans) : null;
   const last7 = stats ? stats.scansByDay.slice(-7) : [];
   const tagline = getTimeBasedTagline();
+
+  const userProfile: UserProfile = useMemo(
+    () => ({
+      type: profile?.health_profile ?? 'standard',
+      allergies: profile?.allergies ?? [],
+      intolerances: profile?.intolerances ?? [],
+    }),
+    [profile],
+  );
+
+  const topByCategoryQuery = useQuery({
+    queryKey: ['top-by-category-home', userProfile.type] as const,
+    queryFn: () => fetchTopByCategoryHome(userProfile),
+    staleTime: TOP_BY_CATEGORY_STALE_MS,
+    gcTime: TOP_BY_CATEGORY_GC_MS,
+  });
 
   return (
     <ScreenContainer scroll>
@@ -117,6 +143,13 @@ export default function HomeScreen() {
             />
           </View>
         ) : null}
+
+        <FadeIn delay={200}>
+          <TopByCategorySection
+            blocks={topByCategoryQuery.data}
+            isLoading={topByCategoryQuery.isLoading}
+          />
+        </FadeIn>
 
         <View className="mt-auto">
           <PrimaryCTA

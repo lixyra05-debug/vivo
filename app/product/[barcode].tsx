@@ -426,7 +426,10 @@ interface CosmeticProductScreenProps {
 
 function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
+  const recordScan = useRecordScan(user?.id);
+  const [scanRecorded, setScanRecorded] = useState(false);
 
   const cosmeticQuery = useQuery({
     queryKey: ['cosmetic', barcode] as const,
@@ -443,6 +446,18 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
       'standard',
     );
   }, [cosmeticQuery.data]);
+
+  useEffect(() => {
+    if (!user || !barcode || !result || scanRecorded) return;
+    setScanRecorded(true);
+    recordScan.mutate({
+      barcode,
+      score: result.score_final,
+      profile: profile?.health_profile ?? 'standard',
+      penalties: result.penalties,
+      productType: 'cosmetic',
+    });
+  }, [user, barcode, result, scanRecorded, recordScan, profile]);
 
   const compatibilityResult = useMemo(() => {
     if (!cosmeticQuery.data || !result) return null;
@@ -514,7 +529,7 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
     );
   }
 
-  // TODO: activer les favoris cosmétiques quand scan_history (ou une table dédiée) supportera type='cosmetic'.
+  // Scans cosmétiques enregistrés depuis le Sprint 2 (product_type='cosmetic'). Favoris cosmétiques : TODO Sprint 3.
   return (
     <ScreenContainer scroll>
       <View style={{ gap: 22 }}>

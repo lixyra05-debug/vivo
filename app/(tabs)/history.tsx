@@ -10,6 +10,7 @@ import { Skeleton } from '@/src/components/ui/Skeleton';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { ScanHistoryCard } from '@/src/components/product/ScanHistoryCard';
 import { EmptyBasket } from '@/src/components/illustrations/EmptyBasket';
+import { HistoryTypeTabs, type HistoryType } from '@/src/components/explore/HistoryTypeTabs';
 import { Colors } from '@/src/constants/colors';
 import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
@@ -43,6 +44,7 @@ export default function HistoryScreen() {
   const { isPremium } = usePremium();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [typeFilter, setTypeFilter] = useState<HistoryType>('all');
 
   const query = useScanHistory({
     userId: user?.id,
@@ -85,16 +87,29 @@ export default function HistoryScreen() {
     return set;
   }, [query.data, compatProfile]);
 
-  const { rows, filtered, reachedLimit, counts, insight } = useMemo(() => {
+  const { rows, filtered, reachedLimit, counts, typeCounts, insight } = useMemo(() => {
     const allRows = dedupeByBarcode(query.data ?? []);
+
+    const typeOf = (r: ScanHistoryRow): 'food' | 'cosmetic' =>
+      r.product_type === 'cosmetic' ? 'cosmetic' : 'food';
+
+    const typeCounters = {
+      all: allRows.length,
+      food: allRows.filter((r) => typeOf(r) === 'food').length,
+      cosmetic: allRows.filter((r) => typeOf(r) === 'cosmetic').length,
+    };
+
+    const typeFiltered =
+      typeFilter === 'all' ? allRows : allRows.filter((r) => typeOf(r) === typeFilter);
+
     const q = search.trim().toLowerCase();
     const searched = q
-      ? allRows.filter((r) => {
+      ? typeFiltered.filter((r) => {
           const name = r.product?.name?.toLowerCase() ?? '';
           const brand = r.product?.brand?.toLowerCase() ?? '';
           return name.includes(q) || brand.includes(q);
         })
-      : allRows;
+      : typeFiltered;
 
     const counters = {
       all: searched.length,
@@ -126,9 +141,10 @@ export default function HistoryScreen() {
       filtered: filteredRows,
       reachedLimit: !isPremium && allRows.length >= FREE_LIMIT,
       counts: counters,
+      typeCounts: typeCounters,
       insight: insightData,
     };
-  }, [query.data, search, filter, isPremium, incompatibleBarcodes]);
+  }, [query.data, search, filter, typeFilter, isPremium, incompatibleBarcodes]);
 
   const chips: ChipDef[] = [
     { key: 'all', label: 'Tous', count: counts.all },
@@ -215,6 +231,16 @@ export default function HistoryScreen() {
             />
           </GlassCard>
         </FadeIn>
+
+        {rows.length > 0 ? (
+          <FadeIn delay={120}>
+            <HistoryTypeTabs
+              value={typeFilter}
+              onChange={setTypeFilter}
+              counts={typeCounts}
+            />
+          </FadeIn>
+        ) : null}
 
         {rows.length > 0 ? (
           <FadeIn delay={140}>

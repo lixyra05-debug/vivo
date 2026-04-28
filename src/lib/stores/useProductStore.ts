@@ -16,6 +16,7 @@ export interface ScanHistoryRow {
   penalties_snapshot: unknown;
   is_favorite: boolean;
   scanned_at: string;
+  product_type: 'food' | 'cosmetic';
   product: Product | null;
 }
 

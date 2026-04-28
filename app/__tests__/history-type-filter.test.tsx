@@ -40,21 +40,26 @@ jest.mock('@/src/lib/stores/useProfileStore', () => ({
     selector({ profile: null }),
 }));
 
-function makeRow(overrides: Partial<ScanHistoryRow>): ScanHistoryRow {
+function makeRow(
+  id: string,
+  barcode: string,
+  productType: 'food' | 'cosmetic',
+  name: string,
+): ScanHistoryRow {
   return {
-    id: overrides.id ?? 'row-default',
+    id,
     user_id: 'user-1',
-    barcode: overrides.barcode ?? '0000',
-    score_at_scan: overrides.score_at_scan ?? 50,
+    barcode,
+    score_at_scan: 65,
     profile_used: 'standard',
     penalties_snapshot: [],
     is_favorite: false,
     scanned_at: '2026-04-25T10:00:00Z',
-    product_type: overrides.product_type ?? 'food',
+    product_type: productType,
     product: {
-      barcode: overrides.barcode ?? '0000',
-      name: overrides.product?.name ?? 'Produit',
-      brand: overrides.product?.brand ?? 'Marque',
+      barcode,
+      name,
+      brand: 'Marque',
       image_url: null,
       ingredients_raw: null,
       additives_tags: [],
@@ -81,11 +86,11 @@ function makeRow(overrides: Partial<ScanHistoryRow>): ScanHistoryRow {
 }
 
 const mockRows: ScanHistoryRow[] = [
-  makeRow({ id: 'r1', barcode: '111', score_at_scan: 92, product: { name: 'Excellent A' } as never }),
-  makeRow({ id: 'r2', barcode: '222', score_at_scan: 85, product: { name: 'Excellent B' } as never }),
-  makeRow({ id: 'r3', barcode: '333', score_at_scan: 50, product: { name: 'Moyen' } as never }),
-  makeRow({ id: 'r4', barcode: '444', score_at_scan: 20, product: { name: 'Mauvais X' } as never }),
-  makeRow({ id: 'r5', barcode: '555', score_at_scan: 10, product: { name: 'Mauvais Y' } as never }),
+  makeRow('r1', '111', 'food', 'Yaourt nature'),
+  makeRow('r2', '222', 'food', 'Pain complet'),
+  makeRow('r3', '333', 'food', 'Pommes bio'),
+  makeRow('r4', '444', 'cosmetic', 'Crème hydratante'),
+  makeRow('r5', '555', 'cosmetic', 'Shampoing doux'),
 ];
 
 jest.mock('@/src/lib/stores/useProductStore', () => {
@@ -111,49 +116,56 @@ function Wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-describe('HistoryScreen filtres rapides', () => {
-  it('affiche tous les scans avec le filtre "Tous" actif par défaut', () => {
-    const { getByLabelText, queryByLabelText, queryByText } = render(
+describe('HistoryScreen filtre par type de produit', () => {
+  it('affiche les 5 scans (3 food + 2 cosmetic) par défaut sur Tous', () => {
+    const { queryByLabelText } = render(
       <Wrapper>
         <HistoryScreen />
       </Wrapper>,
     );
-    expect(getByLabelText(/Excellent A/)).toBeTruthy();
-    expect(queryByLabelText(/Mauvais X/)).toBeTruthy();
-    expect(queryByText('Aucun scan dans ce filtre')).toBeNull();
+    expect(queryByLabelText(/Yaourt nature/)).toBeTruthy();
+    expect(queryByLabelText(/Pain complet/)).toBeTruthy();
+    expect(queryByLabelText(/Pommes bio/)).toBeTruthy();
+    expect(queryByLabelText(/Crème hydratante/)).toBeTruthy();
+    expect(queryByLabelText(/Shampoing doux/)).toBeTruthy();
   });
 
-  it('le chip "À éviter" affiche son compteur (2)', () => {
-    const { getByText } = render(
-      <Wrapper>
-        <HistoryScreen />
-      </Wrapper>,
-    );
-    expect(getByText('À éviter (2)')).toBeTruthy();
-    expect(getByText('Excellents (2)')).toBeTruthy();
-  });
-
-  it('tap sur le chip "À éviter" filtre la liste aux scans <30', () => {
+  it("filtre uniquement les produits Alimentation quand l'onglet Alimentation est actif", () => {
     const { getByLabelText, queryByLabelText } = render(
       <Wrapper>
         <HistoryScreen />
       </Wrapper>,
     );
-    fireEvent.press(getByLabelText('À éviter (2)'));
-    expect(queryByLabelText(/Mauvais X/)).toBeTruthy();
-    expect(queryByLabelText(/Mauvais Y/)).toBeTruthy();
-    expect(queryByLabelText(/Excellent A/)).toBeNull();
-    expect(queryByLabelText(/^Moyen,/)).toBeNull();
+    fireEvent.press(getByLabelText(/Scans Alimentation/));
+    expect(queryByLabelText(/Yaourt nature/)).toBeTruthy();
+    expect(queryByLabelText(/Pain complet/)).toBeTruthy();
+    expect(queryByLabelText(/Pommes bio/)).toBeTruthy();
+    expect(queryByLabelText(/Crème hydratante/)).toBeNull();
+    expect(queryByLabelText(/Shampoing doux/)).toBeNull();
   });
 
-  it('affiche le bandeau insight avec les pourcentages', () => {
-    const { getByText } = render(
+  it("filtre uniquement les produits Cosmétiques quand l'onglet Cosmétiques est actif", () => {
+    const { getByLabelText, queryByLabelText } = render(
       <Wrapper>
         <HistoryScreen />
       </Wrapper>,
     );
-    // 5 rows : 2 excellents (40%), 2 à éviter (40%)
-    expect(getByText(/Sur tes 5 derniers scans/)).toBeTruthy();
-    expect(getByText(/40/)).toBeTruthy();
+    fireEvent.press(getByLabelText(/Scans Cosmétiques/));
+    expect(queryByLabelText(/Yaourt nature/)).toBeNull();
+    expect(queryByLabelText(/Pain complet/)).toBeNull();
+    expect(queryByLabelText(/Pommes bio/)).toBeNull();
+    expect(queryByLabelText(/Crème hydratante/)).toBeTruthy();
+    expect(queryByLabelText(/Shampoing doux/)).toBeTruthy();
+  });
+
+  it('affiche les compteurs corrects sur les onglets (5 / 3 / 2)', () => {
+    const { getByLabelText } = render(
+      <Wrapper>
+        <HistoryScreen />
+      </Wrapper>,
+    );
+    expect(getByLabelText('Tous les scans (5)')).toBeTruthy();
+    expect(getByLabelText('Scans Alimentation (3)')).toBeTruthy();
+    expect(getByLabelText('Scans Cosmétiques (2)')).toBeTruthy();
   });
 });
