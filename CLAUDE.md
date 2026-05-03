@@ -142,6 +142,12 @@ Refonte de la section "Meilleures alternatives" sur la fiche produit : du statiq
   - `app/product/[barcode].tsx` : switch `fetchProductCategoryTag` → `fetchProductCategoriesTags`, pass `categoriesTags={categoryTagsQuery.data ?? []}`.
 - **Tests** : 488 → **508 verts** (+20 : 19 smart-alternatives complets, +2 openfoodfacts/fetchProductCategoriesTags, 4 AlternativeCard, 8 AlternativesSection, 2 FoodProductView adaptés). Aucune régression.
 
+## Pages légales (mai 2026)
+- **CGU** : `app/settings/cgu.tsx` — 10 articles, version 1.0, dernière mise à jour 3 mai 2026. Accessible depuis `/settings/legal` et la checkbox d'inscription.
+- **Politique de Confidentialité** : `app/settings/privacy.tsx` — 12 articles RGPD (art. 6, 9, 15-21), version 1.0, dernière mise à jour 3 mai 2026. Inclut tableaux des données collectées / sous-traitants / durées de conservation. Lien CNIL fonctionnel.
+- **Pas de GlassCard** sur ces écrans (lecture longue → fond cream uniforme).
+- **Tests** : aucun nouveau test (texte statique). 546 tests verts maintenus.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

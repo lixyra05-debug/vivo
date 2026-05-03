@@ -174,7 +174,7 @@ export default function RegisterScreen() {
               }}
             >
               {"J'ai lu et j'accepte les "}
-              <Link href={'/legal/cgu' as Href} asChild>
+              <Link href={'/settings/cgu' as Href} asChild>
                 <Text
                   style={{
                     color: Colors.text,
@@ -186,7 +186,7 @@ export default function RegisterScreen() {
                 </Text>
               </Link>
               {' et la '}
-              <Link href={'/legal/privacy' as Href} asChild>
+              <Link href={'/settings/privacy' as Href} asChild>
                 <Text
                   style={{
                     color: Colors.text,

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ArrowLeft, ExternalLink } from 'lucide-react-native';
+import { AlertTriangle, ArrowLeft, ChevronRight } from 'lucide-react-native';
 import { SecondaryButton } from '@/src/components/ui/SecondaryButton';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
@@ -165,14 +165,20 @@ export default function LegalScreen() {
         </FadeIn>
 
         <FadeIn delay={480}>
-          <SecondaryButton
-            label="Politique de confidentialité"
-            onPress={() => {
-              void Linking.openURL('https://lyxiria.com/privacy');
-            }}
-            icon={<ExternalLink color={Colors.textMuted} size={18} strokeWidth={2.2} />}
-            accessibilityHint="Ouvre la politique dans le navigateur"
-          />
+          <View style={{ gap: 10 }}>
+            <SecondaryButton
+              label="Conditions Générales d'Utilisation"
+              onPress={() => router.push('/settings/cgu')}
+              icon={<ChevronRight color={Colors.textMuted} size={18} strokeWidth={2.2} />}
+              accessibilityHint="Ouvre les CGU"
+            />
+            <SecondaryButton
+              label="Politique de Confidentialité"
+              onPress={() => router.push('/settings/privacy')}
+              icon={<ChevronRight color={Colors.textMuted} size={18} strokeWidth={2.2} />}
+              accessibilityHint="Ouvre la politique de confidentialité"
+            />
+          </View>
         </FadeIn>
 
         <Text
