@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
-  FlatList,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,6 +17,7 @@ import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { CategoryRankCard, type Medal } from '@/src/components/explore/CategoryRankCard';
+import { FeaturedProductCard } from '@/src/components/explore/FeaturedProductCard';
 import {
   CompatibilityToggle,
   type CompatibilityMode,
@@ -32,6 +33,7 @@ import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
 import { isProductCompatible } from '@/src/lib/scoring/profile-filters';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
+import { getFeaturedProducts, type FeaturedProduct } from '@/src/data/featured-products';
 import type {
   CategoryDef,
   CosmeticProduct,
@@ -135,6 +137,16 @@ export default function CategoryScreen() {
     [profile],
   );
 
+  const featuredProducts: FeaturedProduct[] = useMemo(
+    () => (category ? getFeaturedProducts(category.slug) : []),
+    [category],
+  );
+
+  const featuredBarcodeSet = useMemo(
+    () => new Set(featuredProducts.map((f) => f.barcode)),
+    [featuredProducts],
+  );
+
   const listQuery = useQuery({
     queryKey: ['category', slug] as const,
     queryFn: () =>
@@ -168,6 +180,10 @@ export default function CategoryScreen() {
   function handleItemPress(item: RankedItem) {
     if (!category) return;
     router.push(`/product/${item.result.barcode}?type=${category.type}`);
+  }
+
+  function handleFeaturedPress(featured: FeaturedProduct) {
+    router.push(`/product/${featured.barcode}?type=${featured.type}`);
   }
 
   if (!category) {
@@ -214,19 +230,22 @@ export default function CategoryScreen() {
   const isRefreshing = listQuery.isRefetching || rankedQuery.isRefetching;
   const rankedData: RankedItem[] = rankedQuery.data ?? [];
 
+  // Dedup R5 : exclure les barcodes déjà présents dans featured
+  const liveData: RankedItem[] = rankedData.filter(
+    (r) => !featuredBarcodeSet.has(r.result.barcode),
+  );
+
   const compatibleCount = compatProfile
-    ? rankedData.filter((r) => isProductCompatible(r.product, r.scoring, compatProfile)).length
+    ? liveData.filter((r) => isProductCompatible(r.product, r.scoring, compatProfile)).length
     : 0;
 
-  const visibleData: RankedItem[] =
+  const visibleLive: RankedItem[] =
     mode === 'profile' && compatProfile
-      ? rankedData.filter((r) => isProductCompatible(r.product, r.scoring, compatProfile))
-      : rankedData;
+      ? liveData.filter((r) => isProductCompatible(r.product, r.scoring, compatProfile))
+      : liveData;
 
-  const hasItems = visibleData.length > 0;
-
-  const podium = visibleData.slice(0, 3);
-  const rest = visibleData.slice(3);
+  const hasFeatured = featuredProducts.length > 0;
+  const hasLive = visibleLive.length > 0;
 
   return (
     <ScreenContainer>
@@ -260,56 +279,86 @@ export default function CategoryScreen() {
             mode={mode}
             onChange={setMode}
             compatibleCount={compatibleCount}
-            totalCount={rankedData.length}
+            totalCount={liveData.length}
             disabled={!compatProfile}
           />
         </FadeIn>
 
-        {isLoading && !hasItems ? (
-          <View style={{ gap: 10 }}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} height={88} radius={20} />
-            ))}
-            <Text style={styles.loadingHint}>Calcul des scores…</Text>
-          </View>
-        ) : !hasItems ? (
-          <GlassCard style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Aucun produit trouvé</Text>
-            <Text style={styles.emptyText}>
-              Aucun produit n'a pu être analysé dans cette catégorie pour le moment.
-            </Text>
-          </GlassCard>
-        ) : (
-          <FlatList
-            data={[...podium, ...rest]}
-            keyExtractor={(item) => item.result.barcode}
-            contentContainerStyle={{ gap: 10, paddingBottom: 24 }}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                tintColor={Colors.sage}
-                colors={[Colors.sage]}
-              />
-            }
-            renderItem={({ item, index }) => {
-              const medal = medalForIndex(index);
-              return (
-                <FadeIn delay={Math.min(120 + index * 40, 480)}>
-                  <CategoryRankCard
-                    result={item.result}
-                    score={item.score}
-                    rank={index + 1}
-                    medal={medal}
-                    confidence={item.confidence}
-                    onPress={() => handleItemPress(item)}
-                  />
-                </FadeIn>
-              );
-            }}
-          />
-        )}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={Colors.sage}
+              colors={[Colors.sage]}
+            />
+          }
+        >
+          {hasFeatured ? (
+            <FadeIn delay={0}>
+              <View style={{ gap: 10 }}>
+                <Text style={styles.sectionTitle}>⭐ Produits populaires</Text>
+                <View style={{ gap: 8 }}>
+                  {featuredProducts.map((p) => (
+                    <FeaturedProductCard
+                      key={`featured-${p.barcode}`}
+                      product={p}
+                      onPress={() => handleFeaturedPress(p)}
+                    />
+                  ))}
+                </View>
+              </View>
+            </FadeIn>
+          ) : null}
+
+          {hasFeatured ? <View style={styles.separator} /> : null}
+
+          {hasFeatured ? (
+            <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>Plus de produits</Text>
+          ) : null}
+
+          {isLoading && !hasLive ? (
+            <View style={{ gap: 10 }}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} height={88} radius={20} />
+              ))}
+              <Text style={styles.loadingHint}>Calcul des scores…</Text>
+            </View>
+          ) : !hasLive ? (
+            hasFeatured ? null : (
+              <GlassCard style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Aucun produit trouvé</Text>
+                <Text style={styles.emptyText}>
+                  Aucun produit n'a pu être analysé dans cette catégorie pour le moment.
+                </Text>
+              </GlassCard>
+            )
+          ) : (
+            <View style={{ gap: 10 }}>
+              {visibleLive.map((item, index) => {
+                const medal = hasFeatured ? undefined : medalForIndex(index);
+                return (
+                  <FadeIn
+                    key={item.result.barcode}
+                    delay={Math.min(120 + index * 40, 480)}
+                  >
+                    <CategoryRankCard
+                      result={item.result}
+                      score={item.score}
+                      rank={index + 1}
+                      medal={medal}
+                      confidence={item.confidence}
+                      onPress={() => handleItemPress(item)}
+                    />
+                  </FadeIn>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
       </View>
     </ScreenContainer>
   );
@@ -350,6 +399,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 13,
     color: Colors.textMuted,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: Colors.text,
+    letterSpacing: -0.2,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: 'rgba(139, 173, 139, 0.18)',
+    marginVertical: 16,
   },
   loadingHint: {
     fontFamily: 'Inter',
