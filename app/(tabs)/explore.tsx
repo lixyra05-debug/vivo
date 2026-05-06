@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Trophy } from 'lucide-react-native';
+import { BookOpen, Leaf, Search, Trophy } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -82,6 +82,20 @@ export default function ExploreScreen() {
     router.push('/store-ranking');
   }
 
+  function handlePlantsPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/plants');
+  }
+
+  function handleRemediesPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/remedies');
+  }
+
   return (
     <ScreenContainer scroll>
       <View style={{ gap: 18 }}>
@@ -159,6 +173,10 @@ export default function ExploreScreen() {
               categories={filteredCategories}
               onPress={handleCategoryPress}
             />
+            <PlantsSection
+              onPlantsPress={handlePlantsPress}
+              onRemediesPress={handleRemediesPress}
+            />
             <StoresSection
               stores={getAllStores()}
               onPress={handleStorePress}
@@ -226,6 +244,62 @@ function CategoriesSection({ categories, onPress }: CategoriesSectionProps) {
             <CategoryCard category={cat} onPress={() => onPress(cat.slug)} />
           </FadeIn>
         ))}
+      </View>
+    </View>
+  );
+}
+
+interface PlantsSectionProps {
+  onPlantsPress: () => void;
+  onRemediesPress: () => void;
+}
+
+function PlantsSection({ onPlantsPress, onRemediesPress }: PlantsSectionProps) {
+  return (
+    <View style={{ gap: 12 }}>
+      <FadeIn delay={190}>
+        <View style={{ gap: 2 }}>
+          <Text style={styles.sectionTitle}>🌿 Plantes médicinales</Text>
+          <Text style={styles.sectionSubtitle}>Encyclopédie sourcée EMA · Tier Expert</Text>
+        </View>
+      </FadeIn>
+      <View style={styles.grid}>
+        <FadeIn delay={230} style={styles.gridCell}>
+          <Pressable
+            onPress={onPlantsPress}
+            accessibilityRole="button"
+            accessibilityLabel="Encyclopédie des plantes"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <GlassCard style={styles.plantCard}>
+              <View style={styles.plantIconWrap}>
+                <BookOpen color={Colors.sage} size={22} strokeWidth={2.2} />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.plantTitle}>Encyclopédie</Text>
+                <Text style={styles.plantSubtitle}>40+ plantes</Text>
+              </View>
+            </GlassCard>
+          </Pressable>
+        </FadeIn>
+        <FadeIn delay={270} style={styles.gridCell}>
+          <Pressable
+            onPress={onRemediesPress}
+            accessibilityRole="button"
+            accessibilityLabel="Chercheur de remèdes"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <GlassCard style={styles.plantCard}>
+              <View style={styles.plantIconWrap}>
+                <Leaf color={Colors.sage} size={22} strokeWidth={2.2} />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.plantTitle}>Remèdes</Text>
+                <Text style={styles.plantSubtitle}>8 catégories</Text>
+              </View>
+            </GlassCard>
+          </Pressable>
+        </FadeIn>
       </View>
     </View>
   );
@@ -366,5 +440,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.sage,
     letterSpacing: 0.2,
+  },
+  plantCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 18,
+  },
+  plantIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(139, 173, 139, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plantTitle: {
+    fontFamily: 'BricolageGrotesque-SemiBold',
+    fontSize: 15,
+    color: Colors.text,
+    letterSpacing: -0.2,
+  },
+  plantSubtitle: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
   },
 });

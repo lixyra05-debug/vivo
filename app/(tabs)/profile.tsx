@@ -5,9 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   BarChart3,
+  BookOpen,
   FileText,
   HeartPulse,
   HelpCircle,
+  Leaf,
   LogOut,
   Sparkles,
   User as UserIcon,
@@ -116,7 +118,7 @@ export default function ProfileScreen() {
 
   const allergies = profile?.allergies ?? [];
   const intolerances = profile?.intolerances ?? [];
-  const { isPremium } = usePremium();
+  const { isPremium, tier } = usePremium();
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.cream }}>
@@ -279,6 +281,29 @@ export default function ProfileScreen() {
             onSeeMethodology={() => router.push('/methodology')}
           />
         </FadeIn>
+
+        {tier === 'expert' ? (
+          <FadeIn delay={240}>
+            <View style={{ gap: 10 }}>
+              <Text style={styles.sectionLabel}>Mon espace Expert 🌿</Text>
+              <GlassCard style={{ padding: 0, overflow: 'hidden' }}>
+                <SettingsRow
+                  icon={<BookOpen color={Colors.sage} size={18} strokeWidth={2.2} />}
+                  label="Encyclopédie des plantes"
+                  description="40+ plantes sourcées EMA · EFSA"
+                  onPress={() => router.push('/plants')}
+                />
+                <View style={styles.rowDivider} />
+                <SettingsRow
+                  icon={<Leaf color={Colors.sage} size={18} strokeWidth={2.2} />}
+                  label="Chercheur de remèdes"
+                  description="8 catégories de bien-être"
+                  onPress={() => router.push('/remedies')}
+                />
+              </GlassCard>
+            </View>
+          </FadeIn>
+        ) : null}
 
         <FadeIn delay={280}>
           <View style={{ gap: 10 }}>

@@ -189,6 +189,27 @@ Deux features Premium pensées partage social/conversion virale. 569 → **577 t
   - **Tests** : `src/components/premium/__tests__/ScanChocCard.test.tsx` 2 cas (rendu nom + 3 problèmes, score affiché). FoodProductView test mocks ajoutés (usePremium, useAlternatives, useAuthStore, expo-router) pour ne pas péter les 2 tests existants.
 - **Tests projet** : 569 → **577 verts** (+8 net : +6 monthly-recap, +2 ScanChocCard, 0 régression sur 564 historiques).
 
+## Encyclopédie des Plantes + Chercheur de Remèdes (mai 2026)
+Première feature exclusive Tier Expert. 577 → **625 tests verts** (+48). Aucune régression. Stack data statique 100% (R10), sources EMA HMPC / EFSA / Cochrane / PubMed / ANSES uniquement (jamais Beauvillard/Clément/O'Neill — garde-fou test).
+
+- **Data + Logique** :
+  - `src/data/plant-encyclopedia.ts` (901 lignes) — Types `PlantEntry`, `PlantCategory` (`respiratory|digestive|nervous|circulatory|skin|urinary|general`), `EvidenceLevel` (`well-established|traditional|efsa-claim|preliminary`). `PLANT_ENCYCLOPEDIA: PlantEntry[]` avec **40 fiches** sourcées. Helpers `getPlantById`, `getPlantsByCategory`, `searchPlants`. Couverture : nervous 7, digestive 6, respiratory 7, skin 5, circulatory 4, urinary 3, general 8.
+  - `src/lib/remedies/remedy-finder.ts` (134 lignes) — Type `RemedyCategory {id, labelFr, emoji, description, keywords: string[], plantIds: string[]}`. **8 catégories** : sleep, digestion, stress, cough, skin, circulation, energy, immunity. **30 IDs canoniques** consommés par les catégories (chamomile, valerian, linden, passionflower, hops, melissa, peppermint, fennel, anise, caraway, artichoke, chicory, lavender, thyme, ivy, plantain, elderflower, mallow, marshmallow, calendula, burdock, borage, aloe_vera, red_vine, horse_chestnut, garlic, rosemary, nettle, ginger, turmeric). Helpers `findRemedies(categoryId)`, `searchRemedies(query)` (substring sur labelFr + description + keywords).
+  - **Garde-fous tests** : (a) URLs whitelistées (ema.europa.eu, efsa.europa.eu, cochrane.org/cochranelibrary.com, pubmed.ncbi.nlm.nih.gov, anses.fr, ansm.sante.fr, who.int) ; (b) **anti-Beauvillard/Clément/O'Neill** strict ; (c) langage R5-safe (jamais "soigne/guérit/traite/remplace") ; (d) 30 IDs canoniques présents.
+  - **R5 ABSOLUE** : "propriétés documentées", "usage traditionnel reconnu", "favorise", "contribue à". Jamais d'allégation thérapeutique.
+- **Premium gate** : `plant_database` et `herbal_remedies` étaient déjà dans `FEATURE_TIER` (tier='expert', cf Sprint 2 tiers). Aucune modification du gate.
+- **Frontend (4 écrans + 1 composant)** :
+  - `app/plants/index.tsx` — Index encyclopédie. Search bar + grille 7 catégories filtrables + liste plantes via `<PlantListCard>`. **Expert gate** : free/premium voient les 3 premières plantes en clair + le reste opacity 0.25 pointerEvents="none" (max 8) + `<PremiumPaywall featureKey="plant_database" />`.
+  - `app/plants/[id].tsx` — Fiche détaillée. 7 sections en GlassCard (FadeIn cascade) : Catégorie, Propriétés documentées, Usage traditionnel, Partie utilisée, Préparation, Contre-indications (border red light), Interactions médicamenteuses. Footer source + lien externe (Linking). **Expert gate** : free/premium voient sections 1+2 (properties tronqué 80 chars) + paywall ; expert voit tout.
+  - `app/remedies/index.tsx` — Chercheur. Grille 8 catégories visibles toutes (pas de blur). **Expert gate** : tap-to-paywall (la grille reste cliquable, mais ouvre `<PremiumPaywall featureKey="herbal_remedies" />` au lieu de naviguer).
+  - `app/remedies/[categoryId].tsx` — Résultats. Header catégorie + liste `<PlantListCard>` via `findRemedies`. **Expert gate** : 2 premiers en clair + reste opacity 0.25 + paywall.
+  - `src/components/plants/PlantListCard.tsx` (128 lignes) — Row 70px : avatar emoji 32px (cercle sage 0.12) + nameFr/nameLatin + badge `evidenceLevel` (4 variantes locales : well-established #2E7D32, traditional sage textMuted, efsa-claim #5B7B9E, preliminary muted earth). Wrapper FadeIn delay configurable.
+  - **Disclaimer footer** sur chaque écran : *"Ces informations sont fournies à titre éducatif. Elles ne remplacent pas un avis médical. Consultez un professionnel de santé."*
+- **Entrées navigation** :
+  - `app/(tabs)/explore.tsx` : nouvelle section "🌿 Plantes médicinales" (sous-titre "Encyclopédie sourcée EMA · Tier Expert") **entre Catégories et Enseignes**. 2 cards (📖 Encyclopédie / 🔍 Remèdes) avec FadeIn cascade 230/270.
+  - `app/(tabs)/profile.tsx` : section conditionnelle "Mon espace Expert 🌿" si `tier === 'expert'`, entre ProfileStatsSection et Paramètres. 2 SettingsRow (Encyclopédie / Chercheur).
+- **Tests** : 577 → **625 verts** (+48 : 40 plant-encyclopedia + 4 remedy-finder + 2 PlantListCard + helpers/garde-fous). Pas de régression. `npx expo export` OK.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables
