@@ -1,18 +1,19 @@
 /**
- * Premium gate — détermine l'accès aux 3 fonctionnalités premium :
- *   • store_full_ranking   — classement complet des supermarchés
- *   • store_comparison     — top produits par enseigne sans coupure
- *   • smart_alternatives   — alternatives intelligentes au scan
+ * Premium gate — système 2 tiers (Premium + Expert).
  *
- * Source de vérité = table `subscriptions` (D1 validée).
- * Trialing compte comme premium (D2 validée).
+ * Source de vérité = table `subscriptions`.
+ * Hiérarchie : free (0) < premium (1) < expert (2).
+ * Trialing compte comme actif (D2 validée).
  */
 
 import {
   isPremiumUser,
+  getUserTier,
   canAccessFeature,
   getFeatureLimit,
   PREMIUM_FEATURES,
+  FEATURE_TIER,
+  TIER_HIERARCHY,
   type PremiumFeatureKey,
 } from '../premium-gate';
 import { supabase } from '../../api/supabase';
@@ -23,16 +24,27 @@ jest.mock('../../api/supabase', () => ({
   },
 }));
 
+/**
+ * Mock simulant la query : .from('subscriptions').select('plan, status').eq('user_id', x).limit(1).maybeSingle()
+ * Plus de filtre serveur sur plan/status — on fait le filtrage en JS via subscriptionRowToTier.
+ */
 function mockSubscriptionRow(row: { plan: string; status: string } | null) {
   const maybeSingle = jest.fn().mockResolvedValue({ data: row, error: null });
   const limit = jest.fn().mockReturnValue({ maybeSingle });
-  const inFn = jest.fn().mockReturnValue({ limit });
-  const eqStatus = jest.fn().mockReturnValue({ in: inFn });
-  const eqPlan = jest.fn().mockReturnValue({ in: inFn });
-  const eqUser = jest.fn().mockReturnValue({ eq: eqPlan, in: inFn });
+  const eqUser = jest.fn().mockReturnValue({ limit });
   const select = jest.fn().mockReturnValue({ eq: eqUser });
   (supabase.from as jest.Mock).mockReturnValue({ select });
-  return { select, eqUser, eqPlan, eqStatus, inFn, limit, maybeSingle };
+  return { select, eqUser, limit, maybeSingle };
+}
+
+function mockSubscriptionError() {
+  const maybeSingle = jest
+    .fn()
+    .mockResolvedValue({ data: null, error: { message: 'boom' } });
+  const limit = jest.fn().mockReturnValue({ maybeSingle });
+  const eqUser = jest.fn().mockReturnValue({ limit });
+  const select = jest.fn().mockReturnValue({ eq: eqUser });
+  (supabase.from as jest.Mock).mockReturnValue({ select });
 }
 
 describe('premium-gate', () => {
@@ -40,7 +52,7 @@ describe('premium-gate', () => {
     jest.clearAllMocks();
   });
 
-  describe('isPremiumUser', () => {
+  describe('isPremiumUser (backward compat)', () => {
     it('renvoie true pour plan=premium / status=active', async () => {
       mockSubscriptionRow({ plan: 'premium', status: 'active' });
       const res = await isPremiumUser('uid-1');
@@ -61,16 +73,7 @@ describe('premium-gate', () => {
     });
 
     it('renvoie false si erreur Supabase, sans throw', async () => {
-      const maybeSingle = jest
-        .fn()
-        .mockResolvedValue({ data: null, error: { message: 'boom' } });
-      const limit = jest.fn().mockReturnValue({ maybeSingle });
-      const inFn = jest.fn().mockReturnValue({ limit });
-      const eqPlan = jest.fn().mockReturnValue({ in: inFn });
-      const eqUser = jest.fn().mockReturnValue({ eq: eqPlan });
-      const select = jest.fn().mockReturnValue({ eq: eqUser });
-      (supabase.from as jest.Mock).mockReturnValue({ select });
-
+      mockSubscriptionError();
       const res = await isPremiumUser('uid-err');
       expect(res).toBe(false);
     });
@@ -86,19 +89,82 @@ describe('premium-gate', () => {
       expect(res).toBe(false);
       expect(supabase.from).not.toHaveBeenCalled();
     });
+
+    it('reste true pour tier=expert (backward compat)', async () => {
+      mockSubscriptionRow({ plan: 'expert', status: 'active' });
+      const res = await isPremiumUser('uid-expert');
+      expect(res).toBe(true);
+    });
+  });
+
+  describe('getUserTier', () => {
+    it("retourne 'expert' pour plan='expert' AND status='active'", async () => {
+      mockSubscriptionRow({ plan: 'expert', status: 'active' });
+      const tier = await getUserTier('uid-1');
+      expect(tier).toBe('expert');
+    });
+
+    it("retourne 'expert' pour plan='expert' AND status='trialing'", async () => {
+      mockSubscriptionRow({ plan: 'expert', status: 'trialing' });
+      const tier = await getUserTier('uid-2');
+      expect(tier).toBe('expert');
+    });
+
+    it("retourne 'premium' pour plan='premium' AND status='active'", async () => {
+      mockSubscriptionRow({ plan: 'premium', status: 'active' });
+      const tier = await getUserTier('uid-3');
+      expect(tier).toBe('premium');
+    });
+
+    it("retourne 'free' si pas de ligne, userId null, ou status='canceled'", async () => {
+      // Cas 1 : pas de ligne
+      mockSubscriptionRow(null);
+      expect(await getUserTier('uid-no-row')).toBe('free');
+
+      // Cas 2 : userId null (aucun appel Supabase attendu)
+      jest.clearAllMocks();
+      expect(await getUserTier(null)).toBe('free');
+      expect(supabase.from).not.toHaveBeenCalled();
+
+      // Cas 3 : status='canceled'
+      mockSubscriptionRow({ plan: 'premium', status: 'canceled' });
+      expect(await getUserTier('uid-canceled')).toBe('free');
+    });
+
+    it("retourne 'free' si erreur Supabase", async () => {
+      mockSubscriptionError();
+      const tier = await getUserTier('uid-err');
+      expect(tier).toBe('free');
+    });
   });
 
   describe('PREMIUM_FEATURES catalogue', () => {
-    it('expose les 3 clés attendues', () => {
+    it('expose les 17 clés attendues (8 Premium + 9 Expert)', () => {
       const keys = Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[];
       expect(keys).toEqual(
         expect.arrayContaining([
+          // Premium (8)
           'store_full_ranking',
           'store_comparison',
           'smart_alternatives',
+          'unlimited_history',
+          'food_journal',
+          'advanced_stats',
+          'export_data',
+          'priority_support',
+          // Expert (9)
+          'plant_database',
+          'herbal_remedies',
+          'plant_alternatives',
+          'cosmetic_actives',
+          'pregnancy_safety',
+          'children_safety',
+          'interaction_warnings',
+          'expert_articles',
+          'expert_consultation',
         ]),
       );
-      expect(keys).toHaveLength(3);
+      expect(keys).toHaveLength(17);
     });
 
     it('chaque feature a un labelFr non vide', () => {
@@ -111,36 +177,69 @@ describe('premium-gate', () => {
   });
 
   describe('canAccessFeature', () => {
-    it('utilisateur premium accède à toutes les features', () => {
-      expect(canAccessFeature(true, 'store_full_ranking')).toBe(true);
-      expect(canAccessFeature(true, 'store_comparison')).toBe(true);
-      expect(canAccessFeature(true, 'smart_alternatives')).toBe(true);
+    it('utilisateur premium accède aux features premium', () => {
+      expect(canAccessFeature('premium', 'store_full_ranking')).toBe(true);
+      expect(canAccessFeature('premium', 'store_comparison')).toBe(true);
+      expect(canAccessFeature('premium', 'smart_alternatives')).toBe(true);
     });
 
-    it('utilisateur free n\'accède à aucune feature premium', () => {
-      expect(canAccessFeature(false, 'store_full_ranking')).toBe(false);
-      expect(canAccessFeature(false, 'store_comparison')).toBe(false);
-      expect(canAccessFeature(false, 'smart_alternatives')).toBe(false);
+    it("utilisateur free n'accède à aucune feature premium", () => {
+      expect(canAccessFeature('free', 'store_full_ranking')).toBe(false);
+      expect(canAccessFeature('free', 'store_comparison')).toBe(false);
+      expect(canAccessFeature('free', 'smart_alternatives')).toBe(false);
+    });
+
+    it("canAccessFeature('expert', 'plant_database') → true", () => {
+      expect(canAccessFeature('expert', 'plant_database')).toBe(true);
+    });
+
+    it("canAccessFeature('premium', 'plant_database') → false (Expert-only)", () => {
+      expect(canAccessFeature('premium', 'plant_database')).toBe(false);
+    });
+
+    it("canAccessFeature('expert', 'smart_alternatives') → true (hierarchy)", () => {
+      // Expert hérite de toutes les features Premium.
+      expect(canAccessFeature('expert', 'smart_alternatives')).toBe(true);
+      expect(canAccessFeature('expert', 'store_full_ranking')).toBe(true);
+      expect(canAccessFeature('expert', 'store_comparison')).toBe(true);
+    });
+  });
+
+  describe('FEATURE_TIER mapping', () => {
+    it("FEATURE_TIER['smart_alternatives'] === 'premium' ET FEATURE_TIER['plant_database'] === 'expert'", () => {
+      expect(FEATURE_TIER['smart_alternatives']).toBe('premium');
+      expect(FEATURE_TIER['plant_database']).toBe('expert');
+    });
+
+    it('TIER_HIERARCHY définit free < premium < expert', () => {
+      expect(TIER_HIERARCHY.free).toBe(0);
+      expect(TIER_HIERARCHY.premium).toBe(1);
+      expect(TIER_HIERARCHY.expert).toBe(2);
     });
   });
 
   describe('getFeatureLimit', () => {
     it('utilisateur free → store_full_ranking limité à 3', () => {
-      expect(getFeatureLimit(false, 'store_full_ranking')).toBe(3);
+      expect(getFeatureLimit('free', 'store_full_ranking')).toBe(3);
     });
 
     it('utilisateur free → store_comparison limité à 3', () => {
-      expect(getFeatureLimit(false, 'store_comparison')).toBe(3);
+      expect(getFeatureLimit('free', 'store_comparison')).toBe(3);
     });
 
     it('utilisateur free → smart_alternatives limité à 0 (gate complet)', () => {
-      expect(getFeatureLimit(false, 'smart_alternatives')).toBe(0);
+      expect(getFeatureLimit('free', 'smart_alternatives')).toBe(0);
     });
 
     it('utilisateur premium → toutes features illimitées (Infinity)', () => {
-      expect(getFeatureLimit(true, 'store_full_ranking')).toBe(Infinity);
-      expect(getFeatureLimit(true, 'store_comparison')).toBe(Infinity);
-      expect(getFeatureLimit(true, 'smart_alternatives')).toBe(Infinity);
+      expect(getFeatureLimit('premium', 'store_full_ranking')).toBe(Infinity);
+      expect(getFeatureLimit('premium', 'store_comparison')).toBe(Infinity);
+      expect(getFeatureLimit('premium', 'smart_alternatives')).toBe(Infinity);
+    });
+
+    it('utilisateur expert → toutes features illimitées (Infinity)', () => {
+      expect(getFeatureLimit('expert', 'store_full_ranking')).toBe(Infinity);
+      expect(getFeatureLimit('expert', 'plant_database')).toBe(Infinity);
     });
   });
 });

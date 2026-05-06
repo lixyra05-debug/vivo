@@ -24,7 +24,7 @@ import { Colors } from '@/src/constants/colors';
 import { fetchStoreTopProducts, getStoreBySlug } from '@/src/lib/api/stores';
 import { usePremium } from '@/src/lib/hooks/usePremium';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
-import { PREMIUM_FEATURES, getFeatureLimit } from '@/src/lib/premium/premium-gate';
+import { getFeatureLimit } from '@/src/lib/premium/premium-gate';
 import { getOrFetchProduct, productToScoringInput } from '@/src/lib/api/openfoodfacts';
 import { getProductConfidence } from '@/src/lib/api/confidence';
 import { calculateScore } from '@/src/lib/scoring/engine';
@@ -93,7 +93,7 @@ export default function StoreScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const profile = useProfileStore((s) => s.profile);
   const userId = useAuthStore((s) => s.user?.id ?? null);
-  const { isPremium } = usePremium(userId);
+  const { isPremium, tier } = usePremium(userId);
   const store = getStoreBySlug(slug ?? '');
 
   const [page, setPage] = useState<number>(1);
@@ -219,7 +219,7 @@ export default function StoreScreen() {
   const isRefreshing = listQuery.isRefetching || rankedQuery.isRefetching;
   const hasItems = visibleData.length > 0;
 
-  const storeListLimit = getFeatureLimit(isPremium, 'store_comparison');
+  const storeListLimit = getFeatureLimit(tier, 'store_comparison');
   const limitedData = Number.isFinite(storeListLimit)
     ? visibleData.slice(0, storeListLimit)
     : visibleData;
@@ -297,11 +297,8 @@ export default function StoreScreen() {
               showPaywall ? (
                 <View style={{ marginTop: 12 }}>
                   <PremiumPaywall
-                    title={PREMIUM_FEATURES.store_comparison.labelFr}
-                    description={
-                      PREMIUM_FEATURES.store_comparison.descriptionFr
-                    }
-                    onUnlock={handleUnlock}
+                    featureKey="store_comparison"
+                    onUpgrade={() => handleUnlock()}
                   />
                 </View>
               ) : visibleData.length > 0 ? (

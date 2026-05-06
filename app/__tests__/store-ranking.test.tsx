@@ -65,8 +65,14 @@ describe('StoreRankingScreen', () => {
   });
 
   it('Free : affiche les 3 premières enseignes + paywall', async () => {
-    mockUsePremium.mockReturnValue({ isPremium: false, isLoading: false });
-    const { findByText, queryByText } = render(
+    mockUsePremium.mockReturnValue({
+      tier: 'free',
+      isPremium: false,
+      isExpert: false,
+      isLoading: false,
+      canAccess: () => false,
+    });
+    const { findByText, findByLabelText, queryByText } = render(
       <Wrapper>
         <StoreRankingScreen />
       </Wrapper>,
@@ -78,12 +84,18 @@ describe('StoreRankingScreen', () => {
       expect(queryByText('Monoprix')).toBeNull();
       expect(queryByText('Lidl')).toBeNull();
     });
-    expect(await findByText(/29,99€\s*\/\s*an/)).toBeTruthy();
+    expect(await findByLabelText(/Débloquer Premium/)).toBeTruthy();
   });
 
   it('Premium : affiche les 10 enseignes sans paywall', async () => {
-    mockUsePremium.mockReturnValue({ isPremium: true, isLoading: false });
-    const { findByText, queryByText } = render(
+    mockUsePremium.mockReturnValue({
+      tier: 'premium',
+      isPremium: true,
+      isExpert: false,
+      isLoading: false,
+      canAccess: () => true,
+    });
+    const { findByText, queryByLabelText } = render(
       <Wrapper>
         <StoreRankingScreen />
       </Wrapper>,
@@ -91,6 +103,6 @@ describe('StoreRankingScreen', () => {
     expect(await findByText('Carrefour')).toBeTruthy();
     expect(await findByText('Monoprix')).toBeTruthy();
     expect(await findByText('Lidl')).toBeTruthy();
-    expect(queryByText(/29,99€\s*\/\s*an/)).toBeNull();
+    expect(queryByLabelText(/Débloquer Premium/)).toBeNull();
   });
 });

@@ -111,5 +111,22 @@ describe('usePremium()', () => {
     const { result } = renderHook(() => usePremium(), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.isPremium).toBe(false);
+    expect(result.current.tier).toBe('free');
+    expect(result.current.isExpert).toBe(false);
+  });
+
+  it("Test 8 — session + plan='expert' status='active' : tier='expert', isExpert=true, canAccess('plant_database')=true", async () => {
+    setSession('uid-8');
+    mockMaybeSingle.mockResolvedValue({
+      data: { plan: 'expert', status: 'active' },
+      error: null,
+    });
+    const { result } = renderHook(() => usePremium(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.tier).toBe('expert');
+    expect(result.current.isPremium).toBe(true);
+    expect(result.current.isExpert).toBe(true);
+    expect(result.current.canAccess('plant_database')).toBe(true);
+    expect(result.current.canAccess('store_full_ranking')).toBe(true);
   });
 });

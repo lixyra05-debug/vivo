@@ -21,17 +21,14 @@ import { Colors } from '@/src/constants/colors';
 import { calculateStoreRanking } from '@/src/lib/api/store-ranking';
 import { usePremium } from '@/src/lib/hooks/usePremium';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
-import {
-  PREMIUM_FEATURES,
-  getFeatureLimit,
-} from '@/src/lib/premium/premium-gate';
+import { getFeatureLimit } from '@/src/lib/premium/premium-gate';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export default function StoreRankingScreen() {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id ?? null);
-  const { isPremium } = usePremium(userId);
+  const { isPremium, tier } = usePremium(userId);
 
   const rankingQuery = useQuery({
     queryKey: ['store-ranking-full'] as const,
@@ -40,7 +37,7 @@ export default function StoreRankingScreen() {
   });
 
   const ranking = rankingQuery.data ?? [];
-  const limit = getFeatureLimit(isPremium, 'store_full_ranking');
+  const limit = getFeatureLimit(tier, 'store_full_ranking');
   const visibleRanking = useMemo(
     () => (Number.isFinite(limit) ? ranking.slice(0, limit) : ranking),
     [ranking, limit],
@@ -125,11 +122,8 @@ export default function StoreRankingScreen() {
             {!isPremium && ranking.length > visibleRanking.length ? (
               <FadeIn delay={420}>
                 <PremiumPaywall
-                  title={PREMIUM_FEATURES.store_full_ranking.labelFr}
-                  description={
-                    PREMIUM_FEATURES.store_full_ranking.descriptionFr
-                  }
-                  onUnlock={handleUnlock}
+                  featureKey="store_full_ranking"
+                  onUpgrade={() => handleUnlock()}
                 />
               </FadeIn>
             ) : null}

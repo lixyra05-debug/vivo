@@ -148,6 +148,25 @@ Refonte de la section "Meilleures alternatives" sur la fiche produit : du statiq
 - **Pas de GlassCard** sur ces écrans (lecture longue → fond cream uniforme).
 - **Tests** : aucun nouveau test (texte statique). 546 tests verts maintenus.
 
+## Système 2 tiers Premium + Expert (mai 2026)
+Refonte du paywall : passage de 1 tier (Premium 29,99€/an) à 2 tiers (Premium 29,99€/an + Expert Plantes 49,99€/an). 550 → **569 tests verts** (+19).
+
+- **Backend** :
+  - `src/lib/premium/premium-gate.ts` (133 → 321 lignes) : type `SubscriptionTier = 'free' | 'premium' | 'expert'`, `TIER_HIERARCHY {free:0, premium:1, expert:2}`, `FEATURE_TIER` mapping, **17 features** (8 Premium + 9 Expert), helper `subscriptionRowToTier`, `getUserTier()` (source de vérité async), `isPremiumUser` gardé en alias backward-compat (true pour premium ET expert), `canAccessFeature(tier, key)` avec hiérarchie (Expert hérite de Premium), `getFeatureLimit(tier, key)`, hook `usePremium()` exposant `{tier, isPremium, isExpert, isLoading, canAccess}`.
+  - **Catalogue Premium (8)** : `store_full_ranking`, `store_comparison`, `smart_alternatives`, `unlimited_history`, `food_journal`, `advanced_stats`, `export_data`, `priority_support`.
+  - **Catalogue Expert (9)** : `plant_database`, `herbal_remedies`, `plant_alternatives`, `cosmetic_actives`, `pregnancy_safety`, `children_safety`, `interaction_warnings`, `expert_articles`, `expert_consultation`. Sources EFSA/EMA/ANSM/ANSES dans les descriptions FR.
+  - `src/lib/hooks/usePremium.ts` (25 → 46 lignes) : userId-explicite, mocke `getUserTier`, même shape de retour.
+  - `__DEV_UNLOCK_PREMIUM__ = false` → renvoie `'expert'` (top tier) si flippé à true en local. NE JAMAIS commit à `true`.
+  - **Migration `013_expert_tier.sql`** (idempotente) : DROP + ADD CHECK constraint `subscriptions_plan_check` pour autoriser `'expert'` en plus de `'free' | 'premium'`.
+- **Frontend** :
+  - `src/components/premium/PremiumPaywall.tsx` (141 → 511 lignes) refonte BREAKING : nouvelles props `{featureKey: PremiumFeatureKey, previewContent?, onUpgrade: (tier) => void, compact?: boolean}`. Logique : lookup `FEATURE_TIER[featureKey]` détermine quel tier afficher en primary. Mode normal = 2 cartes (primary + cross-sell secondary). Mode compact = 1 carte horizontale.
+  - **Design Premium** : border `rgba(139, 173, 139, 0.32)` sage, fond `rgba(139, 173, 139, 0.06)`, CTA `Colors.sage`, icône `Sparkles`. Pricing **29,99€/an · ~2,50€/mois**.
+  - **Design Expert** : border `rgba(196, 168, 130, 0.6)` earth/gold, fond `rgba(196, 168, 130, 0.10)`, CTA `Colors.earth`, icône `Leaf`, badge **🌿 RECOMMANDÉ** en pill earth top-right. Pricing **49,99€/an · ~4,17€/mois**.
+  - `app/settings/subscription.tsx` (355 → 562 lignes) refonte avec **3 états** : `tier='free'` → 2 cartes side-by-side (stacked si width<380px) ; `tier='premium'` → confirm card "Tu es Premium" + cross-sell Expert ; `tier='expert'` → confirm-only "Tu es Expert 🌿". Section FREE_FEATURES conservée en haut.
+  - **3 consumers migrés** : `app/store/[slug].tsx`, `app/store-ranking.tsx`, `src/components/premium/AlternativesSection.tsx` — passage `title/description/onUnlock` → `featureKey/onUpgrade`.
+  - Garantie persistante R3 : "Le scanner et le score restent TOUJOURS gratuits ✅" sur chaque paywall.
+- **Tests** : 550 → **569 verts** (+19 net : +13 backend gate/hooks, +5 PremiumPaywall, +1 store-ranking adapté). Aucune régression.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

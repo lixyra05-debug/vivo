@@ -80,9 +80,8 @@ export function AlternativesSection({
         </Text>
       ) : null}
       <PremiumPaywall
-        title="Voir toutes les alternatives"
-        description="Accédez aux 5 produits classés par score, NOVA et additifs, mis à jour en continu via Open Food Facts."
-        onUnlock={onUnlock}
+        featureKey="smart_alternatives"
+        onUpgrade={() => onUnlock()}
       />
     </View>
   );
