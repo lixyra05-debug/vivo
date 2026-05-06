@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ScanLine } from 'lucide-react-native';
+import { BarChart3, ChevronRight, ScanLine } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { Greeting } from '@/src/components/home/Greeting';
@@ -18,6 +18,7 @@ import { useScanHistory } from '@/src/lib/stores/useProductStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import { calculateStreak } from '@/src/lib/gamification/streak-engine';
 import { calculateProfileStats } from '@/src/lib/stats/profile-stats-engine';
+import { useMonthlyRecap } from '@/src/lib/stats/use-monthly-recap';
 import { getTimeBasedTagline } from '@/src/lib/home/tagline';
 import { fetchTopByCategoryHome } from '@/src/lib/api/top-by-category';
 import type { ScanRecord } from '@/src/lib/gamification/types';
@@ -49,6 +50,21 @@ export default function HomeScreen() {
   const stats = scans.length > 0 ? calculateProfileStats(scans) : null;
   const last7 = stats ? stats.scansByDay.slice(-7) : [];
   const tagline = getTimeBasedTagline();
+
+  // Banner "Recap mensuel" — affiche le récap du mois précédent si dispo et ≥5 scans.
+  const previousMonth = useMemo(() => {
+    const now = new Date();
+    const m = now.getMonth();
+    if (m === 0) return { year: now.getFullYear() - 1, month: 11 };
+    return { year: now.getFullYear(), month: m - 1 };
+  }, []);
+  const { recap: previousRecap } = useMonthlyRecap(
+    user?.id ?? null,
+    previousMonth.year,
+    previousMonth.month,
+  );
+  const showRecapBanner =
+    previousRecap !== null && previousRecap.totalScans >= 5;
 
   const userProfile: UserProfile = useMemo(
     () => ({
@@ -122,6 +138,38 @@ export default function HomeScreen() {
           <OrganicBlob size={BLOB_SIZE} />
         </View>
 
+        {showRecapBanner && previousRecap ? (
+          <FadeIn delay={150}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Voir mon recap de ${previousRecap.monthLabel}`}
+              onPress={() =>
+                router.push(
+                  `/recap/monthly?year=${previousMonth.year}&month=${previousMonth.month}`,
+                )
+              }
+              style={({ pressed }) => [
+                bannerStyles.banner,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <View style={bannerStyles.iconWrap}>
+                <BarChart3 color={Colors.sage} size={20} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={bannerStyles.title} numberOfLines={1}>
+                  Ton Recap de {previousRecap.monthLabel} est prêt !
+                </Text>
+                <Text style={bannerStyles.subtitle} numberOfLines={1}>
+                  {previousRecap.totalScans} scans · score moyen{' '}
+                  {previousRecap.averageScore}
+                </Text>
+              </View>
+              <ChevronRight color={Colors.textMuted} size={20} strokeWidth={2.2} />
+            </Pressable>
+          </FadeIn>
+        ) : null}
+
         <StatsRow />
 
         {stats && last7.length === 7 ? (
@@ -163,3 +211,42 @@ export default function HomeScreen() {
     </ScreenContainer>
   );
 }
+
+const bannerStyles = StyleSheet.create({
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderWidth: 1,
+    borderColor: '#E2EBE2',
+    shadowColor: '#587858',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    backgroundColor: 'rgba(139, 173, 139, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: Colors.text,
+    letterSpacing: -0.1,
+  },
+  subtitle: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+});

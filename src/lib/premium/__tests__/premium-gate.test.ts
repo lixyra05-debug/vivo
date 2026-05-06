@@ -139,11 +139,11 @@ describe('premium-gate', () => {
   });
 
   describe('PREMIUM_FEATURES catalogue', () => {
-    it('expose les 17 clés attendues (8 Premium + 9 Expert)', () => {
+    it('expose les 19 clés attendues (10 Premium + 9 Expert)', () => {
       const keys = Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[];
       expect(keys).toEqual(
         expect.arrayContaining([
-          // Premium (8)
+          // Premium (10)
           'store_full_ranking',
           'store_comparison',
           'smart_alternatives',
@@ -152,6 +152,8 @@ describe('premium-gate', () => {
           'advanced_stats',
           'export_data',
           'priority_support',
+          'vivo_recap',
+          'scan_choc',
           // Expert (9)
           'plant_database',
           'herbal_remedies',
@@ -164,7 +166,7 @@ describe('premium-gate', () => {
           'expert_consultation',
         ]),
       );
-      expect(keys).toHaveLength(17);
+      expect(keys).toHaveLength(19);
     });
 
     it('chaque feature a un labelFr non vide', () => {

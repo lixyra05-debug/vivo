@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  BarChart3,
   FileText,
   HeartPulse,
   HelpCircle,
@@ -295,6 +296,13 @@ export default function ProfileScreen() {
                 label="Mon abonnement"
                 description={isPremium ? 'Premium actif' : 'Plan gratuit'}
                 onPress={() => router.push('/settings/subscription')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<BarChart3 color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Voir mon Recap mensuel"
+                description="Récapitulatif partageable de ton mois"
+                onPress={() => router.push('/recap/monthly')}
               />
               <View style={styles.rowDivider} />
               <SettingsRow

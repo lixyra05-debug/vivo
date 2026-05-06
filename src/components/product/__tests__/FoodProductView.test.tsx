@@ -11,6 +11,29 @@ jest.mock('@/src/components/premium/AlternativesSection', () => ({
   AlternativesSection: () => null,
 }));
 
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+}));
+
+jest.mock('@/src/lib/hooks/usePremium', () => ({
+  usePremium: () => ({
+    tier: 'free',
+    isPremium: false,
+    isExpert: false,
+    isLoading: false,
+    canAccess: () => false,
+  }),
+}));
+
+jest.mock('@/src/lib/api/use-alternatives', () => ({
+  useAlternatives: () => ({ alternatives: [], isLoading: false }),
+}));
+
+jest.mock('@/src/lib/stores/useAuthStore', () => ({
+  useAuthStore: (selector: (state: { user: null }) => unknown) =>
+    selector({ user: null }),
+}));
+
 const baseProduct: Product = {
   barcode: '3017620422003',
   name: 'Biscuits au chocolat',

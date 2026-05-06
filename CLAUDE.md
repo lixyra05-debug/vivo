@@ -167,6 +167,28 @@ Refonte du paywall : passage de 1 tier (Premium 29,99€/an) à 2 tiers (Premium
   - Garantie persistante R3 : "Le scanner et le score restent TOUJOURS gratuits ✅" sur chaque paywall.
 - **Tests** : 550 → **569 verts** (+19 net : +13 backend gate/hooks, +5 PremiumPaywall, +1 store-ranking adapté). Aucune régression.
 
+## Vivo Recap mensuel + Mode Scan Choc viral (mai 2026)
+Deux features Premium pensées partage social/conversion virale. 569 → **577 tests verts** (+8). Catalogue Premium étendu : 8 → 10 features (`vivo_recap` + `scan_choc`).
+
+- **Premium gate étendu** :
+  - `src/lib/premium/premium-gate.ts` : ajout des 2 clés `vivo_recap` et `scan_choc` au type `PremiumFeatureKey`, à `FEATURE_TIER` (tier='premium'), au catalogue `PREMIUM_FEATURES`. **19 features totales** (10 Premium + 9 Expert).
+  - Test `'expose les 19 clés attendues'` mis à jour.
+- **Dépendances natives** : `react-native-view-shot` + `expo-sharing` installées via `npx expo install`. ⚠️ Incompatibles avec Expo Go → tests runtime nécessitent un dev client.
+- **Vivo Recap mensuel** (Agent 1) :
+  - `src/lib/stats/monthly-recap.ts` — calculateur pur. Type `MonthlyRecap {monthLabel, totalScans, averageScore (round), worstProduct, bestProduct, avoidCount (<40), excellentCount (≥75), badge: 'detective'|'eclaire'|'curieux', topBrand, topCategory}`. Filtre fuseau Europe/Paris. Badge : ≥30 detective, ≥15 eclaire, sinon curieux. Tie-break = première occurrence.
+  - `src/lib/stats/use-monthly-recap.ts` — hook React Query (queryKey `['monthly-recap', userId, year, month]`, staleTime 5min). Joint `products` pour récupérer name/brand → `productLookup`. Bornes month UTC `Date.UTC(year, month, 1)` → `Date.UTC(year, month+1, 1)`.
+  - `app/recap/monthly.tsx` — fullscreen story. LinearGradient `#2D4A2D → #8BAD8B`, **8 cartes FadeIn cascade** 100/200/.../800 dans un `<View ref>` capturé via `captureRef` puis `Sharing.shareAsync` (mimeType png, format png quality 1, result tmpfile). Empty state 0 scans → CTA scanner. Free tier → preview opacity 0.3 + `<PremiumPaywall featureKey="vivo_recap" />`. Default = mois précédent (jan→dec previous year auto).
+  - `app/(tabs)/index.tsx` : banner conditionnel après tagline si `recap.totalScans >= 5` (visible tout le mois, pas de cutoff jour). Icône `BarChart3` + "Ton Recap de [monthLabel] est prêt !".
+  - `app/(tabs)/profile.tsx` : SettingsRow "Voir mon Recap mensuel" (BarChart3) entre "Mon abonnement" et "Comment Vivo note".
+  - **Tests** : `src/lib/stats/__tests__/monthly-recap.test.ts` 6 cas (empty, 30+ scans detective, 15-29 eclaire, <15 curieux, filtrage year/month, worstProduct/bestProduct/topBrand/topCategory).
+- **Mode Scan Choc viral** (Agent 2) :
+  - `src/components/premium/ShareableCard.tsx` — wrapper `<ViewShot ref>` + bouton "Partager" sage qui capture en PNG tmpfile et appelle `Sharing.shareAsync`. Réutilisable.
+  - `src/components/premium/ScanChocCard.tsx` — carte 9:16 portrait. LinearGradient `#DC2626 → #991B1B` rouge intense. Header "⚠️ ATTENTION" Bricolage-Bold 24, image 200×200, score 72px Bricolage-Bold blanc, productName 22px, **3 problèmes** (rows bg `rgba(0,0,0,0.18)` borderRadius 14), section alternative optionnelle (bg sage 0.95). Footer "Scan tes courses sur Vivo".
+  - `app/scan-choc/[barcode].tsx` — route dynamique. `usePremium` → free render `<PremiumPaywall featureKey="scan_choc" />` ; premium/expert fetch produit + score + helper `detectProblems(product, result)` exporté avec **priorité stricte** : `additivesCount≥5` (💀) → `novaGroup===4` (🍳) → seed oils (🛢️) → excès macros (🍬) → fallbacks score `<30` (⚠️ Très mal noté) / `<50` (⚠️ Mal noté). Slice top 3.
+  - `src/components/product/FoodProductView.tsx` : ajout banner auto-toast `score<40 && tier!=='free'` (5s, dedup `useRef<Set<string>>` in-memory). Bouton discret "Partager le scan" navigant vers `/scan-choc/[barcode]` visible **all tiers** (gating sur la destination).
+  - **Tests** : `src/components/premium/__tests__/ScanChocCard.test.tsx` 2 cas (rendu nom + 3 problèmes, score affiché). FoodProductView test mocks ajoutés (usePremium, useAlternatives, useAuthStore, expo-router) pour ne pas péter les 2 tests existants.
+- **Tests projet** : 569 → **577 verts** (+8 net : +6 monthly-recap, +2 ScanChocCard, 0 régression sur 564 historiques).
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

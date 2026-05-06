@@ -1,5 +1,5 @@
 /**
- * Premium gate — système 2 tiers : Premium (8 features) + Expert (9 features).
+ * Premium gate — système 2 tiers : Premium (10 features) + Expert (9 features).
  *
  * Source de vérité : table `subscriptions` (D1 validée).
  * Trialing compte comme actif (D2 validée).
@@ -28,7 +28,7 @@ export const TIER_HIERARCHY: Record<SubscriptionTier, number> = {
 };
 
 export type PremiumFeatureKey =
-  // Premium tier (8)
+  // Premium tier (10)
   | 'store_full_ranking'
   | 'store_comparison'
   | 'smart_alternatives'
@@ -37,6 +37,8 @@ export type PremiumFeatureKey =
   | 'advanced_stats'
   | 'export_data'
   | 'priority_support'
+  | 'vivo_recap'
+  | 'scan_choc'
   // Expert tier (9)
   | 'plant_database'
   | 'herbal_remedies'
@@ -49,7 +51,7 @@ export type PremiumFeatureKey =
   | 'expert_consultation';
 
 export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
-  // Premium (8)
+  // Premium (10)
   store_full_ranking: 'premium',
   store_comparison: 'premium',
   smart_alternatives: 'premium',
@@ -58,6 +60,8 @@ export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   advanced_stats: 'premium',
   export_data: 'premium',
   priority_support: 'premium',
+  vivo_recap: 'premium',
+  scan_choc: 'premium',
   // Expert (9)
   plant_database: 'expert',
   herbal_remedies: 'expert',
@@ -77,7 +81,7 @@ export interface PremiumFeatureDef {
 }
 
 export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
-  // Premium (8)
+  // Premium (10)
   store_full_ranking: {
     labelFr: 'Classement complet des supermarchés',
     descriptionFr:
@@ -123,6 +127,18 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
   priority_support: {
     labelFr: 'Support prioritaire',
     descriptionFr: 'Réponse sous 24h par email pour toute question.',
+    freeLimit: 0,
+  },
+  vivo_recap: {
+    labelFr: 'Recap mensuel partageable',
+    descriptionFr:
+      'Une story récapitulative de tes scans du mois — partageable en image sur les réseaux.',
+    freeLimit: 0,
+  },
+  scan_choc: {
+    labelFr: 'Mode Scan Choc viral',
+    descriptionFr:
+      "Génère une carte d'alerte 1080×1920 quand un produit est mal noté — partageable en story.",
     freeLimit: 0,
   },
 
