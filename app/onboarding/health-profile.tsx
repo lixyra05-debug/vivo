@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -14,8 +15,10 @@ import { FadeIn } from '@/src/components/ui/FadeIn';
 import { ProgressDots } from '@/src/components/ui/ProgressDots';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { TappableSelectableCard } from '@/src/components/onboarding/TappableSelectableCard';
+import { HealthConsentModal } from '@/src/components/health/HealthConsentModal';
 import { Colors } from '@/src/constants/colors';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
+import { hasHealthConsent, saveHealthConsent } from '@/src/lib/api/health-consent';
 import type { HealthProfile } from '@/src/lib/api/types';
 
 interface ProfileOption {
@@ -38,6 +41,34 @@ export default function OnboardingHealthProfileScreen() {
   const router = useRouter();
   const selected = useProfileStore((s) => s.draftHealthProfile);
   const setProfile = useProfileStore((s) => s.setDraftHealthProfile);
+
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [consentVisible, setConsentVisible] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    hasHealthConsent().then((ok) => {
+      if (!cancelled) setConsentGranted(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleContinue() {
+    if (!consentGranted) {
+      setConsentVisible(true);
+      return;
+    }
+    router.push('/onboarding/allergies');
+  }
+
+  async function handleAcceptConsent() {
+    await saveHealthConsent();
+    setConsentGranted(true);
+    setConsentVisible(false);
+    router.push('/onboarding/allergies');
+  }
 
   return (
     <ScreenContainer scroll>
@@ -93,13 +124,18 @@ export default function OnboardingHealthProfileScreen() {
         <FadeIn delay={520} style={{ marginTop: 'auto' }}>
           <PrimaryCTA
             label="Continuer"
-            onPress={() => router.push('/onboarding/allergies')}
+            onPress={handleContinue}
             icon={<ArrowRight color="#FFFFFF" size={18} strokeWidth={2.2} />}
             disabled={!selected}
             accessibilityHint="Passe à l'étape des allergies"
           />
         </FadeIn>
       </View>
+      <HealthConsentModal
+        visible={consentVisible}
+        onAccept={handleAcceptConsent}
+        onCancel={() => setConsentVisible(false)}
+      />
     </ScreenContainer>
   );
 }

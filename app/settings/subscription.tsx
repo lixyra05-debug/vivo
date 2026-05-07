@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
   Check,
   Leaf,
+  RotateCcw,
   Sparkles,
 } from 'lucide-react-native';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -25,6 +26,19 @@ const FREE_FEATURES = [
   'Smart Swaps bruts',
   '30 derniers scans',
 ];
+
+const PREMIUM_RENEWAL_TEXT =
+  "Abonnement annuel de 29,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
+
+const EXPERT_RENEWAL_TEXT =
+  "Abonnement annuel de 49,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
+
+function showRestoreAlert() {
+  Alert.alert(
+    'Restauration',
+    'La restauration des achats sera disponible après la configuration de RevenueCat.',
+  );
+}
 
 const PREMIUM_FEATURE_KEYS = (
   Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[]
@@ -90,8 +104,68 @@ export default function SubscriptionScreen() {
             </Text>
           </FadeIn>
         ) : null}
+
+        <FadeIn delay={580}>
+          <LegalFooter tier={tier} />
+        </FadeIn>
       </View>
     </ScreenContainer>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Legal footer (Apple guideline 3.1.2)
+// ---------------------------------------------------------------------------
+
+function LegalFooter({ tier }: { tier: 'free' | 'premium' | 'expert' }) {
+  const router = useRouter();
+
+  return (
+    <View style={styles.legalFooter}>
+      {tier === 'free' ? (
+        <>
+          <Text style={styles.legalRenewalText}>{PREMIUM_RENEWAL_TEXT}</Text>
+          <Text style={styles.legalRenewalText}>{EXPERT_RENEWAL_TEXT}</Text>
+        </>
+      ) : null}
+      {tier === 'premium' ? (
+        <Text style={styles.legalRenewalText}>{EXPERT_RENEWAL_TEXT}</Text>
+      ) : null}
+
+      <View style={styles.legalLinksRow}>
+        <Pressable
+          onPress={() => router.push('/settings/cgu')}
+          accessibilityRole="link"
+          accessibilityLabel="Ouvrir les conditions d'utilisation"
+          hitSlop={6}
+        >
+          <Text style={styles.legalLink}>Conditions d'utilisation</Text>
+        </Pressable>
+        <Text style={styles.legalLinkSep}>·</Text>
+        <Pressable
+          onPress={() => router.push('/settings/privacy')}
+          accessibilityRole="link"
+          accessibilityLabel="Ouvrir la politique de confidentialité"
+          hitSlop={6}
+        >
+          <Text style={styles.legalLink}>Politique de confidentialité</Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        onPress={showRestoreAlert}
+        accessibilityRole="button"
+        accessibilityLabel="Restaurer les achats"
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.restoreButton,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <RotateCcw color={Colors.sage} size={14} strokeWidth={2.4} />
+        <Text style={styles.restoreLink}>Restaurer les achats</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -710,5 +784,50 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+
+  // Legal footer (Apple guideline 3.1.2)
+  legalFooter: {
+    gap: 12,
+    paddingTop: 4,
+  },
+  legalRenewalText: {
+    fontFamily: 'Inter',
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 16,
+    textAlign: 'left',
+  },
+  legalLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  legalLink: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: Colors.sage,
+    textDecorationLine: 'underline',
+  },
+  legalLinkSep: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  restoreLink: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 13,
+    color: Colors.sage,
+    textDecorationLine: 'underline',
   },
 });

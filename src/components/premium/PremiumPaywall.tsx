@@ -11,7 +11,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   Sparkles,
@@ -22,6 +23,19 @@ import {
 import { GlassCard } from '../ui/GlassCard';
 import { Colors } from '@/src/constants/colors';
 import { FEATURE_TIER, type PremiumFeatureKey } from '@/src/lib/premium/premium-gate';
+
+const PREMIUM_RENEWAL_TEXT =
+  "Abonnement annuel de 29,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
+
+const EXPERT_RENEWAL_TEXT =
+  "Abonnement annuel de 49,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
+
+function showRestoreAlert() {
+  Alert.alert(
+    'Restauration',
+    'La restauration des achats sera disponible après la configuration de RevenueCat.',
+  );
+}
 
 interface PremiumPaywallProps {
   featureKey: PremiumFeatureKey;
@@ -65,7 +79,8 @@ export function PremiumPaywall({
   onUpgrade,
   compact = false,
 }: PremiumPaywallProps) {
-  const requiredTier = FEATURE_TIER[featureKey];
+  const requiredTier: 'premium' | 'expert' =
+    FEATURE_TIER[featureKey] === 'expert' ? 'expert' : 'premium';
 
   function handlePremium() {
     triggerHaptic();
@@ -89,6 +104,7 @@ export function PremiumPaywall({
         ) : (
           <PremiumCard compact onPress={handlePremium} />
         )}
+        <LegalFooter tier={requiredTier} />
         <Text style={styles.guarantee}>
           Le scanner et le score restent TOUJOURS gratuits ✅
         </Text>
@@ -112,9 +128,55 @@ export function PremiumPaywall({
         </>
       )}
 
+      <LegalFooter tier={requiredTier} />
+
       <Text style={styles.guarantee}>
         Le scanner et le score restent TOUJOURS gratuits ✅
       </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Legal footer — mentions auto-renouvellement Apple + liens légaux + restauration
+// (R Apple App Store Review Guidelines 3.1.2 / 5.1.1)
+// ---------------------------------------------------------------------------
+
+function LegalFooter({ tier }: { tier: 'premium' | 'expert' }) {
+  const router = useRouter();
+  const renewalText = tier === 'expert' ? EXPERT_RENEWAL_TEXT : PREMIUM_RENEWAL_TEXT;
+
+  return (
+    <View style={styles.legalFooter}>
+      <Text style={styles.legalRenewalText}>{renewalText}</Text>
+      <View style={styles.legalLinksRow}>
+        <Pressable
+          onPress={() => router.push('/settings/cgu')}
+          accessibilityRole="link"
+          accessibilityLabel="Ouvrir les conditions d'utilisation"
+          hitSlop={6}
+        >
+          <Text style={styles.legalLink}>Conditions d'utilisation</Text>
+        </Pressable>
+        <Text style={styles.legalLinkSep}>·</Text>
+        <Pressable
+          onPress={() => router.push('/settings/privacy')}
+          accessibilityRole="link"
+          accessibilityLabel="Ouvrir la politique de confidentialité"
+          hitSlop={6}
+        >
+          <Text style={styles.legalLink}>Politique de confidentialité</Text>
+        </Pressable>
+      </View>
+      <Pressable
+        onPress={showRestoreAlert}
+        accessibilityRole="button"
+        accessibilityLabel="Restaurer les achats"
+        hitSlop={8}
+        style={styles.restoreButton}
+      >
+        <Text style={styles.restoreLink}>Restaurer les achats</Text>
+      </Pressable>
     </View>
   );
 }
@@ -604,5 +666,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
     textAlign: 'center',
+  },
+
+  // Legal footer (Apple guideline 3.1.2)
+  legalFooter: {
+    gap: 10,
+    paddingTop: 4,
+  },
+  legalRenewalText: {
+    fontFamily: 'Inter',
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 16,
+    textAlign: 'left',
+  },
+  legalLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  legalLink: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: Colors.sage,
+    textDecorationLine: 'underline',
+  },
+  legalLinkSep: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  restoreButton: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  restoreLink: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 13,
+    color: Colors.sage,
+    textDecorationLine: 'underline',
   },
 });

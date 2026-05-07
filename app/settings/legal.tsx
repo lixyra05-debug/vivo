@@ -167,6 +167,12 @@ export default function LegalScreen() {
         <FadeIn delay={480}>
           <View style={{ gap: 10 }}>
             <SecondaryButton
+              label="Avertissements santé"
+              onPress={() => router.push('/settings/health-disclaimer')}
+              icon={<ChevronRight color={Colors.textMuted} size={18} strokeWidth={2.2} />}
+              accessibilityHint="Ouvre les avertissements santé détaillés"
+            />
+            <SecondaryButton
               label="Conditions Générales d'Utilisation"
               onPress={() => router.push('/settings/cgu')}
               icon={<ChevronRight color={Colors.textMuted} size={18} strokeWidth={2.2} />}

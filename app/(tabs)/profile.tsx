@@ -17,6 +17,7 @@ import {
   LogOut,
   Share2,
   Sparkles,
+  Trash2,
   User as UserIcon,
   Users,
 } from 'lucide-react-native';
@@ -35,6 +36,7 @@ import { ProfileStatsSection } from '@/src/components/stats/ProfileStatsSection'
 import { Colors } from '@/src/constants/colors';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { signOut } from '@/src/lib/api/auth';
+import { requestAccountDeletion } from '@/src/lib/api/account-deletion';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import { useScanHistory } from '@/src/lib/stores/useProductStore';
@@ -124,6 +126,31 @@ export default function ProfileScreen() {
     } catch (err) {
       Alert.alert('Déconnexion', err instanceof Error ? err.message : 'Erreur inconnue');
     }
+  }
+
+  function handleDeleteAccount() {
+    if (!user) return;
+    Alert.alert(
+      'Supprimer votre compte ?',
+      'Cette action est irréversible. Toutes vos données (profil, historique, favoris, badges, herbier, protocoles) seront définitivement supprimées sous 30 jours.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await requestAccountDeletion(user.id);
+            } catch (err) {
+              Alert.alert(
+                'Suppression impossible',
+                err instanceof Error ? err.message : 'Erreur inconnue',
+              );
+            }
+          },
+        },
+      ],
+    );
   }
 
   const allergies = profile?.allergies ?? [];
@@ -491,6 +518,15 @@ export default function ProfileScreen() {
                 icon={<LogOut color={Colors.score.red} size={18} strokeWidth={2.2} />}
                 label="Se déconnecter"
                 onPress={handleSignOut}
+                tone="danger"
+                showChevron={false}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<Trash2 color={Colors.score.red} size={18} strokeWidth={2.2} />}
+                label="Supprimer mon compte"
+                description="Action irréversible — sous 30 jours"
+                onPress={handleDeleteAccount}
                 tone="danger"
                 showChevron={false}
               />

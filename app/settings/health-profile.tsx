@@ -18,8 +18,10 @@ import { Input } from '@/src/components/ui/Input';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { TappableChip } from '@/src/components/onboarding/TappableChip';
 import { TappableSelectableCard } from '@/src/components/onboarding/TappableSelectableCard';
+import { HealthConsentModal } from '@/src/components/health/HealthConsentModal';
 import { Colors } from '@/src/constants/colors';
 import { upsertUserProfile } from '@/src/lib/api/auth';
+import { hasHealthConsent, saveHealthConsent } from '@/src/lib/api/health-consent';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import type { HealthProfile } from '@/src/lib/api/types';
@@ -59,6 +61,8 @@ export default function SettingsHealthProfileScreen() {
   const [allergies, setAllergies] = useState<string[]>(profile?.allergies ?? []);
   const [intolerances, setIntolerances] = useState<string[]>(profile?.intolerances ?? []);
   const [saving, setSaving] = useState(false);
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [consentVisible, setConsentVisible] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -68,11 +72,21 @@ export default function SettingsHealthProfileScreen() {
     setIntolerances(profile.intolerances ?? []);
   }, [profile]);
 
+  useEffect(() => {
+    let cancelled = false;
+    hasHealthConsent().then((ok) => {
+      if (!cancelled) setConsentGranted(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function toggle(list: string[], value: string): string[] {
     return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
   }
 
-  async function handleSave() {
+  async function persistProfile() {
     if (!user) return;
     setSaving(true);
     try {
@@ -93,6 +107,22 @@ export default function SettingsHealthProfileScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleSave() {
+    if (!user) return;
+    if (!consentGranted) {
+      setConsentVisible(true);
+      return;
+    }
+    void persistProfile();
+  }
+
+  async function handleAcceptConsent() {
+    await saveHealthConsent();
+    setConsentGranted(true);
+    setConsentVisible(false);
+    void persistProfile();
   }
 
   return (
@@ -208,6 +238,11 @@ export default function SettingsHealthProfileScreen() {
           />
         </FadeIn>
       </View>
+      <HealthConsentModal
+        visible={consentVisible}
+        onAccept={handleAcceptConsent}
+        onCancel={() => setConsentVisible(false)}
+      />
     </ScreenContainer>
   );
 }

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { CosmeticResultView } from './CosmeticResultView';
@@ -84,6 +84,18 @@ export function CosmeticProductView({
           lastUpdated={product.obf_last_updated ?? product.updated_at}
         />
       </FadeIn>
+      <FadeIn delay={280 + educationalCards.length * 120}>
+        <Pressable
+          onPress={() => Linking.openURL('https://world.openbeautyfacts.org')}
+          accessibilityRole="link"
+          accessibilityLabel="Ouvrir Open Beauty Facts"
+          hitSlop={6}
+        >
+          <Text style={styles.attribution}>
+            Données produit : © Open Beauty Facts contributors
+          </Text>
+        </Pressable>
+      </FadeIn>
     </>
   );
 }
@@ -95,5 +107,11 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textDecorationLine: 'underline',
     marginTop: 4,
+  },
+  attribution: {
+    fontFamily: 'Inter',
+    fontSize: 11,
+    color: Colors.sage,
+    textAlign: 'center',
   },
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Share2, Sparkles } from 'lucide-react-native';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -441,6 +441,19 @@ export function FoodProductView({
           lastUpdated={product.off_last_updated ?? product.updated_at}
         />
       </FadeIn>
+
+      <FadeIn delay={1020}>
+        <Pressable
+          onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
+          accessibilityRole="link"
+          accessibilityLabel="Ouvrir Open Food Facts"
+          hitSlop={6}
+        >
+          <Text style={styles.attribution}>
+            Données produit : © Open Food Facts contributors
+          </Text>
+        </Pressable>
+      </FadeIn>
     </>
   );
 }
@@ -506,5 +519,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text,
     letterSpacing: 0.2,
+  },
+  attribution: {
+    fontFamily: 'Inter',
+    fontSize: 11,
+    color: Colors.sage,
+    textAlign: 'center',
   },
 });
