@@ -30,6 +30,7 @@ const TAP_SPIN_DURATION = 600;
 const TAP_COOLDOWN = 700;
 
 const LOGO_SIZE = 100;
+const BUBBLE_SIZE = 130;
 const GLOW_SIZE = 200;
 
 export interface AnimatedVivoBrandProps {
@@ -195,12 +196,14 @@ export function AnimatedVivoBrand({
     opacity: glowOpacity.value,
     transform: [{ scale: glowScale.value }],
   }));
-  const logoStyle = useAnimatedStyle(() => ({
+  const bubbleStyle = useAnimatedStyle(() => ({
     opacity: entranceOpacity.value,
     transform: [
       { scale: entranceScale.value * breathScale.value * bounceScale.value },
-      { rotate: `${rotation.value}deg` },
     ],
+  }));
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
   }));
   const wordStyle = useAnimatedStyle(() => ({
     opacity: wordOpacity.value,
@@ -227,18 +230,20 @@ export function AnimatedVivoBrand({
           style={[styles.glowInner, glowStyle]}
           pointerEvents="none"
         />
-        <Pressable
-          onPress={handlePress}
-          accessibilityRole="button"
-          accessibilityLabel="Animer le logo Vivo"
-          hitSlop={12}
-        >
-          <Animated.Image
-            source={require('@/assets/images/vivo-logo.jpeg')}
-            style={[styles.logo, logoStyle]}
-            resizeMode="contain"
-          />
-        </Pressable>
+        <Animated.View style={[styles.bubble, bubbleStyle]}>
+          <Pressable
+            onPress={handlePress}
+            accessibilityRole="button"
+            accessibilityLabel="Animer le logo Vivo"
+            hitSlop={12}
+          >
+            <Animated.Image
+              source={require('@/assets/images/vivo-logo.png')}
+              style={[styles.logo, logoStyle]}
+              resizeMode="contain"
+            />
+          </Pressable>
+        </Animated.View>
       </Animated.View>
 
       <Animated.Text
@@ -285,6 +290,21 @@ const styles = StyleSheet.create({
     height: GLOW_SIZE * 0.78,
     borderRadius: (GLOW_SIZE * 0.78) / 2,
     backgroundColor: '#A8C4A8',
+  },
+  bubble: {
+    width: BUBBLE_SIZE,
+    height: BUBBLE_SIZE,
+    borderRadius: BUBBLE_SIZE / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 2,
+    borderColor: 'rgba(139, 173, 139, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#8BAD8B',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   logo: {
     width: LOGO_SIZE,
