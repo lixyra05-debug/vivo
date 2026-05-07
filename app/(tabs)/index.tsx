@@ -9,6 +9,7 @@ import { Greeting } from '@/src/components/home/Greeting';
 import { OrganicBlob } from '@/src/components/home/OrganicBlob';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { PlantOfWeekCard } from '@/src/components/home/PlantOfWeekCard';
+import { FamilyProfilePills } from '@/src/components/home/FamilyProfilePills';
 import { StatsRow } from '@/src/components/home/StatsRow';
 import { TopByCategorySection } from '@/src/components/home/TopByCategorySection';
 import { StreakCounter } from '@/src/components/gamification/StreakCounter';
@@ -98,6 +99,10 @@ export default function HomeScreen() {
   return (
     <ScreenContainer scroll>
       <View className="flex-1 gap-8 pt-2">
+        <FadeIn delay={60}>
+          <FamilyProfilePills />
+        </FadeIn>
+
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <View style={{ flex: 1 }}>
             <Greeting />

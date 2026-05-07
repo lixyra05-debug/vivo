@@ -269,6 +269,42 @@ Bouclage du tier Expert avec 5 features pensées rétention quotidienne et engag
 - **R9 — Aucune nouvelle dépendance** : `expo-notifications` ~0.32.16 + AsyncStorage v2.2.0 déjà installés. 0 npm install.
 - **Tests** : 640 → **660 verts** (+20 : +12 Agent 1 [4 wellness-recipes + 4 naturality-score + 2 herbarium-store + 2 reminder-store] + 5 Agent 2 [4 NaturalityBadge + 1 herbarium screen] + 3 Agent 3 [2 plant-of-week + 1 recipes screen]). Pas de régression. `tsc --noEmit` clean. `npx expo export --platform web` OK (11.7MB bundle).
 
+## 4 features Premium finales — Famille · Historique illimité · Export PDF · Stats Avancées (mai 2026)
+Bouclage du tier Premium avec 4 features pensées rétention et utilité famille. 660 → **681 tests verts** (+21). Aucune régression. Migration 014, +1 install autorisée (`expo-print` ~15.0.8). 25 features inchangées en taille (rename `food_journal` → `family_mode`, `export_data` → `export_pdf`).
+
+- **Premium gate** : `src/lib/premium/premium-gate.ts` — rename des 2 placeholders côté `PremiumFeatureKey`, `FEATURE_TIER`, `PREMIUM_FEATURES`. Total reste 25 features (10 Premium + 15 Expert). Catalog plus propre, plus de placeholders fantômes.
+  - `family_mode` : "Mode Famille" — *Crée jusqu'à 4 profils familiaux avec leurs allergies et restrictions, et bascule entre eux d'un tap.*
+  - `export_pdf` : "Export PDF" — *Génère un rapport santé PDF de tes 30 derniers jours, prêt à partager avec ton médecin.*
+
+- **Migration `014_family_profiles.sql`** (idempotente, à appliquer manuellement dans Supabase SQL Editor) :
+  - Table `public.family_profiles` : `id uuid pk`, `user_id uuid fk auth.users on delete cascade`, `name text NOT NULL CHECK length 1-50`, `avatar_emoji text NOT NULL DEFAULT '🧑'`, `age_group text CHECK IN ('adult','child','baby','pregnant')`, `allergies text[] DEFAULT '{}'`, `conditions text[] DEFAULT '{}'`, `is_active boolean DEFAULT false`, `created_at`, `updated_at`
+  - **RLS** : 4 policies (select/insert/update/delete) `auth.uid() = user_id`
+  - **Trigger 1** `enforce_max_family_profiles` BEFORE INSERT — refuse au-delà de 4 (`RAISE EXCEPTION P0001`)
+  - **Trigger 2** `enforce_single_active_family_profile` BEFORE INSERT/UPDATE OF is_active — désactive les autres profils du user dans la même transaction (atomique)
+  - **Trigger 3** `set_updated_at_family_profiles` BEFORE UPDATE — auto-bump `updated_at`
+  - 2 index : `idx_family_profiles_user_id` (lookup) + index partiel `idx_family_profiles_active WHERE is_active = true`
+
+- **Backend** (Agent 1 — 4 modules + 13 tests, livré 660 → 675 = +15) :
+  - `src/lib/family/family-store.ts` (212 lignes) — 6 hooks React Query + 5 helpers internes exportés (`fetchFamilyProfiles`, `createFamilyProfile`, `updateFamilyProfile`, `deleteFamilyProfile`, `setActiveFamilyProfile`). Constante `MAX_FAMILY_PROFILES = 4`. `useActiveFamilyProfile` dérive de `useFamilyProfiles` côté React (pas de query séparée). `useSetActiveFamilyProfile` update juste `{ is_active: true }` — le trigger DB désactive les autres.
+  - `src/lib/export/generate-pdf.ts` (264 lignes) — `generateHealthReportHtml(data): string` pure (testable Jest, escape HTML XSS) + `exportHealthReportPdf(data): Promise<void>` lazy-require `expo-print` + `expo-sharing`. 6 sections HTML : header, période, KPI 4 chiffres, top 5 scannés, top 5 à éviter, badges, footer.
+  - `src/lib/stats/advanced-stats.ts` (270 lignes) — `calculateAdvancedStats(scans, now?)` autonome (helpers Paris dupliqués pour ne pas coupler à `profile-stats-engine.ts`). 6 métriques : `trend28d` (28 points + slope régression linéaire), `distribution` 5 buckets (excellent ≥85, good 70-84, mid 50-69, poor 30-49, bad <30), `topCategories` & `topBrands` (top 5, tie-break count desc puis avgScore desc), `streak` (current/longest jours consécutifs Paris), `toxicExposure` (totalPenalties + uniqueAdditives + worstAdditive sur 30j depuis `penalties_snapshot`).
+  - `src/lib/stores/__tests__/useScanHistory.test.tsx` — 1 test garde-fou : `useScanHistory({limit: 30})` applique `.limit(30)` server-side, `useScanHistory({limit: undefined})` omet `.limit`. Confirme la gate Premium-vs-free déjà câblée dans `app/(tabs)/history.tsx` (lignes 44, 49-52, 442-486).
+
+- **Frontend** (Agent 2 — 6 livrables UI + 2 tests, livré 675 → 681 = +6) :
+  - `app/family/index.tsx` — Liste max 4 profils + tap pour activer + edit pin → `/family/edit?id={id}` + bouton "+ Nouveau profil" (caché si ≥4). Skeleton loading, empty state, paywall `family_mode` pour free.
+  - `app/family/edit.tsx` — Form create/edit. 8 emojis avatar (🧑/👨/👩/🧒/👶/🤰/👴/👵), nom maxLength=50, 4 chips age_group, 14 allergènes EU + 7 conditions multi-select. Boutons Créer/Annuler ou Enregistrer/Supprimer (Alert.alert confirm). Validation nom non vide. Échec mutation → Alert "max 4 profils ?".
+  - `app/stats/index.tsx` — Dashboard 6 sections : KPI strip (totalScans / averageScore / streak), sparkline 28j Catmull-Rom (couleur trend selon slope), distribution 5 buckets colorés, top 5 catégories/marques en rows, exposition toxique (GlassCard tone="warning" si totalPenalties > 50). Empty state si 0 scans + paywall `advanced_stats`.
+  - `src/components/home/FamilyProfilePills.tsx` — ScrollView horizontal de pills compactes (avatar 18px + nom Inter-SemiBold 12), pill active sage, dernière pill "+ Gérer" → `/family`. Render `null` si tier='free' OU profiles.length=0 (auto-gating).
+  - `src/lib/scoring/use-active-compat-profile.ts` — Hook unifié : profil familial actif prime sur `useProfileStore`, fallback `userProfileToCompatibilityProfile(profile)` sinon. Renvoie `null` si rien à filtrer. **Pas encore branché** côté call-sites existants (history/category/store) — c'est un AJOUT pour les futures intégrations.
+  - `app/(tabs)/profile.tsx` : 3 SettingsRow ajoutés — Mode Famille (`Users` icon) → `/family`, Statistiques avancées (`BarChart3`) → `/stats`, Exporter mon rapport PDF (`FileText`) → `handleExportPdf` qui construit `HealthReportData` (userName, periodLabel FR, stats sur 30j, top 5 desc/asc par score, badges earned via `useUserBadges`). Free tier → push `/settings/subscription` ou Alert paywall.
+  - `app/(tabs)/index.tsx` : `<FamilyProfilePills>` en `<FadeIn delay={60}>` au-dessus du Greeting. Composant gère lui-même le `null` (auto-gating).
+
+- **Tests** : 660 → **681 verts** (+21 : Agent 1 +15 [6 family-store + 3 generate-pdf + 5 advanced-stats + 1 useScanHistory], Agent 2 +6 [3 FamilyProfilePills + 3 stats-index]). Aucune régression. `tsc --noEmit` clean. `npx expo export --platform web` OK (11.8MB bundle).
+
+- **R9 — 1 install autorisée par le plan validé** : `expo-print` ~15.0.8 (dépendance Native standard SDK, requise pour `printToFileAsync`). `expo-sharing` ~14.0.8 déjà présent.
+
+- **À faire côté Hector** : appliquer la migration `014_family_profiles.sql` dans Supabase Dashboard → SQL Editor → New query → Run, puis vérifier "Success" avant que le Mode Famille soit utilisable en prod.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

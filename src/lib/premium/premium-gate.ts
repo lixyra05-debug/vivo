@@ -33,9 +33,9 @@ export type PremiumFeatureKey =
   | 'store_comparison'
   | 'smart_alternatives'
   | 'unlimited_history'
-  | 'food_journal'
+  | 'family_mode'
   | 'advanced_stats'
-  | 'export_data'
+  | 'export_pdf'
   | 'priority_support'
   | 'vivo_recap'
   | 'scan_choc'
@@ -62,9 +62,9 @@ export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   store_comparison: 'premium',
   smart_alternatives: 'premium',
   unlimited_history: 'premium',
-  food_journal: 'premium',
+  family_mode: 'premium',
   advanced_stats: 'premium',
-  export_data: 'premium',
+  export_pdf: 'premium',
   priority_support: 'premium',
   vivo_recap: 'premium',
   scan_choc: 'premium',
@@ -118,10 +118,10 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
       "Conservez l'intégralité de votre historique de scans sans limite de durée.",
     freeLimit: 0,
   },
-  food_journal: {
-    labelFr: 'Journal alimentaire',
+  family_mode: {
+    labelFr: 'Mode Famille',
     descriptionFr:
-      'Suivez vos repas et analysez votre nutrition au fil du temps.',
+      "Crée jusqu'à 4 profils familiaux avec leurs allergies et restrictions, et bascule entre eux d'un tap.",
     freeLimit: 0,
   },
   advanced_stats: {
@@ -130,10 +130,10 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
       'Tableaux de bord détaillés sur votre consommation et vos progrès.',
     freeLimit: 0,
   },
-  export_data: {
-    labelFr: 'Export de données',
+  export_pdf: {
+    labelFr: 'Export PDF',
     descriptionFr:
-      'Exportez votre historique et vos statistiques en CSV ou PDF.',
+      'Génère un rapport santé PDF de tes 30 derniers jours, prêt à partager avec ton médecin.',
     freeLimit: 0,
   },
   priority_support: {

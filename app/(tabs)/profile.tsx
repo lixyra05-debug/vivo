@@ -15,8 +15,10 @@ import {
   HelpCircle,
   Leaf,
   LogOut,
+  Share2,
   Sparkles,
   User as UserIcon,
+  Users,
 } from 'lucide-react-native';
 import Animated, {
   Easing,
@@ -43,6 +45,10 @@ import {
   getUserStats,
 } from '@/src/lib/gamification/badge-engine';
 import type { ScanRecord } from '@/src/lib/gamification/types';
+import {
+  exportHealthReportPdf,
+  type HealthReportProduct,
+} from '@/src/lib/export/generate-pdf';
 
 const HEALTH_LABELS = {
   standard: 'Standard',
@@ -123,6 +129,91 @@ export default function ProfileScreen() {
   const allergies = profile?.allergies ?? [];
   const intolerances = profile?.intolerances ?? [];
   const { isPremium, tier } = usePremium();
+
+  async function handleExportPdf() {
+    if (tier === 'free') {
+      Alert.alert(
+        'Premium requis',
+        'L\'export PDF est inclus avec Vivo Premium.',
+        [
+          { text: 'Plus tard', style: 'cancel' },
+          {
+            text: 'Voir Premium',
+            onPress: () => router.push('/settings/subscription'),
+          },
+        ],
+      );
+      return;
+    }
+    try {
+      const allRows = scanHistoryQuery.data ?? [];
+      const totalScans = allRows.length;
+      const averageScore =
+        totalScans === 0
+          ? 0
+          : Math.round(
+              allRows.reduce((sum, r) => sum + r.score_at_scan, 0) / totalScans,
+            );
+      const productsAvoided = allRows.filter((r) => r.score_at_scan < 30).length;
+      const excellentProducts = allRows.filter(
+        (r) => r.score_at_scan >= 80,
+      ).length;
+
+      const sortedDesc = [...allRows].sort(
+        (a, b) => b.score_at_scan - a.score_at_scan,
+      );
+      const sortedAsc = [...allRows].sort(
+        (a, b) => a.score_at_scan - b.score_at_scan,
+      );
+
+      function rowToReportProduct(
+        row: (typeof allRows)[number],
+      ): HealthReportProduct {
+        return {
+          name: row.product?.name ?? null,
+          brand: row.product?.brand ?? null,
+          score: row.score_at_scan,
+          scannedAt: row.scanned_at,
+        };
+      }
+
+      const periodLabel =
+        totalScans === 0
+          ? 'Aucune activité enregistrée'
+          : (() => {
+              const formatter = new Intl.DateTimeFormat('fr-FR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                timeZone: 'Europe/Paris',
+              });
+              const dates = allRows.map((r) => new Date(r.scanned_at).getTime());
+              const oldest = new Date(Math.min(...dates));
+              const latest = new Date(Math.max(...dates));
+              return `Du ${formatter.format(oldest)} au ${formatter.format(latest)}`;
+            })();
+
+      await exportHealthReportPdf({
+        userName: displayName,
+        generatedAt: new Date(),
+        periodLabel,
+        stats: {
+          totalScans,
+          averageScore,
+          productsAvoided,
+          excellentProducts,
+        },
+        topScanned: sortedDesc.slice(0, 5).map(rowToReportProduct),
+        topAvoid: sortedAsc.slice(0, 5).map(rowToReportProduct),
+        badgesUnlocked: badges.earned,
+      });
+    } catch {
+      Alert.alert(
+        'Export impossible',
+        'L\'export PDF n\'est pas disponible sur le web. Réessaie depuis l\'app mobile.',
+      );
+    }
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.cream }}>
@@ -353,6 +444,27 @@ export default function ProfileScreen() {
                 label="Mon abonnement"
                 description={isPremium ? 'Premium actif' : 'Plan gratuit'}
                 onPress={() => router.push('/settings/subscription')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<Users color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Mode Famille"
+                description="Jusqu'à 4 profils familiaux"
+                onPress={() => router.push('/family')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<BarChart3 color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Statistiques avancées"
+                description="Tendances, distribution, exposition"
+                onPress={() => router.push('/stats')}
+              />
+              <View style={styles.rowDivider} />
+              <SettingsRow
+                icon={<Share2 color={Colors.sage} size={18} strokeWidth={2.2} />}
+                label="Exporter mon rapport PDF"
+                description="Synthèse partageable de ta santé"
+                onPress={handleExportPdf}
               />
               <View style={styles.rowDivider} />
               <SettingsRow
