@@ -8,6 +8,7 @@ import { FadeIn } from '@/src/components/ui/FadeIn';
 import { Greeting } from '@/src/components/home/Greeting';
 import { OrganicBlob } from '@/src/components/home/OrganicBlob';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
+import { PlantOfWeekCard } from '@/src/components/home/PlantOfWeekCard';
 import { StatsRow } from '@/src/components/home/StatsRow';
 import { TopByCategorySection } from '@/src/components/home/TopByCategorySection';
 import { StreakCounter } from '@/src/components/gamification/StreakCounter';
@@ -238,6 +239,10 @@ export default function HomeScreen() {
             blocks={topByCategoryQuery.data}
             isLoading={topByCategoryQuery.isLoading}
           />
+        </FadeIn>
+
+        <FadeIn delay={230}>
+          <PlantOfWeekCard />
         </FadeIn>
 
         <View className="mt-auto">

@@ -236,6 +236,39 @@ Deuxième feature exclusive Tier Expert. 625 → **640 tests verts** (+15). Aucu
 - **R9 — Aucune nouvelle dépendance** : AsyncStorage v2.2.0 déjà installé. 0 npm install.
 - **Tests** : 625 → **640 verts** (+15 : +6 protocols data garde-fou + 6 protocol-progress AsyncStorage + 4 components). Pas de régression. `tsc --noEmit` clean. `npx expo export` OK (11.5MB bundle).
 
+## 5 features Expert finales — Herbier · Rappels · Score Naturalité · Plante semaine · Recettes (mai 2026)
+Bouclage du tier Expert avec 5 features pensées rétention quotidienne et engagement long. 640 → **660 tests verts** (+20). Aucune régression. Stockage 100% AsyncStorage (R10), aucune nouvelle dépendance npm (R9), texte 100% R5-safe (garde-fou regex sur les 30 recettes).
+
+- **Premium gate étendu** : 20 → **25 features** (10 Premium + 15 Expert). Ajout des 5 clés `cure_reminders`, `my_herbarium`, `naturality_score`, `plant_of_week`, `wellness_recipes` dans `PremiumFeatureKey`, `FEATURE_TIER` (toutes 'expert'), catalogue `PREMIUM_FEATURES`. Test count update.
+
+- **Data + Logique** (Agent 1) :
+  - `src/data/wellness-recipes.ts` (631 lignes) — Types `WellnessRecipe`, `RecipeCategory` (sleep/digestion/stress/energy/skin/immunity/detox), `RecipeDifficulty`. **30 recettes** réparties (sleep 5 · digestion 5 · stress 4 · energy 4 · skin 4 · immunity 4 · detox 4). Helpers `getRecipeById`, `getRecipesByCategory`, `searchRecipes`. Chaque recette : `{id, titleFr, emoji, category, plantIds, ingredientsFr, preparationFr, durationMinutes, timingFr, benefitsFr, difficulty}`. Garde-fou test : tous les `plantIds` ∈ `PLANT_ENCYCLOPEDIA.id` + regex anti-claim `/(?<!dis)\bsoigne\b|guérit|guerit|\btraite\b|remplace|\bmédicament\b/i`.
+  - `src/lib/naturality/naturality-score.ts` (59 lignes) — Pure function `detectNaturalIngredients(ingredientsList): NaturalityMatch[]`. Word-boundary Unicode `(?<!\p{L})…(?!\p{L})` avec flag `iu` (case-insensitive + unicode). Match nameFr ET nameLatin exacts. Déduplique par plantId. R5-safe par construction.
+  - `src/lib/herbarium/herbarium-store.ts` (120 lignes) — CRUD AsyncStorage. Key `'@vivo_herbarium'`. API : `getHerbarium`, `addToHerbarium(plantId, note?)` idempotent, `removeFromHerbarium`, `updateNote`, `isInHerbarium`. Notes troncées à 200 chars en écriture.
+  - `src/lib/reminders/reminder-store.ts` (221 lignes) — CRUD AsyncStorage + lazy-require `expo-notifications` (graceful : si module absent → `notificationId: null`). Key `'@vivo_reminders'`. API : `getReminders`, `createReminder(plantId, durationDays: 7|14|21|30)` schedule daily 9h, `markTodayDone` ajoute `YYYY-MM-DD` dedupliqué + auto-complete à `markedDays.length >= durationDays`, `deleteReminder` cancel notif + supprime.
+  - `src/lib/plants/plant-of-week.ts` (31 lignes) — Pure deterministic. `getPlantOfWeek(now: Date = new Date())` calcule `Math.floor((utcMidnightToday - utcJan1) / 86_400_000) / 7` modulo `PLANT_ENCYCLOPEDIA.length`. Tous les jours d'une même tranche de 7 jours UTC depuis le 1er janvier renvoient la même plante. Date injectable pour tests déterministes.
+
+- **Frontend** (Agents 2 + 3) :
+  - `src/components/naturality/NaturalityBadge.tsx` (223 lignes) — Auto-gating via `usePremium()`. Si `detectNaturalIngredients(...).length === 0` → `null`. Sinon, GlassCard `<Leaf>` sage avec count pluriel adaptatif ("1 plante bénéfique détectée" / "N plantes bénéfiques détectées"). Expert : tap révèle inline une liste expandable, chaque plante Pressable → `/plants/[id]`. Free/premium : opacity 0.4 + icône `<Lock>` + tap → paywall inline `featureKey="naturality_score"`.
+  - `src/components/herbarium/HerbariumNoteModal.tsx` (168 lignes) — Modal RN slide-from-bottom, TextInput multiline maxLength=200, compteur live, boutons Annuler/Enregistrer.
+  - `src/components/home/PlantOfWeekCard.tsx` (166 lignes) — GlassCard sage avec chip "🌿 Plante de la semaine" + emoji 32 + nameFr Bricolage-Bold + nameLatin italic + 2 lignes properties. Expert tap → `/plants/[id]`. Free/premium : opacity 0.3 + overlay `<Lock>` + tap → écran abonnement.
+  - `src/components/recipes/RecipeTimer.tsx` (166 lignes) — Countdown `mm:ss` via `useState` + `setInterval` avec cleanup `clearInterval` strict dans `useEffect` return. Boutons Lancer/Pause/Réinitialiser. Auto-stop à 0 (pas de Vibration → R9).
+  - `app/herbarium/index.tsx` (372 lignes) — Liste `<PlantListCard>` + note Inter 12 italic + boutons `<Trash2>`/`<Edit3>` (Alert.alert confirm). Empty state CTA "Voir l'encyclopédie". Expert gate via `<PremiumPaywall featureKey="my_herbarium" />`. Disclaimer médical.
+  - `app/reminders/index.tsx` (773 lignes) — Liste cures GlassCard avec emoji + "Jour X/Y" + barre progression sage + status badge + boutons "Pris ✅" (désactivé si `isMarkedToday`) / `<Trash2>`. Bouton flottant `+` ouvre modal create (picker plante ScrollView + 4 chips durée 7/14/21/30j). Expert gate. Disclaimer.
+  - `app/recipes/index.tsx` (445 lignes) — TextInput search + ScrollView 7 chips catégories + cards avec emoji + chip difficulty + chip durée. Expert gate strict (preview 1 + 4 lockés + paywall). Disclaimer.
+  - `app/recipes/[id].tsx` (425 lignes) — Hero emoji 64 + chips + 5 sections GlassCard FadeIn cascade (Ingrédients / Préparation / Plantes utilisées via `<PlantListCard>` cliquables / `<RecipeTimer>` / Bénéfices / Quand consommer). Empty state "Recette introuvable" + bouton retour. Expert gate. Disclaimer.
+
+- **Entrées navigation** :
+  - `app/plants/[id].tsx` : 2 boutons Expert ajoutés en bas de fiche — "Ajouter à mon herbier 🌿" (toggle `isInHerbarium`, désactivé si déjà ajouté) + "Créer un rappel de cure 💊" → `/reminders`. Visibles uniquement si `tier === 'expert'`.
+  - `src/components/product/FoodProductView.tsx` : `<NaturalityBadge>` inséré après section Ingrédients (delay 880).
+  - `src/components/product/CosmeticProductView.tsx` : `<NaturalityBadge>` inséré après section score (delay 180) — particulièrement utile pour matcher les noms latins INCI ("Matricaria recutita extract").
+  - `app/(tabs)/explore.tsx` : section "🌿 Plantes médicinales" passe de 3 → **6 cards** (3×2) : Encyclopédie 📖 / Remèdes 🔍 / Protocoles 📅 / Herbier 🌿 / Rappels 💊 / Recettes ☕. Style `gridCellThird: { width: '32%' }` réutilisé.
+  - `app/(tabs)/profile.tsx` : section Expert passe de 3 → **6 SettingsRow** (Encyclopédie / Chercheur / Protocoles / Herbier / Rappels / Recettes Bien-être).
+  - `app/(tabs)/index.tsx` : `<PlantOfWeekCard>` inséré à `delay={230}` entre TopByCategorySection (200) et le bloc CTA principal.
+
+- **R9 — Aucune nouvelle dépendance** : `expo-notifications` ~0.32.16 + AsyncStorage v2.2.0 déjà installés. 0 npm install.
+- **Tests** : 640 → **660 verts** (+20 : +12 Agent 1 [4 wellness-recipes + 4 naturality-score + 2 herbarium-store + 2 reminder-store] + 5 Agent 2 [4 NaturalityBadge + 1 herbarium screen] + 3 Agent 3 [2 plant-of-week + 1 recipes screen]). Pas de régression. `tsc --noEmit` clean. `npx expo export --platform web` OK (11.7MB bundle).
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

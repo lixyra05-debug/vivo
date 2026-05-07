@@ -18,6 +18,7 @@ import { ReportButton } from './ReportButton';
 import { SourceLink } from './SourceLink';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
 import { AlternativesSection } from '@/src/components/premium/AlternativesSection';
+import { NaturalityBadge } from '@/src/components/naturality/NaturalityBadge';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { findAdditive } from '@/src/lib/scoring/engine';
 import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
@@ -402,6 +403,15 @@ export function FoodProductView({
             </Text>
             <IngredientsList ingredientsRaw={product.ingredients_raw} />
           </View>
+        </FadeIn>
+      ) : null}
+
+      {product.ingredients_raw ? (
+        <FadeIn delay={880}>
+          <NaturalityBadge
+            ingredientsList={product.ingredients_raw}
+            onPressPlant={(plantId) => router.push(`/plants/${plantId}`)}
+          />
         </FadeIn>
       ) : null}
 

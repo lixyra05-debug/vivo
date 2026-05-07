@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { CosmeticResultView } from './CosmeticResultView';
 import { ConfidenceBadge } from './ConfidenceBadge';
@@ -6,6 +7,7 @@ import { CompatibilityBanner } from './CompatibilityBanner';
 import { ReportButton } from './ReportButton';
 import { SourceLink } from './SourceLink';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
+import { NaturalityBadge } from '@/src/components/naturality/NaturalityBadge';
 import { Colors } from '@/src/constants/colors';
 import type { CosmeticProduct, CosmeticScoringResult } from '@/src/lib/api/types';
 import type { getCosmeticConfidence } from '@/src/lib/api/confidence';
@@ -29,6 +31,7 @@ export function CosmeticProductView({
   educationalCards,
   onPressMethodology,
 }: CosmeticProductViewProps) {
+  const router = useRouter();
   return (
     <>
       <CosmeticResultView product={product} result={result} profile="standard" />
@@ -46,6 +49,14 @@ export function CosmeticProductView({
           </Pressable>
         </View>
       </FadeIn>
+      {product.ingredients_inci ? (
+        <FadeIn delay={180}>
+          <NaturalityBadge
+            ingredientsList={product.ingredients_inci}
+            onPressPlant={(plantId) => router.push(`/plants/${plantId}`)}
+          />
+        </FadeIn>
+      ) : null}
       {confidence ? (
         <FadeIn delay={120}>
           <View style={{ alignItems: 'center' }}>

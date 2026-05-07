@@ -1,5 +1,5 @@
 /**
- * Premium gate — système 2 tiers : Premium (10 features) + Expert (9 features).
+ * Premium gate — système 2 tiers : Premium (10 features) + Expert (15 features).
  *
  * Source de vérité : table `subscriptions` (D1 validée).
  * Trialing compte comme actif (D2 validée).
@@ -39,7 +39,7 @@ export type PremiumFeatureKey =
   | 'priority_support'
   | 'vivo_recap'
   | 'scan_choc'
-  // Expert tier (9)
+  // Expert tier (15)
   | 'plant_database'
   | 'herbal_remedies'
   | 'plant_alternatives'
@@ -49,7 +49,12 @@ export type PremiumFeatureKey =
   | 'interaction_warnings'
   | 'expert_articles'
   | 'expert_consultation'
-  | 'protocols_21days';
+  | 'protocols_21days'
+  | 'cure_reminders'
+  | 'my_herbarium'
+  | 'naturality_score'
+  | 'plant_of_week'
+  | 'wellness_recipes';
 
 export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   // Premium (10)
@@ -63,7 +68,7 @@ export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   priority_support: 'premium',
   vivo_recap: 'premium',
   scan_choc: 'premium',
-  // Expert (9)
+  // Expert (15)
   plant_database: 'expert',
   herbal_remedies: 'expert',
   plant_alternatives: 'expert',
@@ -74,6 +79,11 @@ export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   expert_articles: 'expert',
   expert_consultation: 'expert',
   protocols_21days: 'expert',
+  cure_reminders: 'expert',
+  my_herbarium: 'expert',
+  naturality_score: 'expert',
+  plant_of_week: 'expert',
+  wellness_recipes: 'expert',
 };
 
 export interface PremiumFeatureDef {
@@ -144,7 +154,7 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
     freeLimit: 0,
   },
 
-  // Expert (9)
+  // Expert (15)
   plant_database: {
     labelFr: 'Base de données plantes médicinales',
     descriptionFr:
@@ -202,6 +212,36 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
     labelFr: 'Protocoles bien-être 21 jours',
     descriptionFr:
       "Programmes guidés de 21 jours (sommeil, digestion, stress, énergie, peau) avec 1 plante, 1 recette et 1 conseil par jour.",
+    freeLimit: 0,
+  },
+  cure_reminders: {
+    labelFr: 'Rappels de cures',
+    descriptionFr:
+      'Crée et suis tes cures de plantes (7, 14, 21 ou 30 jours) avec rappels quotidiens et marquage des prises.',
+    freeLimit: 0,
+  },
+  my_herbarium: {
+    labelFr: 'Mon Herbier',
+    descriptionFr:
+      'Ta collection personnelle de plantes favorites avec notes privées et accès rapide aux fiches détaillées.',
+    freeLimit: 0,
+  },
+  naturality_score: {
+    labelFr: 'Score Naturalité',
+    descriptionFr:
+      "Détection automatique des plantes bénéfiques dans la liste d'ingrédients de tes produits scannés.",
+    freeLimit: 0,
+  },
+  plant_of_week: {
+    labelFr: 'Plante de la semaine',
+    descriptionFr:
+      "Une plante mise en avant chaque semaine sur ta home pour enrichir progressivement tes connaissances.",
+    freeLimit: 0,
+  },
+  wellness_recipes: {
+    labelFr: 'Recettes bien-être',
+    descriptionFr:
+      'Plus de 30 recettes d’infusions, décoctions et tisanes pour intégrer les plantes au quotidien.',
     freeLimit: 0,
   },
 };

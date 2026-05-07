@@ -139,7 +139,7 @@ describe('premium-gate', () => {
   });
 
   describe('PREMIUM_FEATURES catalogue', () => {
-    it('expose les 20 clés attendues (10 Premium + 10 Expert)', () => {
+    it('expose les 25 clés attendues (10 Premium + 15 Expert)', () => {
       const keys = Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[];
       expect(keys).toEqual(
         expect.arrayContaining([
@@ -154,7 +154,7 @@ describe('premium-gate', () => {
           'priority_support',
           'vivo_recap',
           'scan_choc',
-          // Expert (10)
+          // Expert (15)
           'plant_database',
           'herbal_remedies',
           'plant_alternatives',
@@ -165,9 +165,14 @@ describe('premium-gate', () => {
           'expert_articles',
           'expert_consultation',
           'protocols_21days',
+          'cure_reminders',
+          'my_herbarium',
+          'naturality_score',
+          'plant_of_week',
+          'wellness_recipes',
         ]),
       );
-      expect(keys).toHaveLength(20);
+      expect(keys).toHaveLength(25);
     });
 
     it('chaque feature a un labelFr non vide', () => {

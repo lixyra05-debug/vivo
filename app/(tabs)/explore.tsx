@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Calendar, Leaf, Search, Trophy } from 'lucide-react-native';
+import {
+  Bell,
+  BookHeart,
+  BookOpen,
+  Calendar,
+  Coffee,
+  Leaf,
+  Search,
+  Trophy,
+} from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -103,6 +112,27 @@ export default function ExploreScreen() {
     router.push('/protocols');
   }
 
+  function handleHerbariumPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/herbarium');
+  }
+
+  function handleRemindersPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/reminders');
+  }
+
+  function handleRecipesPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/recipes');
+  }
+
   return (
     <ScreenContainer scroll>
       <View style={{ gap: 18 }}>
@@ -184,6 +214,9 @@ export default function ExploreScreen() {
               onPlantsPress={handlePlantsPress}
               onRemediesPress={handleRemediesPress}
               onProtocolsPress={handleProtocolsPress}
+              onHerbariumPress={handleHerbariumPress}
+              onRemindersPress={handleRemindersPress}
+              onRecipesPress={handleRecipesPress}
             />
             <StoresSection
               stores={getAllStores()}
@@ -261,12 +294,18 @@ interface PlantsSectionProps {
   onPlantsPress: () => void;
   onRemediesPress: () => void;
   onProtocolsPress: () => void;
+  onHerbariumPress: () => void;
+  onRemindersPress: () => void;
+  onRecipesPress: () => void;
 }
 
 function PlantsSection({
   onPlantsPress,
   onRemediesPress,
   onProtocolsPress,
+  onHerbariumPress,
+  onRemindersPress,
+  onRecipesPress,
 }: PlantsSectionProps) {
   return (
     <View style={{ gap: 12 }}>
@@ -327,6 +366,60 @@ function PlantsSection({
               <View style={{ gap: 2 }}>
                 <Text style={styles.plantTitle}>Protocoles</Text>
                 <Text style={styles.plantSubtitle}>21 jours</Text>
+              </View>
+            </GlassCard>
+          </Pressable>
+        </FadeIn>
+        <FadeIn delay={350} style={styles.gridCellThird}>
+          <Pressable
+            onPress={onHerbariumPress}
+            accessibilityRole="button"
+            accessibilityLabel="Mon Herbier"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <GlassCard style={styles.plantCard}>
+              <View style={styles.plantIconWrap}>
+                <BookHeart color={Colors.sage} size={22} strokeWidth={2.2} />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.plantTitle}>Mon Herbier</Text>
+                <Text style={styles.plantSubtitle}>🌿 Mes plantes</Text>
+              </View>
+            </GlassCard>
+          </Pressable>
+        </FadeIn>
+        <FadeIn delay={390} style={styles.gridCellThird}>
+          <Pressable
+            onPress={onRemindersPress}
+            accessibilityRole="button"
+            accessibilityLabel="Mes Rappels"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <GlassCard style={styles.plantCard}>
+              <View style={styles.plantIconWrap}>
+                <Bell color={Colors.sage} size={22} strokeWidth={2.2} />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.plantTitle}>Mes Rappels</Text>
+                <Text style={styles.plantSubtitle}>💊 Cures</Text>
+              </View>
+            </GlassCard>
+          </Pressable>
+        </FadeIn>
+        <FadeIn delay={430} style={styles.gridCellThird}>
+          <Pressable
+            onPress={onRecipesPress}
+            accessibilityRole="button"
+            accessibilityLabel="Recettes Bien-être"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <GlassCard style={styles.plantCard}>
+              <View style={styles.plantIconWrap}>
+                <Coffee color={Colors.sage} size={22} strokeWidth={2.2} />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.plantTitle}>Recettes ☕</Text>
+                <Text style={styles.plantSubtitle}>30 préparations</Text>
               </View>
             </GlassCard>
           </Pressable>

@@ -10,6 +10,25 @@ jest.mock('expo-image', () => {
   return { Image: View };
 });
 
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+}));
+
+jest.mock('@/src/lib/hooks/usePremium', () => ({
+  usePremium: () => ({
+    tier: 'free',
+    isPremium: false,
+    isExpert: false,
+    isLoading: false,
+    canAccess: () => false,
+  }),
+}));
+
+jest.mock('@/src/lib/stores/useAuthStore', () => ({
+  useAuthStore: (selector: (state: { user: null }) => unknown) =>
+    selector({ user: null }),
+}));
+
 const baseProduct: CosmeticProduct = {
   barcode: '3401520107313',
   name: 'Crème hydratante',

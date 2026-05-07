@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, BookHeart, Bell, ExternalLink } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
@@ -9,6 +10,10 @@ import { EVIDENCE_STYLES } from '@/src/components/plants/PlantListCard';
 import { Colors } from '@/src/constants/colors';
 import { usePremium } from '@/src/lib/hooks/usePremium';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
+import {
+  addToHerbarium,
+  isInHerbarium,
+} from '@/src/lib/herbarium/herbarium-store';
 import {
   PLANT_CATEGORIES,
   getPlantById,
@@ -25,9 +30,31 @@ export default function PlantDetailScreen() {
   const isExpert = tier === 'expert';
 
   const plant = id ? getPlantById(id) : undefined;
+  const [inHerbarium, setInHerbarium] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isExpert || !id) return;
+    isInHerbarium(id).then((present) => {
+      if (!cancelled) setInHerbarium(present);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isExpert, id]);
 
   function handleUpgrade(targetTier: 'premium' | 'expert') {
     router.push(`/settings/subscription?tier=${targetTier}`);
+  }
+
+  async function handleAddToHerbarium() {
+    if (!id || inHerbarium) return;
+    await addToHerbarium(id);
+    setInHerbarium(true);
+  }
+
+  function handleCreateReminder() {
+    router.push('/reminders');
   }
 
   if (!plant) {
@@ -147,7 +174,62 @@ export default function PlantDetailScreen() {
           </FadeIn>
         ) : null}
 
-        <FadeIn delay={isExpert ? 980 : 360}>
+        {isExpert ? (
+          <FadeIn delay={940}>
+            <View style={styles.expertActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  inHerbarium
+                    ? 'Plante déjà dans ton herbier'
+                    : 'Ajouter cette plante à mon herbier'
+                }
+                accessibilityState={{ disabled: inHerbarium }}
+                disabled={inHerbarium}
+                onPress={handleAddToHerbarium}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  inHerbarium ? styles.actionButtonAdded : styles.actionButtonPrimary,
+                  pressed && !inHerbarium && { opacity: 0.85 },
+                ]}
+              >
+                <BookHeart
+                  color={inHerbarium ? Colors.earth : '#FFFFFF'}
+                  size={16}
+                  strokeWidth={2.4}
+                />
+                <Text
+                  style={
+                    inHerbarium
+                      ? styles.actionButtonAddedText
+                      : styles.actionButtonPrimaryText
+                  }
+                >
+                  {inHerbarium
+                    ? 'Dans mon herbier ✅'
+                    : 'Ajouter à mon herbier 🌿'}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Créer un rappel de cure"
+                onPress={handleCreateReminder}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  styles.actionButtonOutline,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Bell color={Colors.sage} size={16} strokeWidth={2.4} />
+                <Text style={styles.actionButtonOutlineText}>
+                  Créer un rappel de cure 💊
+                </Text>
+              </Pressable>
+            </View>
+          </FadeIn>
+        ) : null}
+
+        <FadeIn delay={isExpert ? 1000 : 360}>
           <Text style={styles.disclaimer}>
             Ces informations sont fournies à titre éducatif. Elles ne remplacent
             pas un avis médical. Consultez un professionnel de santé.
@@ -363,5 +445,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
+  },
+  expertActions: {
+    gap: 10,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  actionButtonPrimary: {
+    backgroundColor: Colors.sage,
+  },
+  actionButtonPrimaryText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  actionButtonAdded: {
+    backgroundColor: 'rgba(196, 168, 130, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 168, 130, 0.35)',
+    opacity: 0.7,
+  },
+  actionButtonAddedText: {
+    color: Colors.earth,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  actionButtonOutline: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 173, 139, 0.35)',
+  },
+  actionButtonOutlineText: {
+    color: Colors.sage,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    letterSpacing: 0.2,
   },
 });

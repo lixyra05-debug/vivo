@@ -5,8 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   BarChart3,
+  Bell,
+  BookHeart,
   BookOpen,
   Calendar,
+  Coffee,
   FileText,
   HeartPulse,
   HelpCircle,
@@ -307,6 +310,27 @@ export default function ProfileScreen() {
                   label="Mes Protocoles"
                   description="Programmes 21 jours bien-être"
                   onPress={() => router.push('/protocols')}
+                />
+                <View style={styles.rowDivider} />
+                <SettingsRow
+                  icon={<BookHeart color={Colors.sage} size={18} strokeWidth={2.2} />}
+                  label="Mon Herbier"
+                  description="Tes plantes favorites avec notes"
+                  onPress={() => router.push('/herbarium')}
+                />
+                <View style={styles.rowDivider} />
+                <SettingsRow
+                  icon={<Bell color={Colors.sage} size={18} strokeWidth={2.2} />}
+                  label="Mes Rappels"
+                  description="Suivi de tes cures de plantes"
+                  onPress={() => router.push('/reminders')}
+                />
+                <View style={styles.rowDivider} />
+                <SettingsRow
+                  icon={<Coffee color={Colors.sage} size={18} strokeWidth={2.2} />}
+                  label="Recettes Bien-être"
+                  description="30 préparations sourcées EMA"
+                  onPress={() => router.push('/recipes')}
                 />
               </GlassCard>
             </View>
