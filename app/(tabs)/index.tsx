@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, Calendar, ChevronRight, ScanLine } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { Greeting } from '@/src/components/home/Greeting';
-import { OrganicBlob } from '@/src/components/home/OrganicBlob';
+import { AnimatedVivoBrand } from '@/src/components/home/AnimatedVivoBrand';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { PlantOfWeekCard } from '@/src/components/home/PlantOfWeekCard';
 import { FamilyProfilePills } from '@/src/components/home/FamilyProfilePills';
@@ -31,9 +31,6 @@ import type { UserProfile } from '@/src/lib/api/types';
 
 const TOP_BY_CATEGORY_STALE_MS = 30 * 60 * 1000;
 const TOP_BY_CATEGORY_GC_MS = 60 * 60 * 1000;
-
-const BLOB_SIZE = 320;
-const HALO_SIZE = 360;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -132,29 +129,7 @@ export default function HomeScreen() {
           </Text>
         </FadeIn>
 
-        <View
-          className="items-center justify-center"
-          style={{ height: BLOB_SIZE + 40 }}
-          accessibilityElementsHidden={Platform.OS === 'ios' ? false : undefined}
-        >
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              width: HALO_SIZE,
-              height: HALO_SIZE,
-              borderRadius: HALO_SIZE / 2,
-              backgroundColor: '#E2EBE2',
-              opacity: 0.55,
-              shadowColor: '#8BAD8B',
-              shadowOpacity: 0.28,
-              shadowRadius: 40,
-              shadowOffset: { width: 0, height: 12 },
-              elevation: 6,
-            }}
-          />
-          <OrganicBlob size={BLOB_SIZE} />
-        </View>
+        <AnimatedVivoBrand />
 
         {showRecapBanner && previousRecap ? (
           <FadeIn delay={150}>
