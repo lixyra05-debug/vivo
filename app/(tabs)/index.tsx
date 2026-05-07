@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, ChevronRight, ScanLine } from 'lucide-react-native';
+import { BarChart3, Calendar, ChevronRight, ScanLine } from 'lucide-react-native';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { Greeting } from '@/src/components/home/Greeting';
@@ -21,6 +21,9 @@ import { calculateProfileStats } from '@/src/lib/stats/profile-stats-engine';
 import { useMonthlyRecap } from '@/src/lib/stats/use-monthly-recap';
 import { getTimeBasedTagline } from '@/src/lib/home/tagline';
 import { fetchTopByCategoryHome } from '@/src/lib/api/top-by-category';
+import { useProtocol } from '@/src/lib/protocols/use-protocol';
+import { getProtocolById } from '@/src/data/protocols';
+import { usePremium } from '@/src/lib/hooks/usePremium';
 import type { ScanRecord } from '@/src/lib/gamification/types';
 import type { UserProfile } from '@/src/lib/api/types';
 
@@ -65,6 +68,15 @@ export default function HomeScreen() {
   );
   const showRecapBanner =
     previousRecap !== null && previousRecap.totalScans >= 5;
+
+  // Banner protocole actif — visible uniquement Expert + protocole en cours
+  const { tier } = usePremium(user?.id ?? null);
+  const { activeProtocol } = useProtocol();
+  const activeProtocolDef = activeProtocol
+    ? getProtocolById(activeProtocol.protocolId) ?? null
+    : null;
+  const showProtocolBanner =
+    tier === 'expert' && activeProtocol !== null && activeProtocolDef !== null;
 
   const userProfile: UserProfile = useMemo(
     () => ({
@@ -163,6 +175,35 @@ export default function HomeScreen() {
                 <Text style={bannerStyles.subtitle} numberOfLines={1}>
                   {previousRecap.totalScans} scans · score moyen{' '}
                   {previousRecap.averageScore}
+                </Text>
+              </View>
+              <ChevronRight color={Colors.textMuted} size={20} strokeWidth={2.2} />
+            </Pressable>
+          </FadeIn>
+        ) : null}
+
+        {showProtocolBanner && activeProtocol && activeProtocolDef ? (
+          <FadeIn delay={170}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Continuer mon protocole ${activeProtocolDef.titleFr}`}
+              onPress={() =>
+                router.push(`/protocols/${activeProtocol.protocolId}`)
+              }
+              style={({ pressed }) => [
+                bannerStyles.banner,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <View style={bannerStyles.iconWrap}>
+                <Calendar color={Colors.sage} size={20} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={bannerStyles.title} numberOfLines={1}>
+                  Jour {activeProtocol.currentDay}/21 — {activeProtocolDef.titleFr}
+                </Text>
+                <Text style={bannerStyles.subtitle} numberOfLines={1}>
+                  Continue ton protocole
                 </Text>
               </View>
               <ChevronRight color={Colors.textMuted} size={20} strokeWidth={2.2} />

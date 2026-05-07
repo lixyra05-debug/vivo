@@ -210,6 +210,32 @@ Première feature exclusive Tier Expert. 577 → **625 tests verts** (+48). Aucu
   - `app/(tabs)/profile.tsx` : section conditionnelle "Mon espace Expert 🌿" si `tier === 'expert'`, entre ProfileStatsSection et Paramètres. 2 SettingsRow (Encyclopédie / Chercheur).
 - **Tests** : 577 → **625 verts** (+48 : 40 plant-encyclopedia + 4 remedy-finder + 2 PlantListCard + helpers/garde-fous). Pas de régression. `npx expo export` OK.
 
+## Protocoles bien-être 21 jours (mai 2026)
+Deuxième feature exclusive Tier Expert. 625 → **640 tests verts** (+15). Aucune régression. **5 protocoles guidés** (sommeil 😴, digestion 🫃, stress 😰, énergie ⚡, peau 🧴) × 21 jours, rotation 7 plantes × 3 cycles. Stockage progression 100% AsyncStorage (R10 — pas de Supabase). 1 protocole actif à la fois. R5 absolu : "favoriser/contribuer" uniquement, jamais "soigner/guérir/traiter".
+
+- **Premium gate étendu** : 19 → **20 features** (10 Premium + 10 Expert). Ajout de `protocols_21days` dans `PremiumFeatureKey`, `FEATURE_TIER` (tier='expert'), catalogue `PREMIUM_FEATURES`. Test count update.
+- **Data + Logique** (Agent 1) :
+  - `src/data/protocols.ts` (574 lignes) — Types `Protocol`, `ProtocolDay`. `PROTOCOLS: Protocol[]` array (5 × 21 = **105 entrées uniques**). Helper `getProtocolById`. Chaque jour = `{day, plantId, recipeFr, tipFr}`. Variation par cycle : C1 posologie de base, C2 variantes/décoctions, C3 intégration quotidienne. Plantes consommées (avec substitutions validées vs brief initial) :
+    - **sleep** : chamomile, valerian, linden, melissa, passionflower, hops, lavender
+    - **digestion** : peppermint, fennel, anise, caraway, chicory, artichoke, **ginger** (sub coriandre)
+    - **stress** : melissa, passionflower, lavender, hops, valerian, chamomile, linden
+    - **energy** : rosemary, nettle, ginger, turmeric, **ginseng** (sub avoine), **green_tea** (sub carotte), peppermint
+    - **skin** : calendula, burdock, borage, aloe_vera, chamomile, nettle, **witch_hazel** (sub pissenlit)
+  - `src/lib/protocols/protocol-progress.ts` (171 lignes) — Persistence AsyncStorage. Keys `'@vivo_protocol_active'` / `'@vivo_protocol_history'`. 5 fonctions : `getActiveProtocol`, `startProtocol` (auto-abandon de l'actif courant), `completeDay` (feeling 1-5, auto-complete à 21), `abandonProtocol`, `getProtocolHistory`.
+  - `src/lib/protocols/use-protocol.ts` (122 lignes) — Hook React. Calcul `todayDay` via UTC ms simple `Math.floor((Date.now() - new Date(startDate).getTime()) / 86400000) + 1` (capped 21). Expose `{activeProtocol, todayDay, todayPlant, todayRecipe, todayTip, isRestDay, completeToday, startProtocol, abandon, history, isLoading}`.
+  - **Garde-fou R5** : test `/soigne|guérit|guerit|traite |remplace|cure |médicament/i` global sur tous les `recipeFr` + `tipFr` de `PROTOCOLS`.
+- **Frontend (2 écrans + 2 composants)** (Agent 2) :
+  - `src/components/protocols/DayCircle.tsx` (187 lignes) — Cercle 36×36 borderRadius 18, **5 status visuels** (`completed-good` sage, `completed-ok` earth, `today` cream + pulse Reanimated, `future` muted, `missed` red light). Pulse désactivée via `useReduceMotion`. testID="day-circle".
+  - `src/components/protocols/ProtocolCard.tsx` (189 lignes) — GlassCard avec emoji 40px + title/desc + chip "21 jours". Progress bar si `isActive`, pill "EN COURS" earth, opacity 0.4 si `isDisabled` (un autre protocole déjà actif).
+  - `app/protocols/index.tsx` (247 lignes) — Liste 5 protocoles + highlight de l'actif. **Expert gate** : free/premium voient 1 preview en clair + 4 blurred opacity 0.25 + `<PremiumPaywall featureKey="protocols_21days" />`.
+  - `app/protocols/[id].tsx` (708 lignes) — Calendrier 21 jours (3×7 grille DayCircle) + section "Aujourd'hui" (plante + recette + tip + tracker feeling 5 emojis 😫😕😐🙂😁) + boutons "Démarrer" / "Continuer" + section progression avec moyenne feeling + barre. "Abandonner" via `Alert.alert` confirmation. Expert gate strict.
+- **Entrées navigation** :
+  - `app/(tabs)/explore.tsx` : section "🌿 Plantes médicinales" passe de 2 → **3 cards** (Encyclopédie 📖 / Remèdes 🔍 / Protocoles 📅). Style `gridCellThird: { width: '32%' }` ajouté.
+  - `app/(tabs)/profile.tsx` : 3e SettingsRow "Mes Protocoles" (icône `Calendar`) ajouté dans la section conditionnelle Expert.
+  - `app/(tabs)/index.tsx` : banner conditionnel "Jour {currentDay}/21 — {titleFr}" après Recap banner (delay 170, entre Recap 150 et StatsRow). Visible uniquement si `tier === 'expert'` ET `activeProtocol !== null`.
+- **R9 — Aucune nouvelle dépendance** : AsyncStorage v2.2.0 déjà installé. 0 npm install.
+- **Tests** : 625 → **640 verts** (+15 : +6 protocols data garde-fou + 6 protocol-progress AsyncStorage + 4 components). Pas de régression. `tsc --noEmit` clean. `npx expo export` OK (11.5MB bundle).
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

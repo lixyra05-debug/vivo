@@ -48,7 +48,8 @@ export type PremiumFeatureKey =
   | 'children_safety'
   | 'interaction_warnings'
   | 'expert_articles'
-  | 'expert_consultation';
+  | 'expert_consultation'
+  | 'protocols_21days';
 
 export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   // Premium (10)
@@ -72,6 +73,7 @@ export const FEATURE_TIER: Record<PremiumFeatureKey, SubscriptionTier> = {
   interaction_warnings: 'expert',
   expert_articles: 'expert',
   expert_consultation: 'expert',
+  protocols_21days: 'expert',
 };
 
 export interface PremiumFeatureDef {
@@ -194,6 +196,12 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
     labelFr: 'Consultation expert (1/an)',
     descriptionFr:
       'Une consultation visio par an avec un pharmacien spécialisé phytothérapie.',
+    freeLimit: 0,
+  },
+  protocols_21days: {
+    labelFr: 'Protocoles bien-être 21 jours',
+    descriptionFr:
+      "Programmes guidés de 21 jours (sommeil, digestion, stress, énergie, peau) avec 1 plante, 1 recette et 1 conseil par jour.",
     freeLimit: 0,
   },
 };

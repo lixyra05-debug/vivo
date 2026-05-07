@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Leaf, Search, Trophy } from 'lucide-react-native';
+import { BookOpen, Calendar, Leaf, Search, Trophy } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { ScreenContainer } from '@/src/components/ui/ScreenContainer';
 import { FadeIn } from '@/src/components/ui/FadeIn';
@@ -96,6 +96,13 @@ export default function ExploreScreen() {
     router.push('/remedies');
   }
 
+  function handleProtocolsPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/protocols');
+  }
+
   return (
     <ScreenContainer scroll>
       <View style={{ gap: 18 }}>
@@ -176,6 +183,7 @@ export default function ExploreScreen() {
             <PlantsSection
               onPlantsPress={handlePlantsPress}
               onRemediesPress={handleRemediesPress}
+              onProtocolsPress={handleProtocolsPress}
             />
             <StoresSection
               stores={getAllStores()}
@@ -252,9 +260,14 @@ function CategoriesSection({ categories, onPress }: CategoriesSectionProps) {
 interface PlantsSectionProps {
   onPlantsPress: () => void;
   onRemediesPress: () => void;
+  onProtocolsPress: () => void;
 }
 
-function PlantsSection({ onPlantsPress, onRemediesPress }: PlantsSectionProps) {
+function PlantsSection({
+  onPlantsPress,
+  onRemediesPress,
+  onProtocolsPress,
+}: PlantsSectionProps) {
   return (
     <View style={{ gap: 12 }}>
       <FadeIn delay={190}>
@@ -264,7 +277,7 @@ function PlantsSection({ onPlantsPress, onRemediesPress }: PlantsSectionProps) {
         </View>
       </FadeIn>
       <View style={styles.grid}>
-        <FadeIn delay={230} style={styles.gridCell}>
+        <FadeIn delay={230} style={styles.gridCellThird}>
           <Pressable
             onPress={onPlantsPress}
             accessibilityRole="button"
@@ -282,7 +295,7 @@ function PlantsSection({ onPlantsPress, onRemediesPress }: PlantsSectionProps) {
             </GlassCard>
           </Pressable>
         </FadeIn>
-        <FadeIn delay={270} style={styles.gridCell}>
+        <FadeIn delay={270} style={styles.gridCellThird}>
           <Pressable
             onPress={onRemediesPress}
             accessibilityRole="button"
@@ -296,6 +309,24 @@ function PlantsSection({ onPlantsPress, onRemediesPress }: PlantsSectionProps) {
               <View style={{ gap: 2 }}>
                 <Text style={styles.plantTitle}>Remèdes</Text>
                 <Text style={styles.plantSubtitle}>8 catégories</Text>
+              </View>
+            </GlassCard>
+          </Pressable>
+        </FadeIn>
+        <FadeIn delay={310} style={styles.gridCellThird}>
+          <Pressable
+            onPress={onProtocolsPress}
+            accessibilityRole="button"
+            accessibilityLabel="Protocoles 21 jours"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <GlassCard style={styles.plantCard}>
+              <View style={styles.plantIconWrap}>
+                <Calendar color={Colors.sage} size={22} strokeWidth={2.2} />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.plantTitle}>Protocoles</Text>
+                <Text style={styles.plantSubtitle}>21 jours</Text>
               </View>
             </GlassCard>
           </Pressable>
@@ -403,6 +434,10 @@ const styles = StyleSheet.create({
   },
   gridCell: {
     width: '48%',
+    flexGrow: 0,
+  },
+  gridCellThird: {
+    width: '32%',
     flexGrow: 0,
   },
   emptyCard: {

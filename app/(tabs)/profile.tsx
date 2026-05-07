@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   BarChart3,
   BookOpen,
+  Calendar,
   FileText,
   HeartPulse,
   HelpCircle,
@@ -299,6 +300,13 @@ export default function ProfileScreen() {
                   label="Chercheur de remèdes"
                   description="8 catégories de bien-être"
                   onPress={() => router.push('/remedies')}
+                />
+                <View style={styles.rowDivider} />
+                <SettingsRow
+                  icon={<Calendar color={Colors.sage} size={18} strokeWidth={2.2} />}
+                  label="Mes Protocoles"
+                  description="Programmes 21 jours bien-être"
+                  onPress={() => router.push('/protocols')}
                 />
               </GlassCard>
             </View>
