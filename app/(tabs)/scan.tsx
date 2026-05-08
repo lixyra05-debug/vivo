@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -17,6 +18,7 @@ import {
   Flashlight,
   FlashlightOff,
   Hash,
+  Image as ImageIcon,
   ScanLine,
 } from 'lucide-react-native';
 import Animated, {
@@ -37,6 +39,7 @@ import { SearchNotFound } from '@/src/components/illustrations/SearchNotFound';
 import { useToast } from '@/src/components/common/ToastProvider';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { fetchProductMultiSource } from '@/src/lib/api/openfoodfacts';
+import { useOcrSessionStore } from '@/src/lib/stores/useOcrSessionStore';
 import { Colors } from '@/src/constants/colors';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
@@ -132,6 +135,52 @@ export default function ScanScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     }
     setTorch((t) => !t);
+  }
+
+  async function handleTakePhoto() {
+    if (Platform.OS === 'web') return;
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        'Permission refusée',
+        "Vivo a besoin d'accéder à la caméra pour photographier l'étiquette.",
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset?.base64) return;
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    useOcrSessionStore.getState().setImage(asset.base64, mimeType);
+    router.push('/ocr/analyzing');
+  }
+
+  async function handlePickPhoto() {
+    if (Platform.OS === 'web') return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        'Permission refusée',
+        "Vivo a besoin d'accéder à ta galerie pour analyser l'étiquette.",
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset?.base64) return;
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    useOcrSessionStore.getState().setImage(asset.base64, mimeType);
+    router.push('/ocr/analyzing');
   }
 
   if (Platform.OS === 'web') {
@@ -391,6 +440,49 @@ export default function ScanScreen() {
             icon={<ScanLine color="#FFFFFF" size={18} strokeWidth={2.2} />}
             accessibilityHint="Ouvre la fiche produit correspondant à ce code"
           />
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OU</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={{ gap: 4 }}>
+            <View style={styles.ocrTitleRow}>
+              <Camera size={20} color={Colors.sage} strokeWidth={2.2} />
+              <Text style={styles.ocrTitle}>Scanner une étiquette</Text>
+            </View>
+            <Text style={styles.ocrSubtitle}>
+              Prends en photo la liste d'ingrédients d'un produit sans code-barres.
+            </Text>
+          </View>
+
+          <View style={styles.ocrButtonsRow}>
+            <Pressable
+              onPress={handleTakePhoto}
+              accessibilityRole="button"
+              accessibilityLabel="Prendre une photo"
+              style={({ pressed }) => [
+                styles.ocrPrimaryBtn,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Camera color="#FFFFFF" size={16} strokeWidth={2.2} />
+              <Text style={styles.ocrPrimaryBtnText}>Photo</Text>
+            </Pressable>
+            <Pressable
+              onPress={handlePickPhoto}
+              accessibilityRole="button"
+              accessibilityLabel="Choisir depuis la galerie"
+              style={({ pressed }) => [
+                styles.ocrSecondaryBtn,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <ImageIcon color={Colors.sage} size={16} strokeWidth={2.2} />
+              <Text style={styles.ocrSecondaryBtnText}>Galerie</Text>
+            </Pressable>
+          </View>
         </GlassCard>
       </View>
     </View>
@@ -479,6 +571,82 @@ const styles = StyleSheet.create({
 
   manualWrap: { position: 'absolute', left: 16, right: 16 },
   manualCard: { padding: 16, gap: 12 },
+
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 11,
+    color: Colors.textMuted,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  ocrTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ocrTitle: {
+    fontFamily: 'BricolageGrotesque-SemiBold',
+    fontSize: 16,
+    color: Colors.text,
+    letterSpacing: -0.2,
+  },
+  ocrSubtitle: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
+    lineHeight: 18,
+  },
+  ocrButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  ocrPrimaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.sage,
+  },
+  ocrPrimaryBtnText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  ocrSecondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1.4,
+    borderColor: Colors.sage,
+    backgroundColor: '#FFFFFF',
+  },
+  ocrSecondaryBtnText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: Colors.sage,
+    letterSpacing: 0.2,
+  },
 
   permissionIconWrap: {
     width: 108,

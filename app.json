@@ -41,7 +41,11 @@
       "expo-router",
       "expo-dev-client",
       "expo-asset",
-      ["@sentry/react-native/expo", { "organization": "lyxiria", "project": "vivo" }]
+      ["@sentry/react-native/expo", { "organization": "lyxiria", "project": "vivo" }],
+      ["expo-image-picker", {
+        "photosPermission": "Vivo accède à ta galerie pour analyser tes étiquettes.",
+        "cameraPermission": "Vivo utilise ta caméra pour photographier tes étiquettes."
+      }]
     ],
     "experiments": {
       "typedRoutes": true

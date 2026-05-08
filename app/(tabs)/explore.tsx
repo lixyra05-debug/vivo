@@ -7,6 +7,7 @@ import {
   BookHeart,
   BookOpen,
   Calendar,
+  Camera,
   Coffee,
   Leaf,
   Search,
@@ -133,6 +134,13 @@ export default function ExploreScreen() {
     router.push('/recipes');
   }
 
+  function handleOcrPress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+    router.push('/(tabs)/scan');
+  }
+
   return (
     <ScreenContainer scroll>
       <View style={{ gap: 18 }}>
@@ -206,6 +214,28 @@ export default function ExploreScreen() {
           />
         ) : (
           <>
+            {Platform.OS !== 'web' ? (
+              <FadeIn delay={170}>
+                <Pressable
+                  onPress={handleOcrPress}
+                  accessibilityRole="button"
+                  accessibilityLabel="Scanner une étiquette par photo"
+                  style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+                >
+                  <GlassCard style={styles.ocrCard}>
+                    <View style={styles.ocrIconWrap}>
+                      <Camera color={Colors.sage} size={22} strokeWidth={2.2} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.ocrCardTitle}>Scanner une étiquette</Text>
+                      <Text style={styles.ocrCardSubtitle}>
+                        Photographie une liste d'ingrédients
+                      </Text>
+                    </View>
+                  </GlassCard>
+                </Pressable>
+              </FadeIn>
+            ) : null}
             <CategoriesSection
               categories={filteredCategories}
               onPress={handleCategoryPress}
@@ -592,6 +622,33 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   plantSubtitle: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  ocrCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+  },
+  ocrIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(139, 173, 139, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ocrCardTitle: {
+    fontFamily: 'BricolageGrotesque-SemiBold',
+    fontSize: 16,
+    color: Colors.text,
+    letterSpacing: -0.2,
+  },
+  ocrCardSubtitle: {
     fontFamily: 'Inter',
     fontSize: 12,
     color: Colors.textMuted,
