@@ -80,6 +80,7 @@ describe('FoodProductView', () => {
         result={baseResult}
         educationalCards={[]}
         categoriesTags={[]}
+        packagingTags={[]}
         isPremium={false}
         onUnlockPremium={() => undefined}
         onPressAlternative={() => undefined}
@@ -96,6 +97,7 @@ describe('FoodProductView', () => {
         result={{ ...baseResult, score_final: 35 }}
         educationalCards={[]}
         categoriesTags={[]}
+        packagingTags={[]}
         isPremium={false}
         onUnlockPremium={() => undefined}
         onPressAlternative={() => undefined}

@@ -64,6 +64,7 @@ describe('CosmeticProductView', () => {
         confidence={null}
         compatibilityResult={null}
         educationalCards={[]}
+        packagingTags={[]}
         onPressMethodology={() => undefined}
       />,
     );

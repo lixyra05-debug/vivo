@@ -305,6 +305,31 @@ Bouclage du tier Premium avec 4 features pensées rétention et utilité famille
 
 - **À faire côté Hector** : appliquer la migration `014_family_profiles.sql` dans Supabase Dashboard → SQL Editor → New query → Run, puis vérifier "Success" avant que le Mode Famille soit utilisable en prod.
 
+## Packaging Risk + Conglomerate Tracing (mai 2026)
+Deux features GRATUITES qui enrichissent la fiche produit avec des données toxicologiques (matériaux d'emballage) et de transparence corporate (maison-mère). 691 → **723 tests verts** (+32). Aucune régression. R9 ✓ (zéro nouvelle dépendance). R10 ✓ (data 100% statique pour packaging, cache mémoire infini pour conglomerate).
+
+- **Feature 1 — Packaging Risk** 📦 :
+  - `src/data/packaging-risks.ts` (293 lignes) — Knowledge base de **14 matériaux** (13 spécifiques + 1 fallback `unknown_plastic`) typés `PackagingMaterial` avec `riskLevel: 'low'|'moderate'|'high'`. Sources EFSA/ANSES/ECHA/CIRC/eur-lex/OMS uniquement (test garde-fou anti-Gouget/Beauvillard/Clément/O'Neill + allowlist regex `/efsa|anses|echa|circ|iarc|oms|eur-lex|ansm/i`).
+  - **Couverture** : pet (moderate), hdpe (low), pvc (high — phtalates ECHA SVHC + chlorure de vinyle CIRC G1), ldpe (low), pp (low), ps (high — styrène CIRC 2A), metal_can (moderate — BPA/BPS), aluminium (moderate — PTWI OMS), tetra_pak (moderate), plastic_film (moderate), bioplastic (low), glass (low — inerte), cardboard (low), unknown_plastic (moderate fallback).
+  - Helper `detectPackagingRisk(packagingTags)` : normalise les tags OFF/OBF (`en:pet-bottle`, `fr:plastique` → strip lang prefix + NFD + diacritics), match par substring dans `tagPatterns[]`, déduplique par `id`. Fallback `unknown_plastic` si tag plastique générique mais aucun spécifique trouvé. Tri final par risque desc (high → moderate → low), stable sur l'ordre du catalogue.
+  - `src/components/product/PackagingSection.tsx` — GlassCard avec header `📦 Emballage analysé`, ligne par matériau (nom + chip risk tri-état rouge/orange/sage + 2 concerns max + tip + indicateur recyclable), footer `Sources : EFSA · ANSES · …` (max 5). Renvoie `null` si rien matché → la section n'apparaît pas.
+- **Feature 2 — Conglomerate Tracing** 🏢 :
+  - `src/lib/api/conglomerate.ts` (218 lignes) — Résolution maison-mère via Wikidata en 2 temps : (1) REST `wbsearchentities` pour ranker l'entité demandée (premier résultat) ; (2) SPARQL VALUES single-hop sur P127 (owned by) | P749 (parent organization), puis P17 (country) → P298 (ISO 3166-1 alpha-3) sur le owner. Pas de récursion (Wikidata timeout en pratique) — on retourne le parent IMMÉDIAT cohérent (Coca-Cola → The Coca-Cola Company → US, et non Berkshire Hathaway via P127 chain).
+  - **Cache module-level** `Map<string, ConglomerateInfo | null>` infini en mémoire, clé = `brandName.trim().toLowerCase()`. Cache les résultats négatifs aussi (`null`) pour éviter de re-spammer Wikidata. Ne cache PAS les erreurs réseau (autorise un retry plus tard via `FetchTimeoutError → null` non-cached).
+  - Type `ConglomerateInfo { ownerName, ownerWikidataId, countryCode: string|null, countryName: string|null }`. Coercion `iso3` → `null` si pas `/^[A-Z]{3}$/`.
+  - `countryCodeToFlag(code)` — accepte alpha-2 ("FR") ou alpha-3 ("FRA"). Mapping `ISO3_TO_ISO2` interne sur ~52 pays courants en agro/cosmétique. Conversion via Regional Indicator Symbols Unicode (codepoint 0x1F1E6 + offset). Renvoie `''` si conversion impossible.
+  - User-Agent `Vivo/1.0 (https://vivo.lyxiria.com; tech@lyxiria.com)` pour politesse Wikidata. Timeout 5s, pas de retries (`fetchWithTimeout` retries: 0).
+  - `src/components/product/ConglomerateSection.tsx` — GlassCard `🏢 Maison-mère`. Skeleton 2 barres pendant la résolution Wikidata. Owner name + drapeau emoji + countryName + lien `Voir sur Wikidata` → `Linking.openURL('https://www.wikidata.org/wiki/{Q-ID}')`. Pas de drapeau si `countryCode === null` (R3 plan validé). Renvoie `null` si owner introuvable ou brand vide.
+- **Pipeline data** :
+  - `fetchProductPackagingTags(barcode)` ajouté à `src/lib/api/openfoodfacts.ts` (pattern calqué sur `fetchProductCategoriesTags`, `fields=packaging_tags`).
+  - `fetchCosmeticPackagingTags(barcode)` ajouté à `src/lib/api/openbeautyfacts.ts`.
+  - `app/product/[barcode].tsx` : 2 nouveaux `useQuery` (food + cosmetic) staleTime 24h, props `packagingTags={…data ?? []}` propagées vers les vues.
+- **Intégration** :
+  - `FoodProductView` : delays `900` (Packaging) / `920` (Conglomerate). Suite du chain décalée `940 (share scan) / 960 (report) / 1000 (source link) / 1040 (attribution)`.
+  - `CosmeticProductView` : delays `200` (Packaging) / `220` (Conglomerate). Educational cards et footer décalés `260 + i*120 / 260 (report) / 300 (source) / 340 (attribution)`.
+- **Tests** : 691 → **723 verts** (+32 net : 12 packaging-risks data layer + 13 conglomerate API [4 countryCodeToFlag + 9 getConglomerateOwner avec cache positif/négatif/network-error] + 3 PackagingSection UI + 4 ConglomerateSection UI). `tsc --noEmit` clean. `npx expo export --platform web` OK (7MB bundle web).
+- **GRATUIT** : aucune des deux features n'est gatée premium/expert. Cohérent avec règle "Les filtres allergènes sont GRATUITS" — la transparence sur l'emballage et la maison-mère relève du même principe.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables

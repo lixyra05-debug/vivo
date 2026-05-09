@@ -25,10 +25,12 @@ import { Colors } from '@/src/constants/colors';
 import {
   productToScoringInput,
   fetchProductCategoriesTags,
+  fetchProductPackagingTags,
 } from '@/src/lib/api/openfoodfacts';
 import {
   cosmeticToScoringInput,
   getOrFetchCosmetic,
+  fetchCosmeticPackagingTags,
 } from '@/src/lib/api/openbeautyfacts';
 import {
   getProductConfidence,
@@ -95,6 +97,13 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   const categoryTagsQuery = useQuery({
     queryKey: ['product-categories-tags', barcode] as const,
     queryFn: () => fetchProductCategoriesTags(barcode),
+    enabled: Boolean(barcode),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const packagingTagsQuery = useQuery({
+    queryKey: ['product-packaging-tags', barcode] as const,
+    queryFn: () => fetchProductPackagingTags(barcode),
     enabled: Boolean(barcode),
     staleTime: 24 * 60 * 60 * 1000,
   });
@@ -377,6 +386,7 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
           result={result}
           educationalCards={educationalCards}
           categoriesTags={categoryTagsQuery.data ?? []}
+          packagingTags={packagingTagsQuery.data ?? []}
           isPremium={isPremium}
           onUnlockPremium={() => router.push('/profile')}
           onPressAlternative={(bc) => router.push(`/product/${bc}?type=food`)}
@@ -436,6 +446,13 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
     enabled: Boolean(barcode),
     staleTime: SEVEN_DAYS_MS,
     gcTime: SEVEN_DAYS_MS,
+  });
+
+  const cosmeticPackagingTagsQuery = useQuery({
+    queryKey: ['cosmetic-packaging-tags', barcode] as const,
+    queryFn: () => fetchCosmeticPackagingTags(barcode),
+    enabled: Boolean(barcode),
+    staleTime: 24 * 60 * 60 * 1000,
   });
 
   const result = useMemo(() => {
@@ -551,6 +568,7 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
           confidence={confidence}
           compatibilityResult={compatibilityResult}
           educationalCards={educationalCards}
+          packagingTags={cosmeticPackagingTagsQuery.data ?? []}
           onPressMethodology={() => router.push('/methodology')}
         />
         <View style={{ height: 24 }} />

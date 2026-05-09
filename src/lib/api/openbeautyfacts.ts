@@ -31,6 +31,33 @@ export async function fetchCosmeticByBarcode(barcode: string): Promise<OBFProduc
   }
 }
 
+/**
+ * Récupère les tags de matériaux d'emballage OBF (format `en:plastic`,
+ * `en:glass-bottle`, etc.). Consommé par `detectPackagingRisk` côté UI.
+ *
+ * Retourne `[]` si le produit est introuvable, si `packaging_tags` est absent,
+ * ou si la requête échoue (timeout / réseau).
+ */
+export async function fetchCosmeticPackagingTags(
+  barcode: string,
+): Promise<string[]> {
+  try {
+    const url = `${OBF_BASE}/product/${barcode}.json?fields=packaging_tags`;
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.status !== 1) return [];
+    const tags: string[] = Array.isArray(data.product?.packaging_tags)
+      ? data.product.packaging_tags
+      : [];
+    return tags;
+  } catch {
+    return [];
+  }
+}
+
 function parseIngredientsList(inci: string): string[] {
   if (!inci) return [];
   const tokens = inci

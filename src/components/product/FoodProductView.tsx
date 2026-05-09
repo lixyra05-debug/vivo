@@ -19,6 +19,8 @@ import { SourceLink } from './SourceLink';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
 import { AlternativesSection } from '@/src/components/premium/AlternativesSection';
 import { NaturalityBadge } from '@/src/components/naturality/NaturalityBadge';
+import { PackagingSection } from './PackagingSection';
+import { ConglomerateSection } from './ConglomerateSection';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { findAdditive } from '@/src/lib/scoring/engine';
 import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
@@ -33,6 +35,7 @@ export interface FoodProductViewProps {
   result: ScoringResult;
   educationalCards: EducationalCardType[];
   categoriesTags: string[];
+  packagingTags: string[];
   isPremium: boolean;
   onUnlockPremium: () => void;
   onPressAlternative: (barcode: string) => void;
@@ -47,6 +50,7 @@ export function FoodProductView({
   result,
   educationalCards,
   categoriesTags,
+  packagingTags,
   isPremium,
   onUnlockPremium,
   onPressAlternative,
@@ -415,7 +419,15 @@ export function FoodProductView({
         </FadeIn>
       ) : null}
 
+      <FadeIn delay={900}>
+        <PackagingSection packagingTags={packagingTags} />
+      </FadeIn>
+
       <FadeIn delay={920}>
+        <ConglomerateSection brandName={product.brand} />
+      </FadeIn>
+
+      <FadeIn delay={940}>
         <Pressable
           onPress={goToScanChoc}
           accessibilityRole="button"
@@ -430,11 +442,11 @@ export function FoodProductView({
         </Pressable>
       </FadeIn>
 
-      <FadeIn delay={940}>
+      <FadeIn delay={960}>
         <ReportButton barcode={product.barcode} />
       </FadeIn>
 
-      <FadeIn delay={980}>
+      <FadeIn delay={1000}>
         <SourceLink
           barcode={product.barcode}
           source="off"
@@ -442,7 +454,7 @@ export function FoodProductView({
         />
       </FadeIn>
 
-      <FadeIn delay={1020}>
+      <FadeIn delay={1040}>
         <Pressable
           onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
           accessibilityRole="link"

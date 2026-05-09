@@ -101,6 +101,33 @@ export async function fetchProductCategoriesTags(
   }
 }
 
+/**
+ * Récupère les tags de matériaux d'emballage OFF (format `en:pet-bottle`,
+ * `fr:plastique`, etc.). Consommé par `detectPackagingRisk` côté UI.
+ *
+ * Retourne `[]` si le produit est introuvable, si `packaging_tags` est absent,
+ * ou si la requête échoue (timeout / réseau).
+ */
+export async function fetchProductPackagingTags(
+  barcode: string,
+): Promise<string[]> {
+  try {
+    const url = `${OFF_BASE}/product/${barcode}.json?fields=packaging_tags`;
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.status !== 1) return [];
+    const tags: string[] = Array.isArray(data.product?.packaging_tags)
+      ? data.product.packaging_tags
+      : [];
+    return tags;
+  } catch {
+    return [];
+  }
+}
+
 function parsePortionGrams(servingSize?: string): number {
   if (!servingSize) return 100;
   const match = servingSize.match(/(\d+(?:[.,]\d+)?)\s*(g|ml)/i);

@@ -6,6 +6,8 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 import { CompatibilityBanner } from './CompatibilityBanner';
 import { ReportButton } from './ReportButton';
 import { SourceLink } from './SourceLink';
+import { PackagingSection } from './PackagingSection';
+import { ConglomerateSection } from './ConglomerateSection';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
 import { NaturalityBadge } from '@/src/components/naturality/NaturalityBadge';
 import { Colors } from '@/src/constants/colors';
@@ -20,6 +22,7 @@ export interface CosmeticProductViewProps {
   confidence: ReturnType<typeof getCosmeticConfidence> | null;
   compatibilityResult: ReturnType<typeof checkCompatibility> | null;
   educationalCards: EducationalCardType[];
+  packagingTags: string[];
   onPressMethodology: () => void;
 }
 
@@ -29,6 +32,7 @@ export function CosmeticProductView({
   confidence,
   compatibilityResult,
   educationalCards,
+  packagingTags,
   onPressMethodology,
 }: CosmeticProductViewProps) {
   const router = useRouter();
@@ -57,6 +61,12 @@ export function CosmeticProductView({
           />
         </FadeIn>
       ) : null}
+      <FadeIn delay={200}>
+        <PackagingSection packagingTags={packagingTags} />
+      </FadeIn>
+      <FadeIn delay={220}>
+        <ConglomerateSection brandName={product.brand} />
+      </FadeIn>
       {confidence ? (
         <FadeIn delay={120}>
           <View style={{ alignItems: 'center' }}>
@@ -70,21 +80,21 @@ export function CosmeticProductView({
         </FadeIn>
       ) : null}
       {educationalCards.map((card, i) => (
-        <FadeIn key={card.id} delay={200 + i * 120}>
+        <FadeIn key={card.id} delay={260 + i * 120}>
           <EducationalCard card={card} />
         </FadeIn>
       ))}
-      <FadeIn delay={200 + educationalCards.length * 120}>
+      <FadeIn delay={260 + educationalCards.length * 120}>
         <ReportButton barcode={product.barcode} />
       </FadeIn>
-      <FadeIn delay={240 + educationalCards.length * 120}>
+      <FadeIn delay={300 + educationalCards.length * 120}>
         <SourceLink
           barcode={product.barcode}
           source="obf"
           lastUpdated={product.obf_last_updated ?? product.updated_at}
         />
       </FadeIn>
-      <FadeIn delay={280 + educationalCards.length * 120}>
+      <FadeIn delay={340 + educationalCards.length * 120}>
         <Pressable
           onPress={() => Linking.openURL('https://world.openbeautyfacts.org')}
           accessibilityRole="link"
