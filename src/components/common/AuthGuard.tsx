@@ -4,6 +4,11 @@ import { useRouter, useSegments } from 'expo-router';
 import { supabase } from '@/src/lib/api/supabase';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
+import {
+  identifyPurchasesUser,
+  initPurchases,
+  logOutPurchasesUser,
+} from '@/src/lib/purchases/revenuecat';
 import { Colors } from '@/src/constants/colors';
 
 function useAuthInit() {
@@ -17,12 +22,19 @@ function useAuthInit() {
       if (!mounted) return;
       setSession(data.session);
       setInitialized(true);
+      // RevenueCat : no-op silencieux sur web / Expo Go / clé placeholder
+      void initPurchases(data.session?.user?.id);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'SIGNED_IN' && session?.user?.id) {
+        void identifyPurchasesUser(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        void logOutPurchasesUser();
+      }
     });
 
     return () => {

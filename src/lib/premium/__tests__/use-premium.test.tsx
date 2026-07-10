@@ -10,12 +10,15 @@ import type { ReactNode } from 'react';
 
 const mockMaybeSingle = jest.fn();
 
+// Chaîne getUserTier : .from('subscriptions').select().eq().limit(1).maybeSingle()
 jest.mock('../../api/supabase', () => ({
   supabase: {
     from: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({
         eq: jest.fn().mockReturnValue({
-          maybeSingle: () => mockMaybeSingle(),
+          limit: jest.fn().mockReturnValue({
+            maybeSingle: () => mockMaybeSingle(),
+          }),
         }),
       }),
     }),

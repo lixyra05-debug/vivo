@@ -1,4 +1,11 @@
-import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -18,6 +25,12 @@ import {
   usePremium,
   type PremiumFeatureKey,
 } from '@/src/lib/premium/premium-gate';
+import {
+  useVivoPrices,
+  useVivoPurchaseFlow,
+  type VivoPrice,
+  type VivoPrices,
+} from '@/src/lib/purchases/use-vivo-purchase';
 
 const FREE_FEATURES = [
   'Scans illimités',
@@ -33,13 +46,6 @@ const PREMIUM_RENEWAL_TEXT =
 const EXPERT_RENEWAL_TEXT =
   "Abonnement annuel de 49,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
 
-function showRestoreAlert() {
-  Alert.alert(
-    'Restauration',
-    'La restauration des achats sera disponible après la configuration de RevenueCat.',
-  );
-}
-
 const PREMIUM_FEATURE_KEYS = (
   Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[]
 ).filter((k) => FEATURE_TIER[k] === 'premium');
@@ -54,12 +60,18 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { tier, isPremium, isExpert } = usePremium();
+  const prices = useVivoPrices();
+  const { purchasingTier, isRestoring, busy, purchase, restore } =
+    useVivoPurchaseFlow();
 
   const stackVertical = width < STACK_BREAKPOINT;
 
-  function handleUpgrade() {
-    // TODO: hook RevenueCat / Stripe — Sprint 3+
-    router.push('/profile');
+  function handleUpgrade(target: 'premium' | 'expert') {
+    void purchase(target);
+  }
+
+  function handleRestore() {
+    void restore();
   }
 
   return (
@@ -87,12 +99,20 @@ export default function SubscriptionScreen() {
         {tier === 'free' ? (
           <FreeStateCards
             stackVertical={stackVertical}
+            prices={prices}
+            purchasingTier={purchasingTier}
+            busy={busy}
             onUpgrade={handleUpgrade}
           />
         ) : null}
 
         {tier === 'premium' ? (
-          <PremiumStateCards onUpgrade={handleUpgrade} />
+          <PremiumStateCards
+            expertPrice={prices.expert}
+            loading={purchasingTier === 'expert'}
+            disabled={busy}
+            onUpgrade={handleUpgrade}
+          />
         ) : null}
 
         {isExpert ? <ExpertStateCard /> : null}
@@ -106,7 +126,11 @@ export default function SubscriptionScreen() {
         ) : null}
 
         <FadeIn delay={580}>
-          <LegalFooter tier={tier} />
+          <LegalFooter
+            tier={tier}
+            isRestoring={isRestoring}
+            onRestore={handleRestore}
+          />
         </FadeIn>
       </View>
     </ScreenContainer>
@@ -117,7 +141,13 @@ export default function SubscriptionScreen() {
 // Legal footer (Apple guideline 3.1.2)
 // ---------------------------------------------------------------------------
 
-function LegalFooter({ tier }: { tier: 'free' | 'premium' | 'expert' }) {
+interface LegalFooterProps {
+  tier: 'free' | 'premium' | 'expert';
+  isRestoring: boolean;
+  onRestore: () => void;
+}
+
+function LegalFooter({ tier, isRestoring, onRestore }: LegalFooterProps) {
   const router = useRouter();
 
   return (
@@ -153,17 +183,25 @@ function LegalFooter({ tier }: { tier: 'free' | 'premium' | 'expert' }) {
       </View>
 
       <Pressable
-        onPress={showRestoreAlert}
+        onPress={onRestore}
+        disabled={isRestoring}
         accessibilityRole="button"
         accessibilityLabel="Restaurer les achats"
+        accessibilityState={{ busy: isRestoring }}
         hitSlop={8}
         style={({ pressed }) => [
           styles.restoreButton,
           pressed && { opacity: 0.7 },
         ]}
       >
-        <RotateCcw color={Colors.sage} size={14} strokeWidth={2.4} />
-        <Text style={styles.restoreLink}>Restaurer les achats</Text>
+        {isRestoring ? (
+          <ActivityIndicator color={Colors.sage} size="small" />
+        ) : (
+          <>
+            <RotateCcw color={Colors.sage} size={14} strokeWidth={2.4} />
+            <Text style={styles.restoreLink}>Restaurer les achats</Text>
+          </>
+        )}
       </Pressable>
     </View>
   );
@@ -258,10 +296,19 @@ function CurrentPlanCard({ tier }: CurrentPlanProps) {
 
 interface FreeStateProps {
   stackVertical: boolean;
-  onUpgrade: () => void;
+  prices: VivoPrices;
+  purchasingTier: 'premium' | 'expert' | null;
+  busy: boolean;
+  onUpgrade: (tier: 'premium' | 'expert') => void;
 }
 
-function FreeStateCards({ stackVertical, onUpgrade }: FreeStateProps) {
+function FreeStateCards({
+  stackVertical,
+  prices,
+  purchasingTier,
+  busy,
+  onUpgrade,
+}: FreeStateProps) {
   return (
     <FadeIn delay={180}>
       <View
@@ -273,11 +320,17 @@ function FreeStateCards({ stackVertical, onUpgrade }: FreeStateProps) {
         <PlanCard
           variant="premium"
           stackVertical={stackVertical}
+          price={prices.premium}
+          loading={purchasingTier === 'premium'}
+          disabled={busy}
           onUpgrade={onUpgrade}
         />
         <PlanCard
           variant="expert"
           stackVertical={stackVertical}
+          price={prices.expert}
+          loading={purchasingTier === 'expert'}
+          disabled={busy}
           onUpgrade={onUpgrade}
         />
       </View>
@@ -289,7 +342,19 @@ function FreeStateCards({ stackVertical, onUpgrade }: FreeStateProps) {
 // Premium state — confirmation + cross-sell Expert
 // ---------------------------------------------------------------------------
 
-function PremiumStateCards({ onUpgrade }: { onUpgrade: () => void }) {
+interface PremiumStateProps {
+  expertPrice: VivoPrice;
+  loading: boolean;
+  disabled: boolean;
+  onUpgrade: (tier: 'premium' | 'expert') => void;
+}
+
+function PremiumStateCards({
+  expertPrice,
+  loading,
+  disabled,
+  onUpgrade,
+}: PremiumStateProps) {
   return (
     <View style={{ gap: 16 }}>
       <FadeIn delay={180}>
@@ -317,7 +382,9 @@ function PremiumStateCards({ onUpgrade }: { onUpgrade: () => void }) {
                 Aller plus loin — Vivo Expert 🌿
               </Text>
               <Text style={styles.expertUpsellPrice}>
-                49,99€/an · ~4,17€/mois
+                {expertPrice.hint
+                  ? `${expertPrice.label} · ${expertPrice.hint}`
+                  : expertPrice.label}
               </Text>
             </View>
           </View>
@@ -334,16 +401,25 @@ function PremiumStateCards({ onUpgrade }: { onUpgrade: () => void }) {
             ))}
           </View>
           <Pressable
-            onPress={onUpgrade}
+            onPress={() => onUpgrade('expert')}
+            disabled={disabled}
             accessibilityRole="button"
-            accessibilityLabel="Débloquer Expert — 49,99€ par an"
+            accessibilityLabel={expertPrice.a11y}
+            accessibilityState={{ disabled, busy: loading }}
             style={({ pressed }) => [
               styles.ctaExpert,
               pressed && { opacity: 0.85 },
+              disabled && !loading && styles.ctaDimmed,
             ]}
           >
-            <Leaf color="#FFFFFF" size={16} strokeWidth={2.4} />
-            <Text style={styles.ctaText}>Passer à Expert</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Leaf color="#FFFFFF" size={16} strokeWidth={2.4} />
+                <Text style={styles.ctaText}>Passer à Expert</Text>
+              </>
+            )}
           </Pressable>
         </GlassCard>
       </FadeIn>
@@ -380,17 +456,22 @@ function ExpertStateCard() {
 interface PlanCardProps {
   variant: 'premium' | 'expert';
   stackVertical: boolean;
-  onUpgrade: () => void;
+  price: VivoPrice;
+  loading: boolean;
+  disabled: boolean;
+  onUpgrade: (tier: 'premium' | 'expert') => void;
 }
 
-function PlanCard({ variant, stackVertical, onUpgrade }: PlanCardProps) {
+function PlanCard({
+  variant,
+  stackVertical,
+  price,
+  loading,
+  disabled,
+  onUpgrade,
+}: PlanCardProps) {
   const isExpert = variant === 'expert';
   const tierName = isExpert ? 'Expert' : 'Premium';
-  const price = isExpert ? '49,99€/an' : '29,99€/an';
-  const priceHint = isExpert ? '~4,17€/mois' : '~2,50€/mois';
-  const a11y = isExpert
-    ? 'Débloquer Expert — 49,99€ par an'
-    : 'Débloquer Premium — 29,99€ par an';
   const featureKeys = isExpert ? EXPERT_FEATURE_KEYS : PREMIUM_FEATURE_KEYS;
   const Icon = isExpert ? Leaf : Sparkles;
   const accent = isExpert ? Colors.earth : Colors.sage;
@@ -420,8 +501,10 @@ function PlanCard({ variant, stackVertical, onUpgrade }: PlanCardProps) {
 
       <View style={{ gap: 4 }}>
         <Text style={styles.planTierLabel}>Vivo {tierName}</Text>
-        <Text style={styles.planPrice}>{price}</Text>
-        <Text style={styles.planPriceHint}>{priceHint}</Text>
+        <Text style={styles.planPrice}>{price.label}</Text>
+        {price.hint ? (
+          <Text style={styles.planPriceHint}>{price.hint}</Text>
+        ) : null}
       </View>
 
       <View style={{ gap: 6 }}>
@@ -449,15 +532,24 @@ function PlanCard({ variant, stackVertical, onUpgrade }: PlanCardProps) {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={a11y}
-        onPress={onUpgrade}
+        accessibilityLabel={price.a11y}
+        accessibilityState={{ disabled, busy: loading }}
+        disabled={disabled}
+        onPress={() => onUpgrade(variant)}
         style={({ pressed }) => [
           isExpert ? styles.ctaExpert : styles.ctaPremium,
           pressed && { opacity: 0.85 },
+          disabled && !loading && styles.ctaDimmed,
         ]}
       >
-        <Icon color="#FFFFFF" size={16} strokeWidth={2.4} />
-        <Text style={styles.ctaText}>Débloquer {tierName}</Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <>
+            <Icon color="#FFFFFF" size={16} strokeWidth={2.4} />
+            <Text style={styles.ctaText}>Débloquer {tierName}</Text>
+          </>
+        )}
       </Pressable>
     </View>
   );
@@ -719,6 +811,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
     letterSpacing: 0.2,
+  },
+  // CTA de l'autre tier estompé pendant qu'un achat/restore est en cours
+  ctaDimmed: {
+    opacity: 0.55,
   },
 
   // Premium / Expert confirm cards

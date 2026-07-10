@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { PaperProvider } from 'react-native-paper';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
@@ -23,6 +23,7 @@ import {
 import { AuthGuard } from '@/src/components/common/AuthGuard';
 import { ErrorBoundary } from '@/src/components/common/ErrorBoundary';
 import { ToastProvider } from '@/src/components/common/ToastProvider';
+import { queryClient } from '@/src/lib/api/query-client';
 import { initSentry } from '@/src/lib/monitoring/sentry';
 
 // Init Sentry au chargement du module (avant que React monte les écrans).
@@ -30,8 +31,6 @@ import { initSentry } from '@/src/lib/monitoring/sentry';
 initSentry();
 
 SplashScreen.preventAutoHideAsync();
-
-const queryClient = new QueryClient();
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',

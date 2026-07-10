@@ -1,17 +1,26 @@
 /**
- * PremiumPaywall — système 2 tiers Premium + Expert (avril 2026).
+ * PremiumPaywall — système 2 tiers Premium + Expert, achats RevenueCat in-place.
  *
  * Règles :
  *   • Lookup `FEATURE_TIER[featureKey]` pour déterminer le tier primary
  *   • Mode normal : carte primary + teaser cross-sell (du tier opposé) en footer
  *   • Mode `compact` : 1 seule carte horizontale (pour intégration in-line)
  *   • Garantie "scanner et score restent TOUJOURS gratuits" toujours présente (R3)
- *   • Pricing : Premium 29,99€/an (~2,50€/mois), Expert 49,99€/an (~4,17€/mois)
+ *   • Prix localisés App Store via useVivoPrices, fallback 29,99€/49,99€ (R5)
+ *   • Tap CTA → purchaseVivoTier in-place ; annulation silencieuse (R6) ;
+ *     web/Expo Go → Alert d'indisponibilité (achats App Store uniquement)
  *   • Design Vivo : sage (#8BAD8B) Premium, earth (#C4A882) Expert. PAS de purple gradient.
  */
 
 import type { ReactNode } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -23,6 +32,11 @@ import {
 import { GlassCard } from '../ui/GlassCard';
 import { Colors } from '@/src/constants/colors';
 import { FEATURE_TIER, type PremiumFeatureKey } from '@/src/lib/premium/premium-gate';
+import {
+  useVivoPrices,
+  useVivoPurchaseFlow,
+  type VivoPrice,
+} from '@/src/lib/purchases/use-vivo-purchase';
 
 const PREMIUM_RENEWAL_TEXT =
   "Abonnement annuel de 29,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
@@ -30,16 +44,13 @@ const PREMIUM_RENEWAL_TEXT =
 const EXPERT_RENEWAL_TEXT =
   "Abonnement annuel de 49,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
 
-function showRestoreAlert() {
-  Alert.alert(
-    'Restauration',
-    'La restauration des achats sera disponible après la configuration de RevenueCat.',
-  );
-}
-
 interface PremiumPaywallProps {
   featureKey: PremiumFeatureKey;
   previewContent?: ReactNode;
+  /**
+   * @deprecated Les achats se font désormais in-place via RevenueCat — ce
+   * callback n'est plus invoqué. Conservé pour ne pas casser les consumers.
+   */
   onUpgrade: (tier: 'premium' | 'expert') => void;
   /** Mode carte horizontale courte (pour intégration in-line) — affiche uniquement le primary. */
   compact?: boolean;
@@ -57,14 +68,6 @@ const EXPERT_BULLETS: readonly string[] = [
   'Sécurité grossesse, enfants, interactions plantes-médicaments',
 ];
 
-const PREMIUM_PRICE_LABEL = '29,99€/an';
-const PREMIUM_PRICE_HINT = '~2,50€/mois';
-const PREMIUM_A11Y = 'Débloquer Premium — 29,99€ par an';
-
-const EXPERT_PRICE_LABEL = '49,99€/an';
-const EXPERT_PRICE_HINT = '~4,17€/mois';
-const EXPERT_A11Y = 'Débloquer Expert — 49,99€ par an';
-
 function triggerHaptic() {
   if (Platform.OS !== 'web') {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
@@ -76,20 +79,26 @@ function triggerHaptic() {
 export function PremiumPaywall({
   featureKey,
   previewContent,
-  onUpgrade,
   compact = false,
 }: PremiumPaywallProps) {
   const requiredTier: 'premium' | 'expert' =
     FEATURE_TIER[featureKey] === 'expert' ? 'expert' : 'premium';
+  const prices = useVivoPrices();
+  const { purchasingTier, isRestoring, busy, purchase, restore } =
+    useVivoPurchaseFlow();
 
   function handlePremium() {
     triggerHaptic();
-    onUpgrade('premium');
+    void purchase('premium');
   }
 
   function handleExpert() {
     triggerHaptic();
-    onUpgrade('expert');
+    void purchase('expert');
+  }
+
+  function handleRestore() {
+    void restore();
   }
 
   if (compact) {
@@ -99,12 +108,25 @@ export function PremiumPaywall({
         {requiredTier === 'expert' ? (
           <ExpertCard
             compact
+            price={prices.expert}
+            loading={purchasingTier === 'expert'}
+            disabled={busy}
             onPress={handleExpert}
           />
         ) : (
-          <PremiumCard compact onPress={handlePremium} />
+          <PremiumCard
+            compact
+            price={prices.premium}
+            loading={purchasingTier === 'premium'}
+            disabled={busy}
+            onPress={handlePremium}
+          />
         )}
-        <LegalFooter tier={requiredTier} />
+        <LegalFooter
+          tier={requiredTier}
+          isRestoring={isRestoring}
+          onRestore={handleRestore}
+        />
         <Text style={styles.guarantee}>
           Le scanner et le score restent TOUJOURS gratuits ✅
         </Text>
@@ -118,17 +140,39 @@ export function PremiumPaywall({
 
       {requiredTier === 'expert' ? (
         <>
-          <ExpertCard onPress={handleExpert} />
-          <PremiumTeaser onPress={handlePremium} />
+          <ExpertCard
+            price={prices.expert}
+            loading={purchasingTier === 'expert'}
+            disabled={busy}
+            onPress={handleExpert}
+          />
+          <PremiumTeaser
+            price={prices.premium}
+            disabled={busy}
+            onPress={handlePremium}
+          />
         </>
       ) : (
         <>
-          <PremiumCard onPress={handlePremium} />
-          <ExpertTeaser onPress={handleExpert} />
+          <PremiumCard
+            price={prices.premium}
+            loading={purchasingTier === 'premium'}
+            disabled={busy}
+            onPress={handlePremium}
+          />
+          <ExpertTeaser
+            price={prices.expert}
+            disabled={busy}
+            onPress={handleExpert}
+          />
         </>
       )}
 
-      <LegalFooter tier={requiredTier} />
+      <LegalFooter
+        tier={requiredTier}
+        isRestoring={isRestoring}
+        onRestore={handleRestore}
+      />
 
       <Text style={styles.guarantee}>
         Le scanner et le score restent TOUJOURS gratuits ✅
@@ -142,7 +186,13 @@ export function PremiumPaywall({
 // (R Apple App Store Review Guidelines 3.1.2 / 5.1.1)
 // ---------------------------------------------------------------------------
 
-function LegalFooter({ tier }: { tier: 'premium' | 'expert' }) {
+interface LegalFooterProps {
+  tier: 'premium' | 'expert';
+  isRestoring: boolean;
+  onRestore: () => void;
+}
+
+function LegalFooter({ tier, isRestoring, onRestore }: LegalFooterProps) {
   const router = useRouter();
   const renewalText = tier === 'expert' ? EXPERT_RENEWAL_TEXT : PREMIUM_RENEWAL_TEXT;
 
@@ -169,13 +219,19 @@ function LegalFooter({ tier }: { tier: 'premium' | 'expert' }) {
         </Pressable>
       </View>
       <Pressable
-        onPress={showRestoreAlert}
+        onPress={onRestore}
+        disabled={isRestoring}
         accessibilityRole="button"
         accessibilityLabel="Restaurer les achats"
+        accessibilityState={{ busy: isRestoring }}
         hitSlop={8}
         style={styles.restoreButton}
       >
-        <Text style={styles.restoreLink}>Restaurer les achats</Text>
+        {isRestoring ? (
+          <ActivityIndicator color={Colors.sage} size="small" />
+        ) : (
+          <Text style={styles.restoreLink}>Restaurer les achats</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -187,10 +243,13 @@ function LegalFooter({ tier }: { tier: 'premium' | 'expert' }) {
 
 interface CardProps {
   compact?: boolean;
+  price: VivoPrice;
+  loading: boolean;
+  disabled: boolean;
   onPress: () => void;
 }
 
-function PremiumCard({ compact, onPress }: CardProps) {
+function PremiumCard({ compact, price, loading, disabled, onPress }: CardProps) {
   if (compact) {
     return (
       <GlassCard tone="default" style={styles.premiumCardCompact}>
@@ -200,20 +259,29 @@ function PremiumCard({ compact, onPress }: CardProps) {
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.compactTitle}>Vivo Premium</Text>
           <Text style={styles.compactSubtitle}>
-            {PREMIUM_PRICE_LABEL} · {PREMIUM_PRICE_HINT}
+            {price.hint ? `${price.label} · ${price.hint}` : price.label}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={PREMIUM_A11Y}
+          accessibilityLabel={price.a11y}
+          accessibilityState={{ disabled, busy: loading }}
+          disabled={disabled}
           onPress={onPress}
           style={({ pressed }) => [
             styles.ctaPremiumCompact,
             pressed && { opacity: 0.85 },
+            disabled && !loading && styles.ctaDimmed,
           ]}
         >
-          <Sparkles color="#FFFFFF" size={14} strokeWidth={2.4} />
-          <Text style={styles.ctaCompactText}>Débloquer</Text>
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Sparkles color="#FFFFFF" size={14} strokeWidth={2.4} />
+              <Text style={styles.ctaCompactText}>Débloquer</Text>
+            </>
+          )}
         </Pressable>
       </GlassCard>
     );
@@ -228,8 +296,10 @@ function PremiumCard({ compact, onPress }: CardProps) {
         <View style={{ flex: 1 }}>
           <Text style={styles.tierLabel}>Vivo Premium</Text>
           <Text style={styles.priceText}>
-            {PREMIUM_PRICE_LABEL}{' '}
-            <Text style={styles.priceHint}>· {PREMIUM_PRICE_HINT}</Text>
+            {price.label}
+            {price.hint ? (
+              <Text style={styles.priceHint}> · {price.hint}</Text>
+            ) : null}
           </Text>
         </View>
       </View>
@@ -252,15 +322,24 @@ function PremiumCard({ compact, onPress }: CardProps) {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={PREMIUM_A11Y}
+        accessibilityLabel={price.a11y}
+        accessibilityState={{ disabled, busy: loading }}
+        disabled={disabled}
         onPress={onPress}
         style={({ pressed }) => [
           styles.ctaPremium,
           pressed && { opacity: 0.85 },
+          disabled && !loading && styles.ctaDimmed,
         ]}
       >
-        <Sparkles color="#FFFFFF" size={18} strokeWidth={2.4} />
-        <Text style={styles.ctaText}>{`Débloquer Premium — ${PREMIUM_PRICE_LABEL}`}</Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <>
+            <Sparkles color="#FFFFFF" size={18} strokeWidth={2.4} />
+            <Text style={styles.ctaText}>{`Débloquer Premium — ${price.label}`}</Text>
+          </>
+        )}
       </Pressable>
     </GlassCard>
   );
@@ -270,7 +349,7 @@ function PremiumCard({ compact, onPress }: CardProps) {
 // Expert card
 // ---------------------------------------------------------------------------
 
-function ExpertCard({ compact, onPress }: CardProps) {
+function ExpertCard({ compact, price, loading, disabled, onPress }: CardProps) {
   if (compact) {
     return (
       <GlassCard tone="default" style={styles.expertCardCompact}>
@@ -283,20 +362,29 @@ function ExpertCard({ compact, onPress }: CardProps) {
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.compactTitle}>Vivo Expert</Text>
           <Text style={styles.compactSubtitle}>
-            {EXPERT_PRICE_LABEL} · {EXPERT_PRICE_HINT}
+            {price.hint ? `${price.label} · ${price.hint}` : price.label}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={EXPERT_A11Y}
+          accessibilityLabel={price.a11y}
+          accessibilityState={{ disabled, busy: loading }}
+          disabled={disabled}
           onPress={onPress}
           style={({ pressed }) => [
             styles.ctaExpertCompact,
             pressed && { opacity: 0.85 },
+            disabled && !loading && styles.ctaDimmed,
           ]}
         >
-          <Leaf color="#FFFFFF" size={14} strokeWidth={2.4} />
-          <Text style={styles.ctaCompactText}>Débloquer</Text>
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Leaf color="#FFFFFF" size={14} strokeWidth={2.4} />
+              <Text style={styles.ctaCompactText}>Débloquer</Text>
+            </>
+          )}
         </Pressable>
       </GlassCard>
     );
@@ -315,8 +403,10 @@ function ExpertCard({ compact, onPress }: CardProps) {
         <View style={{ flex: 1 }}>
           <Text style={styles.tierLabel}>Vivo Expert</Text>
           <Text style={styles.priceText}>
-            {EXPERT_PRICE_LABEL}{' '}
-            <Text style={styles.priceHint}>· {EXPERT_PRICE_HINT}</Text>
+            {price.label}
+            {price.hint ? (
+              <Text style={styles.priceHint}> · {price.hint}</Text>
+            ) : null}
           </Text>
         </View>
       </View>
@@ -342,15 +432,24 @@ function ExpertCard({ compact, onPress }: CardProps) {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={EXPERT_A11Y}
+        accessibilityLabel={price.a11y}
+        accessibilityState={{ disabled, busy: loading }}
+        disabled={disabled}
         onPress={onPress}
         style={({ pressed }) => [
           styles.ctaExpert,
           pressed && { opacity: 0.85 },
+          disabled && !loading && styles.ctaDimmed,
         ]}
       >
-        <Leaf color="#FFFFFF" size={18} strokeWidth={2.4} />
-        <Text style={styles.ctaText}>{`Débloquer Expert — ${EXPERT_PRICE_LABEL}`}</Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <>
+            <Leaf color="#FFFFFF" size={18} strokeWidth={2.4} />
+            <Text style={styles.ctaText}>{`Débloquer Expert — ${price.label}`}</Text>
+          </>
+        )}
       </Pressable>
     </GlassCard>
   );
@@ -360,11 +459,19 @@ function ExpertCard({ compact, onPress }: CardProps) {
 // Cross-sell teasers (mode normal uniquement)
 // ---------------------------------------------------------------------------
 
-function ExpertTeaser({ onPress }: { onPress: () => void }) {
+interface TeaserProps {
+  price: VivoPrice;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+function ExpertTeaser({ price, disabled, onPress }: TeaserProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={EXPERT_A11Y}
+      accessibilityLabel={price.a11y}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.teaserCard, pressed && { opacity: 0.85 }]}
     >
@@ -375,18 +482,20 @@ function ExpertTeaser({ onPress }: { onPress: () => void }) {
         <Text style={styles.teaserTitle}>Aller plus loin — Vivo Expert 🌿</Text>
         <Text style={styles.teaserBody}>
           Plantes médicinales, sécurité grossesse & enfants, interactions
-          plantes-médicaments. {EXPERT_PRICE_LABEL}.
+          plantes-médicaments. {price.label}.
         </Text>
       </View>
     </Pressable>
   );
 }
 
-function PremiumTeaser({ onPress }: { onPress: () => void }) {
+function PremiumTeaser({ price, disabled, onPress }: TeaserProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={PREMIUM_A11Y}
+      accessibilityLabel={price.a11y}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.teaserCard, pressed && { opacity: 0.85 }]}
     >
@@ -397,7 +506,7 @@ function PremiumTeaser({ onPress }: { onPress: () => void }) {
         <Text style={styles.teaserTitle}>Vivo Premium suffit ?</Text>
         <Text style={styles.teaserBody}>
           Si tu n'as pas besoin des plantes médicinales, Premium couvre les
-          courses et alternatives. {PREMIUM_PRICE_LABEL}.
+          courses et alternatives. {price.label}.
         </Text>
       </View>
     </Pressable>
@@ -621,6 +730,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 13,
     letterSpacing: 0.2,
+  },
+  // CTA de l'autre tier estompé pendant qu'un achat/restore est en cours
+  ctaDimmed: {
+    opacity: 0.55,
   },
 
   // Compact title (for compact card body)

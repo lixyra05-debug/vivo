@@ -11,6 +11,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../api/supabase';
 import { useAuthStore } from '../stores/useAuthStore';
+import {
+  getTierFromPurchases,
+  isPurchasesAvailable,
+  syncTierToSupabase,
+} from '../purchases/revenuecat';
 
 /**
  * Flag de développement pour tester l'app en mode Expert (top tier) sans abonnement actif.
@@ -269,8 +274,11 @@ function subscriptionRowToTier(
 }
 
 /**
- * Source de vérité tier — async lookup côté serveur.
- * Si `__DEV_UNLOCK_PREMIUM__ = true` → renvoie 'expert' (top tier) pour tout débloquer.
+ * Source de vérité tier — résolution en cascade :
+ *   1. `__DEV_UNLOCK_PREMIUM__ = true` → 'expert' (priorité absolue, QA local)
+ *   2. RevenueCat (entitlements natifs) quand le module est disponible —
+ *      le miroir Supabase est resynchronisé en arrière-plan si différent
+ *   3. Fallback (web, Expo Go, erreur SDK) → miroir Supabase `subscriptions`
  * Si pas d'userId → 'free'.
  */
 export async function getUserTier(
@@ -278,6 +286,14 @@ export async function getUserTier(
 ): Promise<SubscriptionTier> {
   if (__DEV_UNLOCK_PREMIUM__) return 'expert';
   if (!userId) return 'free';
+
+  if (isPurchasesAvailable()) {
+    const rcTier = await getTierFromPurchases();
+    if (rcTier !== null) {
+      void syncTierToSupabase(rcTier);
+      return rcTier;
+    }
+  }
 
   try {
     const { data, error } = await supabase
@@ -338,10 +354,10 @@ export interface UsePremiumResult {
 
 /**
  * Hook React qui détermine le tier de l'utilisateur courant.
- * Lit la session depuis useAuthStore et interroge la table `subscriptions`.
+ * Lit la session depuis useAuthStore et résout le tier via `getUserTier`
+ * (RevenueCat prioritaire sur build natif, miroir `subscriptions` en fallback).
  *
  * - `__DEV_UNLOCK_PREMIUM__ = true` court-circuite (tier = 'expert').
- * - Sinon : tier dérivé de {plan, status} via subscriptionRowToTier.
  *
  * Backward-compat : `isPremium` reste exposé (true pour premium ET expert).
  */
@@ -350,16 +366,7 @@ export function usePremium(): UsePremiumResult {
 
   const query = useQuery({
     queryKey: ['subscription', userId],
-    queryFn: async (): Promise<SubscriptionRow | null> => {
-      if (!userId) return null;
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('plan, status')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (error) return null;
-      return data as SubscriptionRow | null;
-    },
+    queryFn: () => getUserTier(userId),
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
   });
@@ -374,7 +381,7 @@ export function usePremium(): UsePremiumResult {
     };
   }
 
-  const tier = subscriptionRowToTier(query.data);
+  const tier: SubscriptionTier = query.data ?? 'free';
   return {
     tier,
     isPremium: tier !== 'free',
