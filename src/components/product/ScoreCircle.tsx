@@ -1,5 +1,23 @@
+/**
+ * ScoreCircle — le nombre central de l'app.
+ *
+ * Deux corrections de cohérence :
+ *
+ * 1. Le score est désormais NOMMÉ. Il ne mesurait rien d'explicite : « 100 »
+ *    et « / 100 » se lisaient comme un verdict global sur le produit, alors
+ *    que le moteur ne pèse que la formulation. Une fiche pouvait donc afficher
+ *    100/100 juste au-dessus d'une section « Risques toxicologiques » portant
+ *    sur l'emballage — deux affirmations vraies qui se contredisent à l'écran.
+ *
+ * 2. Le libellé lu par les lecteurs d'écran vient de `getScoreVerdict`, source
+ *    unique du verdict. Il était calculé par une table locale décalée d'un
+ *    cran : un 95 s'annonçait « Bon » à l'oral alors que l'écran affichait
+ *    « Excellent », et un 10 s'annonçait « Danger » là où l'écran disait
+ *    « À éviter ».
+ */
+
 import { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   Easing,
@@ -9,6 +27,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { scoreColor } from '@/src/constants/colors';
+import { Palette, Spacing, Type } from '@/src/constants/theme';
+import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -16,28 +36,23 @@ interface Props {
   score: number;
   size?: number;
   strokeWidth?: number;
+  /** Ce que le score mesure. Optionnel : la valeur par défaut couvre les deux fiches. */
+  label?: string;
 }
 
-const COLOR_LABEL = {
-  green: 'Bon',
-  yellow: 'Moyen',
-  orange: 'Mauvais',
-  red: 'Danger',
-} as const;
+export const SCORE_LABEL_DEFAULT = 'Qualité de la formulation';
 
-function getColorKey(s: number): keyof typeof COLOR_LABEL {
-  if (s >= 70) return 'green';
-  if (s >= 50) return 'yellow';
-  if (s >= 25) return 'orange';
-  return 'red';
-}
-
-export function ScoreCircle({ score, size = 160, strokeWidth = 12 }: Props) {
+export function ScoreCircle({
+  score,
+  size = 160,
+  strokeWidth = 12,
+  label = SCORE_LABEL_DEFAULT,
+}: Props) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const color = scoreColor(clamped);
-  const colorKey = getColorKey(clamped);
+  const verdictLabel = getScoreVerdict(clamped).label;
   const progress = useSharedValue(0);
   const reduceMotion = useReduceMotion();
 
@@ -63,13 +78,16 @@ export function ScoreCircle({ score, size = 160, strokeWidth = 12 }: Props) {
       className="items-center justify-center"
       style={{ width: size, height: size }}
       accessibilityRole="text"
-      accessibilityLabel={`Score de santé : ${clamped} sur 100. ${COLOR_LABEL[colorKey]}.`}
+      accessibilityLabel={`${label} : ${clamped} sur 100. ${verdictLabel}.`}
     >
       <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
         <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
+          // Dernier hex du fichier (= `Palette.borderSoft`). Le remplacer sort
+          // ce fichier de l'allowlist de `theme-guard.test.ts` : les deux
+          // changements doivent aller dans le même commit. Backlog phase 2.
           stroke="#E7E7DA"
           strokeWidth={strokeWidth}
           fill="transparent"
@@ -100,7 +118,24 @@ export function ScoreCircle({ score, size = 160, strokeWidth = 12 }: Props) {
         <Text className="text-xs uppercase tracking-wider text-sage-700" accessibilityElementsHidden>
           / 100
         </Text>
+        {/* Borné en largeur : le libellé doit tenir dans l'anneau, pas le déborder. */}
+        <Text
+          style={[styles.label, { maxWidth: size * 0.66 }]}
+          numberOfLines={2}
+          accessibilityElementsHidden
+        >
+          {label}
+        </Text>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  label: {
+    ...Type.micro,
+    color: Palette.textMuted,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+  },
+});

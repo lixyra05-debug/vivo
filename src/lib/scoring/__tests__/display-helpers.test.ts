@@ -5,6 +5,7 @@ import {
   groupPenaltiesByCategory,
   mapIngredientsToRisk,
 } from '../display-helpers';
+import { scoreColor } from '@/src/constants/colors';
 import type { PenaltyDetail } from '../../api/types';
 
 describe('getNutrientThreshold', () => {
@@ -180,6 +181,66 @@ describe('getScoreVerdict', () => {
     expect(getScoreVerdict(55).description.length).toBeGreaterThan(0);
     expect(getScoreVerdict(30).description.length).toBeGreaterThan(0);
     expect(getScoreVerdict(5).description.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Ces deux gardes portent sur les DESCRIPTIONS uniquement. Les libellés
+ * (« Excellent » … « À éviter ») forment l'échelle publique de l'app : ils sont
+ * figés, et « À éviter » y est un palier, pas un conseil.
+ */
+describe('getScoreVerdict — le verdict constate, il ne prescrit pas', () => {
+  const TIERS = [95, 75, 55, 30, 5];
+
+  // Tournures qui disent à l'utilisateur quoi faire du produit.
+  const PRESCRIPTION =
+    /\b(à consommer|consommer|consommation|à limiter|limiter|évitez|privilégi|remplaç|remplacer|bannir|mangez)\b/i;
+
+  // Qualificatifs absolus ou allégations de santé sur le produit entier.
+  const ABSOLU = /\b(irréprochables?|sains?|saines?|parfaites?|parfaits?|inoffensifs?|garantis?)\b|sans danger/i;
+
+  it("aucune description ne prescrit une conduite de consommation", () => {
+    for (const score of TIERS) {
+      const { description } = getScoreVerdict(score);
+      expect([score, PRESCRIPTION.test(description)]).toEqual([score, false]);
+    }
+  });
+
+  it('aucune description ne qualifie le produit en absolu', () => {
+    for (const score of TIERS) {
+      const { description } = getScoreVerdict(score);
+      expect([score, ABSOLU.test(description)]).toEqual([score, false]);
+    }
+  });
+});
+
+describe('cohérence des échelles de score', () => {
+  // Le score n'a qu'une échelle publique. `ScoreCircle` en tenait une seconde,
+  // décalée d'un cran (95 → « Bon » à l'oral, « Excellent » à l'écran) ;
+  // l'écran OCR en tenait une troisième (75 / 50 / 30) qui colorait un même 72
+  // en jaune ici et en vert sur une fiche produit.
+
+  function colorBoundaries(): number[] {
+    const found: number[] = [];
+    for (let s = 1; s <= 100; s++) {
+      if (scoreColor(s) !== scoreColor(s - 1)) found.push(s);
+    }
+    return found;
+  }
+
+  it("l'échelle de couleur n'a que trois bornes : 25, 50, 70", () => {
+    expect(colorBoundaries()).toEqual([25, 50, 70]);
+  });
+
+  it('toute borne de couleur est aussi une borne de verdict', () => {
+    // L'inverse est faux et voulu : 90 sépare Excellent de Bon sans changer
+    // de couleur. Le verdict raffine l'échelle, il ne la contredit pas.
+    for (const s of colorBoundaries()) {
+      expect([s, getScoreVerdict(s).label]).not.toEqual([
+        s,
+        getScoreVerdict(s - 1).label,
+      ]);
+    }
   });
 });
 

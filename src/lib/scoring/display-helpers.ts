@@ -87,6 +87,24 @@ export interface ScoreVerdict {
   description: string;
 }
 
+/**
+ * Verdict affiché sous le score.
+ *
+ * Les seuils (90 / 70 / 50 / 25) et les libellés sont INCHANGÉS : ils font
+ * partie de l'échelle publique de l'app. Seules les descriptions ont été
+ * réécrites, pour deux raisons :
+ *
+ *   1. Elles prescrivaient une consommation — « À consommer sans hésitation »,
+ *      « Consommation occasionnelle », « À limiter fortement ». Vivo constate
+ *      ce que contient un produit ; il ne dit pas quoi en faire.
+ *   2. Elles décrivaient LE PRODUIT (« un aliment de qualité irréprochable »)
+ *      alors que le score ne mesure que la FORMULATION. L'emballage et la
+ *      maison-mère sont analysés par d'autres sections de la fiche, qui
+ *      pouvaient afficher un risque juste sous un 100/100.
+ *
+ * Chaque description reste vraie par construction : à un score donné
+ * correspond exactement `100 - score` points de pénalité.
+ */
 export function getScoreVerdict(score: number): ScoreVerdict {
   const clamped = Math.max(0, Math.min(100, score));
 
@@ -94,32 +112,36 @@ export function getScoreVerdict(score: number): ScoreVerdict {
     return {
       label: 'Excellent',
       description:
-        'Un aliment de qualité irréprochable. À consommer sans hésitation.',
+        "La formulation ne relève presque aucune pénalité. L'emballage et la maison-mère sont analysés séparément.",
     };
   }
   if (clamped >= 70) {
     return {
       label: 'Bon',
       description:
-        "Un produit sain dans l'ensemble. Quelques points d'attention mineurs.",
+        'Peu de pénalités relevées sur la formulation. Le détail figure dans la décomposition du score.',
     };
   }
   if (clamped >= 50) {
     return {
       label: 'Moyen',
       description:
-        'Consommation occasionnelle. Des alternatives plus saines existent.',
+        'Les pénalités relevées sur la formulation pèsent sensiblement sur le score.',
     };
   }
   if (clamped >= 25) {
+    // 25 ≤ score < 50 ⇒ 50 < pénalités ≤ 75.
     return {
       label: 'Mauvais',
-      description: 'À limiter fortement. Plusieurs éléments préoccupants.',
+      description:
+        'Plus de la moitié des points sont retirés par les pénalités de formulation.',
     };
   }
+  // score < 25 ⇒ pénalités > 75.
   return {
     label: 'À éviter',
-    description: "Composition problématique. On cherche un remplaçant.",
+    description:
+      'Plus des trois quarts des points sont retirés par les pénalités de formulation.',
   };
 }
 

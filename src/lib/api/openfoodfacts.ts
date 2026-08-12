@@ -2,6 +2,10 @@ import { supabase } from './supabase';
 import type { Product } from './types';
 import { fetchCosmeticByBarcode, type OBFProduct } from './openbeautyfacts';
 import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
+import {
+  normalizePackagings,
+  type PackagingComponent,
+} from '@/src/data/packaging-risks';
 
 const OFF_BASE = 'https://fr.openfoodfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
@@ -102,27 +106,31 @@ export async function fetchProductCategoriesTags(
 }
 
 /**
- * Récupère les tags de matériaux d'emballage OFF (format `en:pet-bottle`,
- * `fr:plastique`, etc.). Consommé par `detectPackagingRisk` côté UI.
+ * Récupère les composants d'emballage OFF (`packagings[]`) : un objet par
+ * élément physique, avec son matériau, sa forme et son contact alimentaire.
+ * Consommé par `detectPackagingRisk` côté UI.
  *
- * Retourne `[]` si le produit est introuvable, si `packaging_tags` est absent,
- * ou si la requête échoue (timeout / réseau).
+ * Remplace la lecture de `packaging_tags`, un champ hérité qui aplatit
+ * matériaux, formes et mentions de recyclage sans lien entre eux et se révèle
+ * fréquemment erroné — c'est lui qui faisait afficher « Aluminium » sur une
+ * bouteille d'eau en PET.
+ *
+ * Retourne `[]` si le produit est introuvable, si `packagings` est absent, ou
+ * si la requête échoue. Aucun repli sur `packaging_tags` : la section
+ * emballage disparaît plutôt que d'afficher une donnée non fiable.
  */
-export async function fetchProductPackagingTags(
+export async function fetchProductPackagings(
   barcode: string,
-): Promise<string[]> {
+): Promise<PackagingComponent[]> {
   try {
-    const url = `${OFF_BASE}/product/${barcode}.json?fields=packaging_tags`;
+    const url = `${OFF_BASE}/product/${barcode}.json?fields=packagings`;
     const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': USER_AGENT },
     });
     if (!res.ok) return [];
     const data = await res.json();
     if (data.status !== 1) return [];
-    const tags: string[] = Array.isArray(data.product?.packaging_tags)
-      ? data.product.packaging_tags
-      : [];
-    return tags;
+    return normalizePackagings(data.product?.packagings);
   } catch {
     return [];
   }
@@ -261,7 +269,6 @@ export function productToScoringInput(product: Product): {
   portion_grams: number;
   oil_types: string[];
   is_organic: boolean;
-  packaging_material?: string;
 } {
   const novaRaw = product.nova_group ?? 4;
   const nova = (novaRaw >= 1 && novaRaw <= 4 ? novaRaw : 4) as 1 | 2 | 3 | 4;
@@ -280,6 +287,5 @@ export function productToScoringInput(product: Product): {
     portion_grams: product.portion_grams ?? 100,
     oil_types: product.oil_types ?? [],
     is_organic: product.is_organic,
-    packaging_material: product.packaging_material ?? undefined,
   };
 }

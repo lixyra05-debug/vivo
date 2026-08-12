@@ -25,12 +25,12 @@ import { Colors } from '@/src/constants/colors';
 import {
   productToScoringInput,
   fetchProductCategoriesTags,
-  fetchProductPackagingTags,
+  fetchProductPackagings,
 } from '@/src/lib/api/openfoodfacts';
 import {
   cosmeticToScoringInput,
   getOrFetchCosmetic,
-  fetchCosmeticPackagingTags,
+  fetchCosmeticPackagings,
 } from '@/src/lib/api/openbeautyfacts';
 import {
   getProductConfidence,
@@ -101,9 +101,9 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
     staleTime: 24 * 60 * 60 * 1000,
   });
 
-  const packagingTagsQuery = useQuery({
-    queryKey: ['product-packaging-tags', barcode] as const,
-    queryFn: () => fetchProductPackagingTags(barcode),
+  const packagingsQuery = useQuery({
+    queryKey: ['product-packagings', barcode] as const,
+    queryFn: () => fetchProductPackagings(barcode),
     enabled: Boolean(barcode),
     staleTime: 24 * 60 * 60 * 1000,
   });
@@ -386,7 +386,7 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
           result={result}
           educationalCards={educationalCards}
           categoriesTags={categoryTagsQuery.data ?? []}
-          packagingTags={packagingTagsQuery.data ?? []}
+          packagings={packagingsQuery.data ?? []}
           isPremium={isPremium}
           onUnlockPremium={() => router.push('/profile')}
           onPressAlternative={(bc) => router.push(`/product/${bc}?type=food`)}
@@ -448,9 +448,9 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
     gcTime: SEVEN_DAYS_MS,
   });
 
-  const cosmeticPackagingTagsQuery = useQuery({
-    queryKey: ['cosmetic-packaging-tags', barcode] as const,
-    queryFn: () => fetchCosmeticPackagingTags(barcode),
+  const cosmeticPackagingsQuery = useQuery({
+    queryKey: ['cosmetic-packagings', barcode] as const,
+    queryFn: () => fetchCosmeticPackagings(barcode),
     enabled: Boolean(barcode),
     staleTime: 24 * 60 * 60 * 1000,
   });
@@ -568,7 +568,7 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
           confidence={confidence}
           compatibilityResult={compatibilityResult}
           educationalCards={educationalCards}
-          packagingTags={cosmeticPackagingTagsQuery.data ?? []}
+          packagings={cosmeticPackagingsQuery.data ?? []}
           onPressMethodology={() => router.push('/methodology')}
         />
         <View style={{ height: 24 }} />

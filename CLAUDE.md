@@ -311,7 +311,7 @@ Deux features GRATUITES qui enrichissent la fiche produit avec des données toxi
 - **Feature 1 — Packaging Risk** 📦 :
   - `src/data/packaging-risks.ts` (293 lignes) — Knowledge base de **14 matériaux** (13 spécifiques + 1 fallback `unknown_plastic`) typés `PackagingMaterial` avec `riskLevel: 'low'|'moderate'|'high'`. Sources EFSA/ANSES/ECHA/CIRC/eur-lex/OMS uniquement (test garde-fou anti-Gouget/Beauvillard/Clément/O'Neill + allowlist regex `/efsa|anses|echa|circ|iarc|oms|eur-lex|ansm/i`).
   - **Couverture** : pet (moderate), hdpe (low), pvc (high — phtalates ECHA SVHC + chlorure de vinyle CIRC G1), ldpe (low), pp (low), ps (high — styrène CIRC 2A), metal_can (moderate — BPA/BPS), aluminium (moderate — PTWI OMS), tetra_pak (moderate), plastic_film (moderate), bioplastic (low), glass (low — inerte), cardboard (low), unknown_plastic (moderate fallback).
-  - Helper `detectPackagingRisk(packagingTags)` : normalise les tags OFF/OBF (`en:pet-bottle`, `fr:plastique` → strip lang prefix + NFD + diacritics), match par substring dans `tagPatterns[]`, déduplique par `id`. Fallback `unknown_plastic` si tag plastique générique mais aucun spécifique trouvé. Tri final par risque desc (high → moderate → low), stable sur l'ordre du catalogue.
+  - Helper `detectPackagingRisk(components: PackagingComponent[])` : consomme `packagings[]` (matériau + forme + `food_contact`), **plus `packaging_tags`** — voir « Source packaging » ci-dessous. Normalise `material` (strip lang prefix + NFD + diacritics), match par substring dans `tagPatterns[]`, déduplique par `id`. `qualifiedBy` exige matériau ET forme pour les entrées qu'un matériau seul n'identifie pas (`en:metal` + `en:can` → `metal_can`). Fallback `unknown_plastic` si plastique générique et aucun polymère précis. Tri : contact alimentaire d'abord, puis risque desc, puis ordre du catalogue. Plafonné à `MAX_DETECTED_MATERIALS = 3`.
   - `src/components/product/PackagingSection.tsx` — GlassCard avec header `📦 Emballage analysé`, ligne par matériau (nom + chip risk tri-état rouge/orange/sage + 2 concerns max + tip + indicateur recyclable), footer `Sources : EFSA · ANSES · …` (max 5). Renvoie `null` si rien matché → la section n'apparaît pas.
 - **Feature 2 — Conglomerate Tracing** 🏢 :
   - `src/lib/api/conglomerate.ts` (218 lignes) — Résolution maison-mère via Wikidata en 2 temps : (1) REST `wbsearchentities` pour ranker l'entité demandée (premier résultat) ; (2) SPARQL VALUES single-hop sur P127 (owned by) | P749 (parent organization), puis P17 (country) → P298 (ISO 3166-1 alpha-3) sur le owner. Pas de récursion (Wikidata timeout en pratique) — on retourne le parent IMMÉDIAT cohérent (Coca-Cola → The Coca-Cola Company → US, et non Berkshire Hathaway via P127 chain).
@@ -320,15 +320,61 @@ Deux features GRATUITES qui enrichissent la fiche produit avec des données toxi
   - `countryCodeToFlag(code)` — accepte alpha-2 ("FR") ou alpha-3 ("FRA"). Mapping `ISO3_TO_ISO2` interne sur ~52 pays courants en agro/cosmétique. Conversion via Regional Indicator Symbols Unicode (codepoint 0x1F1E6 + offset). Renvoie `''` si conversion impossible.
   - User-Agent `Vivo/1.0 (https://vivo.lyxiria.com; tech@lyxiria.com)` pour politesse Wikidata. Timeout 5s, pas de retries (`fetchWithTimeout` retries: 0).
   - `src/components/product/ConglomerateSection.tsx` — GlassCard `🏢 Maison-mère`. Skeleton 2 barres pendant la résolution Wikidata. Owner name + drapeau emoji + countryName + lien `Voir sur Wikidata` → `Linking.openURL('https://www.wikidata.org/wiki/{Q-ID}')`. Pas de drapeau si `countryCode === null` (R3 plan validé). Renvoie `null` si owner introuvable ou brand vide.
-- **Pipeline data** :
-  - `fetchProductPackagingTags(barcode)` ajouté à `src/lib/api/openfoodfacts.ts` (pattern calqué sur `fetchProductCategoriesTags`, `fields=packaging_tags`).
-  - `fetchCosmeticPackagingTags(barcode)` ajouté à `src/lib/api/openbeautyfacts.ts`.
-  - `app/product/[barcode].tsx` : 2 nouveaux `useQuery` (food + cosmetic) staleTime 24h, props `packagingTags={…data ?? []}` propagées vers les vues.
+- **Pipeline data** *(source corrigée mai 2026 — voir « Source packaging » ci-dessous)* :
+  - `fetchProductPackagings(barcode)` dans `src/lib/api/openfoodfacts.ts` (`fields=packagings`), `fetchCosmeticPackagings(barcode)` dans `openbeautyfacts.ts`. Les deux passent par `normalizePackagings()` exporté de `packaging-risks.ts`.
+  - `app/product/[barcode].tsx` : 2 `useQuery` (food + cosmetic) staleTime 24h, props `packagings={…data ?? []}` propagées vers les vues.
+
+- **Source packaging — `packagings[]`, jamais `packaging_tags`** :
+  - `packaging_tags` est un champ hérité qui aplatit matériaux, formes et mentions de recyclage sans lien entre eux, et se révèle fréquemment erroné. Sur la Cristaline `3274080005003` il contient `["en:aluminium-can", "en:hdpefilm-packet", "en:ppfilm-wrapper", "en:ldpe-film"]` → la fiche affichait « Aluminium » sur une bouteille en PET. Le matching était juste ; la donnée était fausse.
+  - Mesuré sur 100 produits FR : `packagings[]` présent sur **85 %**, `packaging_tags` sur 76 %. Changer de source **augmente** la couverture. Un seul produit avait des tags sans `packagings[]`.
+  - **Aucun repli** sur `packaging_tags` : si `packagings[]` est absent, la section disparaît. Verrouillé par un test dans `openfoodfacts.test.ts`.
+  - **`food_contact`** : seul un `0` EXPLICITE exclut un composant. Le champ est absent sur ~40 % des composants observés (1→79, 0→40, absent→78) ; le traiter comme « pas de contact » viderait la moitié du catalogue. Absent = inconnu = conservé.
+  - **`recyclable: boolean | null`** — tri-état. `null` = la recyclabilité dépend de la composition réelle, que la donnée ne précise pas → `PackagingSection` affiche « Recyclabilité inconnue » en ton neutre (icône `HelpCircle`), jamais « Non recyclable ». Trois entrées sont passées à `null` : `unknown_plastic` (générique par définition, et `en:plastic` = 42 % des matériaux), `plastic_film` (son propre concern dit « variable selon la composition »), `bioplastic` (« PLA, etc. » recouvre des polymères au sort opposé). **Seuls `pvc` et `ps` gardent `false`** : leur exclusion des filières est documentée. Test allowlist décroissante — toute nouvelle entrée à `false` fait échouer la suite.
+  - **Test d'ancrage** : `packaging-risks.test.ts` fige le cas Cristaline réel → PET + HDPE, **jamais d'aluminium**.
+  - `ScoringInput.packaging_material` a été retiré (`types.ts`) : le moteur ne l'a jamais lu et le champ laissait croire que l'emballage entrait dans le score. `Product.packaging_material` est conservé — c'est le champ OFF brut.
 - **Intégration** :
   - `FoodProductView` : delays `900` (Packaging) / `920` (Conglomerate). Suite du chain décalée `940 (share scan) / 960 (report) / 1000 (source link) / 1040 (attribution)`.
   - `CosmeticProductView` : delays `200` (Packaging) / `220` (Conglomerate). Educational cards et footer décalés `260 + i*120 / 260 (report) / 300 (source) / 340 (attribution)`.
 - **Tests** : 691 → **723 verts** (+32 net : 12 packaging-risks data layer + 13 conglomerate API [4 countryCodeToFlag + 9 getConglomerateOwner avec cache positif/négatif/network-error] + 3 PackagingSection UI + 4 ConglomerateSection UI). `tsc --noEmit` clean. `npx expo export --platform web` OK (7MB bundle web).
 - **GRATUIT** : aucune des deux features n'est gatée premium/expert. Cohérent avec règle "Les filtres allergènes sont GRATUITS" — la transparence sur l'emballage et la maison-mère relève du même principe.
+
+## Dette identifiée (non corrigée, à arbitrer)
+
+### Le filtre « Ce que je peux manger » compte les produits non vérifiés comme compatibles
+`checkCompatibility` expose depuis mai 2026 un champ `verificationStatus: 'verified' | 'insufficient_data'`
+(`src/lib/api/types.ts`), qui distingue « vérifié et compatible » de « pas pu être vérifié faute de liste
+d'ingrédients ». La fiche produit l'exploite : `CompatibilityBanner` affiche un troisième état neutre
+« Vérification impossible » au lieu de « Compatible avec votre profil ».
+
+**Deux consommateurs ne le lisent pas encore** et se contentent de `isCompatible`, qui répond seulement à
+« existe-t-il un blocker ? » — donc `true` quand rien n'a pu être contrôlé :
+- `app/(tabs)/history.tsx:85` — `if (!compat.isCompatible) set.add(row.barcode)`
+- `src/lib/scoring/profile-filters.ts:19` — `checkCompatibility(...).isCompatible`
+
+**Conséquence** : un utilisateur allergique qui active le toggle « Compatibles » sur l'historique, une
+catégorie ou une enseigne voit apparaître des produits dont les allergènes n'ont jamais été vérifiés.
+
+**Pourquoi ce n'est pas corrigé** : `isCompatible` a été volontairement gelé pour ne pas modifier la
+sémantique d'un champ consommé ailleurs, et ces deux fichiers étaient hors du périmètre du lot.
+**Correction proposée** : faire lire `verificationStatus` aux deux call-sites et exclure — ou baliser —
+les produits `insufficient_data` dans les listes filtrées. Ne PAS changer `isCompatible`.
+
+### `ScoreComparison` tient une quatrième échelle de score
+Le lot « cohérence » de mai 2026 a unifié trois échelles : le verdict (`getScoreVerdict`), le libellé lu
+par les lecteurs d'écran (`ScoreCircle`, ex-`COLOR_LABEL`) et les couleurs de l'écran OCR
+(ex-`ocrScoreColor`, seuils 75/50/30). `ScoreComparison` n'était dans aucun des périmètres et diverge
+encore sur deux points :
+
+- `src/components/product/ScoreComparison.tsx:77` — la légende de l'axe affiche **« Danger »** là où
+  `getScoreVerdict` dit « À éviter ». Même incohérence que celle corrigée dans `ScoreCircle`.
+- `src/components/product/ScoreComparison.tsx:67` — le dégradé est en palette **v1**
+  (`#F44336, #FF9800, #FFC107, #4CAF50`) alors que le marqueur posé dessus prend sa couleur de
+  `scoreColor`, passé en **v2**. À 45, le chiffre est `#A8500B` sur une bande `#FF9800`.
+
+**Attention** : corriger la légende fait échouer `src/components/product/__tests__/ScoreComparison.test.tsx:17`
+(`expect(getByText('Danger')).toBeTruthy()`) — le test doit être adapté dans le même commit. Corriger le
+dégradé sort le fichier de l'allowlist de `theme-guard.test.ts` (même règle que `ScoreCircle.tsx:88`) :
+retirer aussi la ligne de l'allowlist, sinon l'assertion « aucune entrée périmée » échoue.
 
 ## Conventions
 - TypeScript strict (`strict: true`)

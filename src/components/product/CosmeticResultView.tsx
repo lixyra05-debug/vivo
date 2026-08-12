@@ -34,34 +34,45 @@ const RISK_LABEL: Record<CosmeticIngredientRisk, string> = {
   danger: 'Danger',
 };
 
-function verdictFromScore(score: number): { label: string; description: string } {
+/**
+ * Verdict cosmétique. Seuils (90 / 70 / 50 / 30) et libellés INCHANGÉS ;
+ * seules les descriptions ont été réécrites en constats.
+ *
+ * Elles prescrivaient une conduite (« À limiter », « On cherche un
+ * remplaçant ») et qualifiaient la formule en absolu (« irréprochable »,
+ * « globalement saine ») alors que le score ne pèse que les ingrédients INCI
+ * identifiés — pas l'emballage, pas ce que la peau tolère.
+ *
+ * Exporté pour être testable : c'est du contenu réglementairement sensible.
+ */
+export function verdictFromScore(score: number): { label: string; description: string } {
   if (score >= 90) {
     return {
       label: 'Excellent',
-      description: 'Formule irréprochable. Aucun ingrédient préoccupant.',
+      description: 'Très peu de pénalités relevées sur la formule.',
     };
   }
   if (score >= 70) {
     return {
       label: 'Bon',
-      description: "Formule globalement saine. Quelques points d'attention mineurs.",
+      description: "Peu d'ingrédients pénalisés dans la formule.",
     };
   }
   if (score >= 50) {
     return {
       label: 'Moyen',
-      description: 'Quelques ingrédients à surveiller. Des alternatives existent.',
+      description: 'Plusieurs ingrédients de la formule sont pénalisés.',
     };
   }
   if (score >= 30) {
     return {
       label: 'Mauvais',
-      description: 'Plusieurs ingrédients problématiques. À limiter.',
+      description: 'La formule cumule de nombreux ingrédients pénalisés.',
     };
   }
   return {
     label: 'À éviter',
-    description: 'Composition préoccupante. On cherche un remplaçant.',
+    description: 'La formule cumule des pénalités majeures.',
   };
 }
 

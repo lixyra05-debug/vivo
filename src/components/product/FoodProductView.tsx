@@ -27,6 +27,7 @@ import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
 import { useAlternatives } from '@/src/lib/api/use-alternatives';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { usePremium } from '@/src/lib/hooks/usePremium';
+import type { PackagingComponent } from '@/src/data/packaging-risks';
 import type { Product, ScoringResult } from '@/src/lib/api/types';
 import type { EducationalCard as EducationalCardType } from '@/src/lib/gamification/types';
 
@@ -35,7 +36,7 @@ export interface FoodProductViewProps {
   result: ScoringResult;
   educationalCards: EducationalCardType[];
   categoriesTags: string[];
-  packagingTags: string[];
+  packagings: PackagingComponent[];
   isPremium: boolean;
   onUnlockPremium: () => void;
   onPressAlternative: (barcode: string) => void;
@@ -50,7 +51,7 @@ export function FoodProductView({
   result,
   educationalCards,
   categoriesTags,
-  packagingTags,
+  packagings,
   isPremium,
   onUnlockPremium,
   onPressAlternative,
@@ -420,7 +421,7 @@ export function FoodProductView({
       ) : null}
 
       <FadeIn delay={900}>
-        <PackagingSection packagingTags={packagingTags} />
+        <PackagingSection packagings={packagings} />
       </FadeIn>
 
       <FadeIn delay={920}>

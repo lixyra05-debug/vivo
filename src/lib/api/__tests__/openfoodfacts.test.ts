@@ -1,6 +1,7 @@
 import {
   fetchProductMultiSource,
   fetchProductCategoriesTags,
+  fetchProductPackagings,
 } from '../openfoodfacts';
 
 describe('fetchProductMultiSource', () => {
@@ -107,6 +108,86 @@ describe('fetchProductCategoriesTags', () => {
     const b = await fetchProductCategoriesTags('2');
     expect(a).toEqual([]);
     expect(b).toEqual([]);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('fetchProductPackagings', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('demande `packagings` et non le champ hérité `packaging_tags`', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 1, product: { packagings: [] } }), {
+        status: 200,
+      }),
+    );
+
+    await fetchProductPackagings('3274080005003');
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain('fields=packagings');
+    expect(url).not.toContain('packaging_tags');
+  });
+
+  it('retourne les composants avec matériau, forme et contact alimentaire', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: 1,
+          product: {
+            packagings: [
+              {
+                material: 'en:pet-1-polyethylene-terephthalate',
+                shape: 'en:bottle',
+                food_contact: 1,
+                weight_measured: 20.24,
+              },
+            ],
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    expect(await fetchProductPackagings('3274080005003')).toEqual([
+      {
+        material: 'en:pet-1-polyethylene-terephthalate',
+        shape: 'en:bottle',
+        food_contact: 1,
+      },
+    ]);
+  });
+
+  it('ne retombe JAMAIS sur packaging_tags quand packagings est absent', async () => {
+    // R6. Ces tags sont ceux, réels, de la bouteille Cristaline : ils
+    // annoncent une canette en aluminium sur une bouteille en PET. Mieux vaut
+    // aucune section qu'une section fausse.
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: 1,
+          product: {
+            packaging_tags: ['en:aluminium-can', 'en:hdpefilm-packet'],
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    expect(await fetchProductPackagings('3274080005003')).toEqual([]);
+  });
+
+  it('retourne [] quand le produit est introuvable ou que la requête échoue', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 0 }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(new Response('not found', { status: 404 }));
+
+    expect(await fetchProductPackagings('1')).toEqual([]);
+    expect(await fetchProductPackagings('2')).toEqual([]);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

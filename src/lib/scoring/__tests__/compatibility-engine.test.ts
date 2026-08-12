@@ -1,4 +1,8 @@
-import { checkCompatibility, FODMAP_TRIGGERS } from '../compatibility-engine';
+import {
+  checkCompatibility,
+  FODMAP_TRIGGERS,
+  INSUFFICIENT_DATA_LABEL_FR,
+} from '../compatibility-engine';
 import type {
   CompatibilityProfile,
   CosmeticProduct,
@@ -330,6 +334,54 @@ describe('checkCompatibility', () => {
     const result = checkCompatibility(product, makeScoring({ score_final: 100 }), profile);
     expect(result.compatibilityPercentage).toBe(100);
     expect(result.isCompatible).toBe(true);
+  });
+});
+
+describe('verificationStatus', () => {
+  it("vaut 'insufficient_data' quand une allergie est déclarée sans liste d'ingrédients", () => {
+    const product = makeProduct({ ingredients_raw: '' });
+    const profile = emptyProfile({ allergies: ['arachides'] });
+    const result = checkCompatibility(product, makeScoring(), profile);
+    expect(result.verificationStatus).toBe('insufficient_data');
+  });
+
+  it("vaut 'verified' dès que les ingrédients sont exploitables", () => {
+    const product = makeProduct({ ingredients_raw: 'eau, sucre, sel' });
+    const profile = emptyProfile({ allergies: ['arachides'] });
+    const result = checkCompatibility(product, makeScoring(), profile);
+    expect(result.verificationStatus).toBe('verified');
+  });
+
+  it("vaut 'verified' si aucun critère ne demandait d'inspecter le texte", () => {
+    // Profil vide sur un produit sans ingrédients : il n'y avait rien à
+    // vérifier, donc rien n'a échoué. Ne pas confondre avec le cas ci-dessus.
+    const result = checkCompatibility(makeProduct(), makeScoring(), emptyProfile());
+    expect(result.verificationStatus).toBe('verified');
+  });
+
+  it("n'altère ni isCompatible ni compatibilityPercentage — champ purement additif", () => {
+    // Garde-fou de non-régression : c'est exactement le cas qui produisait
+    // « Compatible » à tort. Les deux champs historiques doivent garder leur
+    // valeur d'avant, seul le nouveau statut porte l'information manquante.
+    const product = makeProduct({ ingredients_raw: '' });
+    const profile = emptyProfile({ allergies: ['arachides', 'gluten'] });
+    const result = checkCompatibility(product, makeScoring(), profile);
+    expect(result.isCompatible).toBe(true);
+    expect(result.compatibilityPercentage).toBe(100);
+    expect(result.verificationStatus).toBe('insufficient_data');
+  });
+
+  it('expose le motif une seule fois même avec plusieurs critères en échec', () => {
+    const product = makeProduct({ ingredients_raw: '' });
+    const profile = emptyProfile({
+      allergies: ['arachides', 'gluten'],
+      dietary: ['vegan'],
+    });
+    const result = checkCompatibility(product, makeScoring(), profile);
+    const flags = result.incompatibilities.filter(
+      (i) => i.labelFr === INSUFFICIENT_DATA_LABEL_FR,
+    );
+    expect(flags).toHaveLength(1);
   });
 });
 

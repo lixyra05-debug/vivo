@@ -25,7 +25,10 @@ export interface ScoringInput {
   portion_grams: number;
   oil_types: string[];
   is_organic: boolean;
-  packaging_material?: string;
+  // `packaging_material` a été retiré : le moteur ne l'a jamais lu. Le champ
+  // laissait croire que l'emballage entrait dans le score, alors qu'il n'y
+  // contribue pas — il est analysé à part par `PackagingSection`.
+  // `Product.packaging_material` est conservé : c'est le champ OFF brut.
 }
 
 export interface UserProfile {
@@ -237,4 +240,17 @@ export interface CompatibilityResult {
   score: number; // pass-through from scoring result
   incompatibilities: IncompatibilityReason[];
   compatibilityPercentage: number; // 0-100, % of criteria passed
+  /**
+   * Distingue « vérifié et compatible » de « pas pu être vérifié ».
+   *
+   * `isCompatible` ne répond qu'à « existe-t-il un blocker ? ». Quand la liste
+   * d'ingrédients est absente, aucun blocker ne peut être levé : le résultat
+   * était donc `true`, indistinguable d'une vraie compatibilité. Un utilisateur
+   * allergique lisait « Compatible » alors que rien n'avait été contrôlé.
+   *
+   * Champ OPTIONNEL et purement additif : `isCompatible` et
+   * `compatibilityPercentage` gardent exactement leur sémantique, aucun
+   * consommateur existant n'a besoin de changer.
+   */
+  verificationStatus?: 'verified' | 'insufficient_data';
 }

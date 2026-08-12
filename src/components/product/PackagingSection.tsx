@@ -1,25 +1,35 @@
 /**
- * PackagingSection — affiche les risques d'emballage détectés via OFF/OBF tags.
+ * PackagingSection — affiche les risques d'emballage détectés.
  *
- * Run `detectPackagingRisk` sur les tags packaging du produit. Retourne `null`
- * si rien n'est détecté (cas le plus fréquent — beaucoup de produits OFF/OBF
- * n'ont pas leurs tags packaging structurés). Sinon, GlassCard avec une row
- * par matériau : nom, chip risk, premier concern, tip, indicateur recyclable.
+ * Consomme `packagings[]` d'OFF/OBF (un composant = un matériau + une forme +
+ * un contact alimentaire) et non plus `packaging_tags`, dont les entrées à
+ * plat pouvaient annoncer « Aluminium » sur une bouteille en PET.
+ *
+ * Retourne `null` quand rien n'est détecté — y compris quand `packagings[]`
+ * est absent du produit. Aucun repli sur l'ancienne source : mieux vaut pas de
+ * section qu'une section fausse.
  *
  * Sources EFSA / ANSES / ECHA / CIRC / OMS / eur-lex affichées en footer.
  */
 
 import { StyleSheet, Text, View } from 'react-native';
-import { Package, Recycle, AlertCircle, Lightbulb } from 'lucide-react-native';
+import {
+  Package,
+  Recycle,
+  AlertCircle,
+  HelpCircle,
+  Lightbulb,
+} from 'lucide-react-native';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Colors } from '@/src/constants/colors';
 import {
   detectPackagingRisk,
+  type PackagingComponent,
   type PackagingRiskLevel,
 } from '@/src/data/packaging-risks';
 
 interface PackagingSectionProps {
-  packagingTags: string[] | null | undefined;
+  packagings: PackagingComponent[] | null | undefined;
 }
 
 const RISK_CHIP_STYLE: Record<
@@ -43,9 +53,43 @@ const RISK_CHIP_STYLE: Record<
   },
 };
 
-export function PackagingSection({ packagingTags }: PackagingSectionProps) {
-  const tags = Array.isArray(packagingTags) ? packagingTags : [];
-  const materials = detectPackagingRisk(tags);
+export const RECYCLABILITY_UNKNOWN_LABEL = 'Recyclabilité inconnue';
+
+/**
+ * Trois états, pas deux. `null` signifie que la recyclabilité dépend de la
+ * composition réelle, que la donnée OFF ne précise pas — l'afficher comme
+ * « Non recyclable » transformerait une absence de donnée en verdict, sur des
+ * matériaux génériques qui représentent 42 % des composants observés.
+ *
+ * L'état inconnu est neutre : même gris que « Non recyclable », mais une icône
+ * différente, pour qu'il ne se lise pas comme un jugement atténué.
+ */
+function RecyclabilityRow({ recyclable }: { recyclable: boolean | null }) {
+  if (recyclable === null) {
+    return (
+      <View style={styles.recyclableRow}>
+        <HelpCircle color={Colors.textMuted} size={13} strokeWidth={2.2} />
+        <Text style={[styles.recyclableText, { color: Colors.textMuted }]}>
+          {RECYCLABILITY_UNKNOWN_LABEL}
+        </Text>
+      </View>
+    );
+  }
+
+  const color = recyclable ? Colors.score.green : Colors.textMuted;
+  return (
+    <View style={styles.recyclableRow}>
+      <Recycle color={color} size={13} strokeWidth={2.2} />
+      <Text style={[styles.recyclableText, { color }]}>
+        {recyclable ? 'Recyclable' : 'Non recyclable'}
+      </Text>
+    </View>
+  );
+}
+
+export function PackagingSection({ packagings }: PackagingSectionProps) {
+  const components = Array.isArray(packagings) ? packagings : [];
+  const materials = detectPackagingRisk(components);
 
   if (materials.length === 0) return null;
 
@@ -93,25 +137,7 @@ export function PackagingSection({ packagingTags }: PackagingSectionProps) {
                 <Text style={styles.tipText}>{m.tip}</Text>
               </View>
 
-              <View style={styles.recyclableRow}>
-                <Recycle
-                  color={m.recyclable ? Colors.score.green : Colors.textMuted}
-                  size={13}
-                  strokeWidth={2.2}
-                />
-                <Text
-                  style={[
-                    styles.recyclableText,
-                    {
-                      color: m.recyclable
-                        ? Colors.score.green
-                        : Colors.textMuted,
-                    },
-                  ]}
-                >
-                  {m.recyclable ? 'Recyclable' : 'Non recyclable'}
-                </Text>
-              </View>
+              <RecyclabilityRow recyclable={m.recyclable} />
             </View>
           );
         })}

@@ -1,6 +1,10 @@
 import { supabase } from './supabase';
 import type { CosmeticProduct, CosmeticScoringInput } from './types';
 import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
+import {
+  normalizePackagings,
+  type PackagingComponent,
+} from '@/src/data/packaging-risks';
 
 const OBF_BASE = 'https://world.openbeautyfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
@@ -32,27 +36,22 @@ export async function fetchCosmeticByBarcode(barcode: string): Promise<OBFProduc
 }
 
 /**
- * Récupère les tags de matériaux d'emballage OBF (format `en:plastic`,
- * `en:glass-bottle`, etc.). Consommé par `detectPackagingRisk` côté UI.
- *
- * Retourne `[]` si le produit est introuvable, si `packaging_tags` est absent,
- * ou si la requête échoue (timeout / réseau).
+ * Récupère les composants d'emballage OBF (`packagings[]`). Même contrat que
+ * `fetchProductPackagings` côté OFF : aucun repli sur `packaging_tags`, la
+ * section disparaît si la donnée structurée est absente.
  */
-export async function fetchCosmeticPackagingTags(
+export async function fetchCosmeticPackagings(
   barcode: string,
-): Promise<string[]> {
+): Promise<PackagingComponent[]> {
   try {
-    const url = `${OBF_BASE}/product/${barcode}.json?fields=packaging_tags`;
+    const url = `${OBF_BASE}/product/${barcode}.json?fields=packagings`;
     const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': USER_AGENT },
     });
     if (!res.ok) return [];
     const data = await res.json();
     if (data.status !== 1) return [];
-    const tags: string[] = Array.isArray(data.product?.packaging_tags)
-      ? data.product.packaging_tags
-      : [];
-    return tags;
+    return normalizePackagings(data.product?.packagings);
   } catch {
     return [];
   }

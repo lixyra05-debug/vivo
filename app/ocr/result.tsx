@@ -33,7 +33,7 @@ import { GlassCard } from '@/src/components/ui/GlassCard';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { ShareableCard } from '@/src/components/premium/ShareableCard';
-import { Colors } from '@/src/constants/colors';
+import { Colors, scoreColor } from '@/src/constants/colors';
 import { useOcrSessionStore } from '@/src/lib/stores/useOcrSessionStore';
 import type {
   OcrAnalysisResult,
@@ -54,13 +54,6 @@ const RISK_STYLES: Record<OcrRiskLevel, RiskStyle> = {
   caution: { bg: 'rgba(255,152,0,0.16)', text: '#B96B00' },
   avoid: { bg: 'rgba(244,67,54,0.14)', text: '#B5311E' },
 };
-
-function ocrScoreColor(score: number): string {
-  if (score >= 75) return '#4CAF50';
-  if (score >= 50) return '#FFC107';
-  if (score >= 30) return '#FF9800';
-  return '#F44336';
-}
 
 export default function OcrResultScreen() {
   const router = useRouter();
@@ -91,7 +84,10 @@ interface OcrResultContentProps {
 }
 
 function OcrResultContent({ result, onScanAgain, onBack }: OcrResultContentProps) {
-  const scoreColor = useMemo(() => ocrScoreColor(result.score), [result.score]);
+  // Même échelle que le reste de l'app (70 / 50 / 25). L'écran avait la
+  // sienne (75 / 50 / 30) : un 72 s'affichait en jaune ici et en vert sur une
+  // fiche produit, pour une valeur identique.
+  const scoreHex = useMemo(() => scoreColor(result.score), [result.score]);
   const productLabel = result.productType === 'cosmetic' ? '🧴 Cosmétique' : '🥗 Aliment';
 
   function handleIngredientPress(ing: OcrIngredient) {
@@ -129,10 +125,10 @@ function OcrResultContent({ result, onScanAgain, onBack }: OcrResultContentProps
             <View
               style={[
                 styles.scoreCircle,
-                { borderColor: scoreColor, backgroundColor: `${scoreColor}14` },
+                { borderColor: scoreHex, backgroundColor: `${scoreHex}14` },
               ]}
             >
-              <Text style={[styles.scoreValue, { color: scoreColor }]}>
+              <Text style={[styles.scoreValue, { color: scoreHex }]}>
                 {result.score}
               </Text>
               <Text style={styles.scoreUnit}>/100</Text>
@@ -239,10 +235,10 @@ function OcrResultContent({ result, onScanAgain, onBack }: OcrResultContentProps
                 <View
                   style={[
                     styles.shareScoreCircle,
-                    { borderColor: scoreColor, backgroundColor: `${scoreColor}14` },
+                    { borderColor: scoreHex, backgroundColor: `${scoreHex}14` },
                   ]}
                 >
-                  <Text style={[styles.shareScoreValue, { color: scoreColor }]}>
+                  <Text style={[styles.shareScoreValue, { color: scoreHex }]}>
                     {result.score}
                   </Text>
                   <Text style={styles.shareScoreUnit}>/100</Text>

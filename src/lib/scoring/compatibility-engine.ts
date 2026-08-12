@@ -11,6 +11,16 @@ import type {
 // === Public exports ===
 
 /**
+ * Libellé unique du motif « on n'a pas pu vérifier ».
+ *
+ * Exporté parce que deux endroits doivent le reconnaître sans le redire :
+ * le calcul du pourcentage ici, et la bannière, qui le porte déjà dans son
+ * titre et n'a donc pas à le répéter dans sa liste de motifs.
+ */
+export const INSUFFICIENT_DATA_LABEL_FR =
+  'Données insuffisantes pour vérifier la compatibilité';
+
+/**
  * Liste de déclencheurs FODMAP courants (FR + EN).
  * Source : Monash University FODMAP guide (high-FODMAP foods).
  * Volontairement >=20 entrées pour couvrir les déclencheurs principaux.
@@ -290,7 +300,7 @@ export function checkCompatibility(
     dataInsufficientFlagged = true;
     incompatibilities.push({
       type: 'condition',
-      labelFr: 'Données insuffisantes pour vérifier la compatibilité',
+      labelFr: INSUFFICIENT_DATA_LABEL_FR,
       severity: 'warning',
     });
   }
@@ -639,11 +649,10 @@ export function checkCompatibility(
     compatibilityPercentage = Math.round((passed / totalCriteria) * 100);
   }
   // Cas limite : aucun ingrédient à inspecter et aucune autre incompat → 100 %.
-  if (
-    !hasText &&
-    sorted.length === 1 &&
-    sorted[0].labelFr.startsWith('Données insuffisantes')
-  ) {
+  // Équivalent strict à l'ancien test sur le libellé : `flagInsufficientData`
+  // est le seul producteur de ce motif, et chacun de ses appels est gardé par
+  // `!hasText`. Comportement inchangé, chaîne magique en moins.
+  if (dataInsufficientFlagged && sorted.length === 1) {
     compatibilityPercentage = 100;
   }
 
@@ -652,5 +661,6 @@ export function checkCompatibility(
     score: scoringResult.score_final,
     incompatibilities: sorted,
     compatibilityPercentage,
+    verificationStatus: dataInsufficientFlagged ? 'insufficient_data' : 'verified',
   };
 }

@@ -11,6 +11,7 @@ import { ConglomerateSection } from './ConglomerateSection';
 import { EducationalCard } from '@/src/components/education/EducationalCard';
 import { NaturalityBadge } from '@/src/components/naturality/NaturalityBadge';
 import { Colors } from '@/src/constants/colors';
+import type { PackagingComponent } from '@/src/data/packaging-risks';
 import type { CosmeticProduct, CosmeticScoringResult } from '@/src/lib/api/types';
 import type { getCosmeticConfidence } from '@/src/lib/api/confidence';
 import type { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
@@ -22,7 +23,7 @@ export interface CosmeticProductViewProps {
   confidence: ReturnType<typeof getCosmeticConfidence> | null;
   compatibilityResult: ReturnType<typeof checkCompatibility> | null;
   educationalCards: EducationalCardType[];
-  packagingTags: string[];
+  packagings: PackagingComponent[];
   onPressMethodology: () => void;
 }
 
@@ -32,7 +33,7 @@ export function CosmeticProductView({
   confidence,
   compatibilityResult,
   educationalCards,
-  packagingTags,
+  packagings,
   onPressMethodology,
 }: CosmeticProductViewProps) {
   const router = useRouter();
@@ -62,7 +63,7 @@ export function CosmeticProductView({
         </FadeIn>
       ) : null}
       <FadeIn delay={200}>
-        <PackagingSection packagingTags={packagingTags} />
+        <PackagingSection packagings={packagings} />
       </FadeIn>
       <FadeIn delay={220}>
         <ConglomerateSection brandName={product.brand} />
