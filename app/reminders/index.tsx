@@ -143,7 +143,7 @@ export default function RemindersScreen() {
 
           <FadeIn delay={60}>
             <View style={{ gap: 4 }}>
-              <Text style={styles.title}>Mes Rappels 💊</Text>
+              <Text style={styles.title}>Mes Rappels</Text>
               <Text style={styles.subtitle}>Suivi de tes cures de plantes</Text>
             </View>
           </FadeIn>
@@ -199,7 +199,7 @@ export default function RemindersScreen() {
 
         <FadeIn delay={60}>
           <View style={{ gap: 4 }}>
-            <Text style={styles.title}>Mes Rappels 💊</Text>
+            <Text style={styles.title}>Mes Rappels</Text>
             <Text style={styles.subtitle}>Suivi de tes cures de plantes</Text>
           </View>
         </FadeIn>

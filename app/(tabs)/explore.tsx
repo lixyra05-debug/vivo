@@ -341,7 +341,7 @@ function PlantsSection({
     <View style={{ gap: 12 }}>
       <FadeIn delay={190}>
         <View style={{ gap: 2 }}>
-          <Text style={styles.sectionTitle}>🌿 Plantes médicinales</Text>
+          <Text style={styles.sectionTitle}>Plantes médicinales</Text>
           <Text style={styles.sectionSubtitle}>Encyclopédie sourcée EMA · Tier Expert</Text>
         </View>
       </FadeIn>
@@ -413,7 +413,7 @@ function PlantsSection({
               </View>
               <View style={{ gap: 2 }}>
                 <Text style={styles.plantTitle}>Mon Herbier</Text>
-                <Text style={styles.plantSubtitle}>🌿 Mes plantes</Text>
+                <Text style={styles.plantSubtitle}>Mes plantes</Text>
               </View>
             </GlassCard>
           </Pressable>
@@ -431,7 +431,7 @@ function PlantsSection({
               </View>
               <View style={{ gap: 2 }}>
                 <Text style={styles.plantTitle}>Mes Rappels</Text>
-                <Text style={styles.plantSubtitle}>💊 Cures</Text>
+                <Text style={styles.plantSubtitle}>Cures</Text>
               </View>
             </GlassCard>
           </Pressable>
@@ -448,7 +448,7 @@ function PlantsSection({
                 <Coffee color={Colors.sage} size={22} strokeWidth={2.2} />
               </View>
               <View style={{ gap: 2 }}>
-                <Text style={styles.plantTitle}>Recettes ☕</Text>
+                <Text style={styles.plantTitle}>Recettes</Text>
                 <Text style={styles.plantSubtitle}>30 préparations</Text>
               </View>
             </GlassCard>

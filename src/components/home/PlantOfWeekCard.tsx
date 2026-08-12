@@ -12,9 +12,9 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Lock } from 'lucide-react-native';
 import { GlassCard } from '@/src/components/ui/GlassCard';
-import { Colors } from '@/src/constants/colors';
+import { Icon } from '@/src/components/ui/Icon';
+import { Palette, Radius, Spacing, Type, withAlpha } from '@/src/constants/theme';
 import { usePremium } from '@/src/lib/hooks/usePremium';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { getPlantOfWeek } from '@/src/lib/plants/plant-of-week';
@@ -50,7 +50,7 @@ export function PlantOfWeekCard() {
         <View style={[styles.inner, !isExpert && styles.innerLocked]}>
           <View style={styles.badgeRow}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>🌿 Plante de la semaine</Text>
+              <Text style={styles.badgeText}>Plante de la semaine</Text>
             </View>
           </View>
 
@@ -74,7 +74,7 @@ export function PlantOfWeekCard() {
         {!isExpert ? (
           <View style={styles.lockOverlay} pointerEvents="none">
             <View style={styles.lockBadge}>
-              <Lock color={Colors.earth} size={20} strokeWidth={2.4} />
+              <Icon name="Lock" color="earthDeep" />
             </View>
             <Text style={styles.lockText}>Réservé Expert</Text>
           </View>
@@ -86,13 +86,12 @@ export function PlantOfWeekCard() {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
-    borderRadius: 20,
+    padding: Spacing.lg,
     overflow: 'hidden',
     position: 'relative',
   },
   inner: {
-    gap: 10,
+    gap: Spacing.md,
   },
   innerLocked: {
     opacity: 0.3,
@@ -101,42 +100,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(139, 173, 139, 0.16)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    backgroundColor: withAlpha(Palette.sage, 0.16),
   },
   badgeText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 11,
-    color: Colors.sage,
-    letterSpacing: 0.3,
+    ...Type.micro,
+    color: Palette.sageVivid,
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   emoji: {
     fontSize: 32,
     lineHeight: 38,
   },
   nameFr: {
-    fontFamily: 'BricolageGrotesque-Bold',
-    fontSize: 18,
-    color: Colors.text,
-    letterSpacing: -0.3,
+    ...Type.h2,
+    color: Palette.ink,
   },
   nameLatin: {
+    ...Type.caption,
     fontFamily: 'Inter',
-    fontSize: 13,
-    color: Colors.textMuted,
+    color: Palette.textMuted,
     fontStyle: 'italic',
   },
   properties: {
+    ...Type.caption,
     fontFamily: 'Inter',
-    fontSize: 13,
-    color: Colors.textMuted,
+    color: Palette.textSecondary,
     lineHeight: 19,
   },
   lockOverlay: {
@@ -147,20 +142,19 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: Spacing.sm,
   },
   lockBadge: {
     width: 44,
     height: 44,
-    borderRadius: 999,
-    backgroundColor: 'rgba(196, 168, 130, 0.16)',
+    borderRadius: Radius.pill,
+    backgroundColor: withAlpha(Palette.earth, 0.16),
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* `earth` posé en texte tenait 2,17:1 — remplacé par `earthDeep` (5,91:1). */
   lockText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 12,
-    color: Colors.earth,
-    letterSpacing: 0.4,
+    ...Type.micro,
+    color: Palette.earthDeep,
   },
 });

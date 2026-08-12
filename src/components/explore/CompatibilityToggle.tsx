@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   counterText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 11,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     letterSpacing: 0.2,
   },
 });

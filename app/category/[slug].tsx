@@ -300,7 +300,7 @@ export default function CategoryScreen() {
           {hasFeatured ? (
             <FadeIn delay={0}>
               <View style={{ gap: 10 }}>
-                <Text style={styles.sectionTitle}>⭐ Produits populaires</Text>
+                <Text style={styles.sectionTitle}>Produits populaires</Text>
                 <View style={{ gap: 8 }}>
                   {featuredProducts.map((p) => (
                     <FeaturedProductCard

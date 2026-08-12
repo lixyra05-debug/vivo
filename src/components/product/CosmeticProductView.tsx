@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   attribution: {
     fontFamily: 'Inter',
     fontSize: 11,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     textAlign: 'center',
   },
 });

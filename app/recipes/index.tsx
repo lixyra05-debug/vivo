@@ -111,7 +111,7 @@ export default function RecipesIndexScreen() {
 
         <FadeIn delay={60}>
           <View style={{ gap: 4 }}>
-            <Text style={styles.title}>Recettes Bien-être ☕</Text>
+            <Text style={styles.title}>Recettes Bien-être</Text>
             <Text style={styles.subtitle}>
               30 préparations à base de plantes
             </Text>

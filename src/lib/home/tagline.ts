@@ -17,7 +17,7 @@ const MESSAGES: Record<TimeSlot, string> = {
   morning: 'Bonne matinée ! Prêt à scanner ?',
   afternoon: 'Scanne et découvre ce qui est vraiment compatible avec ta santé.',
   evening: 'Bonne soirée ! Un dernier scan avant de se poser ?',
-  late: 'Encore debout ? Scanne si tu veux 😉',
+  late: 'Encore debout ? Scanne si tu veux.',
 };
 
 export function getTimeBasedTagline(now: Date = new Date()): string {

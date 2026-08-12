@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 12,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     letterSpacing: 0.2,
   },
   skeleton: {

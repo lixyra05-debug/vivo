@@ -13,8 +13,8 @@
 
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
-import { Colors } from '@/src/constants/colors';
+import { Icon } from '@/src/components/ui/Icon';
+import { Palette, Radius, Spacing, Type, withAlpha } from '@/src/constants/theme';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { usePremium } from '@/src/lib/hooks/usePremium';
 import {
@@ -92,7 +92,7 @@ export function FamilyProfilePills() {
           pressed && { opacity: 0.85 },
         ]}
       >
-        <Plus color={Colors.sage} size={14} strokeWidth={2.4} />
+        <Icon name="Plus" size="sm" color="sageVivid" />
         <Text style={[styles.pillLabel, styles.pillLabelManage]}>Gérer</Text>
       </Pressable>
     </ScrollView>
@@ -101,32 +101,34 @@ export function FamilyProfilePills() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 4,
-    gap: 8,
+    paddingHorizontal: Spacing.xs,
+    gap: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
     borderWidth: 1,
     minHeight: 36,
   },
+  /* La pill active portait du blanc sur `sage` : 2,49:1, illisible. Le fond
+   * passe sur `sageVivid`, qui tient 4,80:1 avec le libellé clair. */
   pillActive: {
-    backgroundColor: Colors.sage,
-    borderColor: Colors.sage,
+    backgroundColor: Palette.sageVivid,
+    borderColor: Palette.sageVivid,
   },
   pillInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: '#E2EBE2',
+    backgroundColor: withAlpha(Palette.surfaceRaised, 0.85),
+    borderColor: Palette.borderCard,
   },
   pillManage: {
-    backgroundColor: 'rgba(139, 173, 139, 0.08)',
-    borderColor: 'rgba(139, 173, 139, 0.45)',
+    backgroundColor: withAlpha(Palette.sage, 0.08),
+    borderColor: withAlpha(Palette.sage, 0.45),
     borderStyle: 'dashed',
   },
   pillEmoji: {
@@ -134,18 +136,17 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   pillLabel: {
+    ...Type.caption,
     fontFamily: 'Inter-SemiBold',
-    fontSize: 13,
-    letterSpacing: 0.2,
     maxWidth: 120,
   },
   pillLabelActive: {
-    color: '#FFFFFF',
+    color: Palette.textOnDark,
   },
   pillLabelInactive: {
-    color: Colors.text,
+    color: Palette.textPrimary,
   },
   pillLabelManage: {
-    color: Colors.sage,
+    color: Palette.sageVivid,
   },
 });

@@ -128,7 +128,7 @@ export function PremiumPaywall({
           onRestore={handleRestore}
         />
         <Text style={styles.guarantee}>
-          Le scanner et le score restent TOUJOURS gratuits ✅
+          Le scanner et le score restent TOUJOURS gratuits
         </Text>
       </View>
     );
@@ -175,7 +175,7 @@ export function PremiumPaywall({
       />
 
       <Text style={styles.guarantee}>
-        Le scanner et le score restent TOUJOURS gratuits ✅
+        Le scanner et le score restent TOUJOURS gratuits
       </Text>
     </View>
   );
@@ -354,7 +354,7 @@ function ExpertCard({ compact, price, loading, disabled, onPress }: CardProps) {
     return (
       <GlassCard tone="default" style={styles.expertCardCompact}>
         <View style={styles.recommendedPill}>
-          <Text style={styles.recommendedText}>🌿 RECOMMANDÉ</Text>
+          <Text style={styles.recommendedText}>RECOMMANDÉ</Text>
         </View>
         <View style={styles.expertIconBadge}>
           <Leaf color={Colors.earth} size={18} strokeWidth={2.4} />
@@ -393,7 +393,7 @@ function ExpertCard({ compact, price, loading, disabled, onPress }: CardProps) {
   return (
     <GlassCard tone="default" style={styles.expertCard}>
       <View style={styles.recommendedPill}>
-        <Text style={styles.recommendedText}>🌿 RECOMMANDÉ</Text>
+        <Text style={styles.recommendedText}>RECOMMANDÉ</Text>
       </View>
 
       <View style={styles.headerRow}>
@@ -417,15 +417,12 @@ function ExpertCard({ compact, price, loading, disabled, onPress }: CardProps) {
       </Text>
 
       <View style={styles.featuresList}>
-        {EXPERT_BULLETS.map((label, index) => (
+        {EXPERT_BULLETS.map((label) => (
           <View key={label} style={styles.featureRow}>
             <View style={styles.checkCircleExpert}>
-              <Check color={Colors.earth} size={12} strokeWidth={3} />
+              <Check color={Colors.earthDeep} size={12} strokeWidth={3} />
             </View>
-            <Text style={styles.featureText}>
-              {label}
-              {index === 0 ? ' ✓' : ''}
-            </Text>
+            <Text style={styles.featureText}>{label}</Text>
           </View>
         ))}
       </View>
@@ -479,7 +476,7 @@ function ExpertTeaser({ price, disabled, onPress }: TeaserProps) {
         <Leaf color={Colors.earth} size={16} strokeWidth={2.4} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.teaserTitle}>Aller plus loin — Vivo Expert 🌿</Text>
+        <Text style={styles.teaserTitle}>Aller plus loin — Vivo Expert</Text>
         <Text style={styles.teaserBody}>
           Plantes médicinales, sécurité grossesse & enfants, interactions
           plantes-médicaments. {price.label}.
@@ -803,7 +800,7 @@ const styles = StyleSheet.create({
   legalLink: {
     fontFamily: 'Inter-Medium',
     fontSize: 12,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     textDecorationLine: 'underline',
   },
   legalLinkSep: {
@@ -818,7 +815,7 @@ const styles = StyleSheet.create({
   restoreLink: {
     fontFamily: 'Inter-Medium',
     fontSize: 13,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     textDecorationLine: 'underline',
   },
 });

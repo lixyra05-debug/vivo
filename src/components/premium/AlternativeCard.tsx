@@ -18,7 +18,7 @@ interface NovaStyle {
 
 function novaStyle(group: number): NovaStyle {
   if (group <= 2) {
-    return { bg: 'rgba(139,173,139,0.18)', color: Colors.sage };
+    return { bg: 'rgba(139,173,139,0.18)', color: Colors.sageVivid };
   }
   if (group === 3) {
     return { bg: 'rgba(255,152,0,0.18)', color: '#B96B00' };
@@ -33,7 +33,7 @@ interface AdditivesStyle {
 
 function additivesStyle(count: number): AdditivesStyle {
   if (count === 0) {
-    return { label: '✅ 0 additif', color: Colors.sage };
+    return { label: '0 additif', color: Colors.sageVivid };
   }
   if (count <= 3) {
     return {
@@ -41,7 +41,7 @@ function additivesStyle(count: number): AdditivesStyle {
       color: Colors.textMuted,
     };
   }
-  return { label: `⚠️ ${count} additifs`, color: '#B96B00' };
+  return { label: `${count} additifs`, color: '#B96B00' };
 }
 
 export function AlternativeCard({ alt, onPress }: AlternativeCardProps) {

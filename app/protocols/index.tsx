@@ -64,7 +64,7 @@ export default function ProtocolsListScreen() {
 
         <FadeIn delay={60}>
           <View style={{ gap: 4 }}>
-            <Text style={styles.title}>🌿 Protocoles 21 jours</Text>
+            <Text style={styles.title}>Protocoles 21 jours</Text>
             <Text style={styles.subtitle}>
               5 programmes guidés sourcés EMA
             </Text>

@@ -36,7 +36,7 @@ const CATEGORIES: CategoryDef[] = [
   { key: 'additives', label: 'Additifs', color: Colors.score.red },
   { key: 'macros', label: 'Macros', color: Colors.score.orange },
   { key: 'oils', label: 'Huiles', color: '#866B46' },
-  { key: 'bonus', label: 'Bonus', color: Colors.sage },
+  { key: 'bonus', label: 'Bonus', color: Colors.sageVivid },
 ];
 
 const MAX_BAR_HEIGHT = 120;

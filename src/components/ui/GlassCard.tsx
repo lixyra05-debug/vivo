@@ -1,36 +1,89 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { ViewStyle, StyleProp } from 'react-native';
+import { Elevation, Palette, Radius, Spacing, withAlpha } from '@/src/constants/theme';
+
+/**
+ * GlassCard — carte de contenu.
+ *
+ * Le défaut de la v1 : toutes les cartes étaient identiques. Une fiche produit
+ * empilait dix cartes au même niveau d'élévation → aucune hiérarchie, l'œil ne
+ * savait pas où se poser. `variant` corrige ça.
+ *
+ *   flat   → sections secondaires (creux, liseré, pas d'ombre)
+ *   raised → défaut, contenu courant
+ *   hero   → UN SEUL par écran
+ *
+ * `tone` reste orthogonal : il n'exprime que l'état sémantique et ne surcharge
+ * la surface que pour les états d'alerte, laissant `variant` piloter le neutre.
+ */
+
+type Tone = 'default' | 'warning' | 'danger' | 'info';
+type Variant = 'flat' | 'raised' | 'hero';
 
 interface GlassCardProps {
   children: ReactNode;
   className?: string;
   style?: StyleProp<ViewStyle>;
-  tone?: 'default' | 'warning' | 'danger' | 'info';
+  tone?: Tone;
+  /** Défaut `raised` — aucun call-site existant n'a besoin de changer. */
+  variant?: Variant;
+  /** Passe-plat a11y : évite d'ajouter une `View` uniquement pour l'étiquette. */
+  accessibilityLabel?: string;
 }
 
-const TONE_STYLES: Record<NonNullable<GlassCardProps['tone']>, ViewStyle> = {
-  default: {
-    backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    borderColor: '#E2EBE2',
+const VARIANT_STYLES: Record<Variant, ViewStyle> = {
+  flat: {
+    backgroundColor: Palette.surfaceInset,
+    ...Elevation.flat,
   },
-  warning: {
-    backgroundColor: 'rgba(255, 152, 0, 0.06)',
-    borderColor: 'rgba(255, 152, 0, 0.22)',
+  raised: {
+    backgroundColor: Palette.surfaceRaised,
+    borderWidth: 1,
+    borderColor: Palette.borderCard,
+    ...Elevation.raised,
   },
-  danger: {
-    backgroundColor: 'rgba(244, 67, 54, 0.06)',
-    borderColor: 'rgba(244, 67, 54, 0.24)',
-  },
-  info: {
-    backgroundColor: 'rgba(255, 193, 7, 0.08)',
-    borderColor: 'rgba(255, 193, 7, 0.3)',
+  hero: {
+    backgroundColor: Palette.surfaceRaised,
+    borderWidth: 1,
+    borderColor: Palette.borderCard,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    ...Elevation.hero,
   },
 };
 
-export function GlassCard({ children, className, style, tone = 'default' }: GlassCardProps) {
+/** `default` est volontairement vide : la surface neutre appartient à `variant`. */
+const TONE_STYLES: Record<Tone, ViewStyle> = {
+  default: {},
+  warning: {
+    backgroundColor: withAlpha(Palette.scorePoor, 0.06),
+    borderColor: withAlpha(Palette.scorePoor, 0.22),
+  },
+  danger: {
+    backgroundColor: withAlpha(Palette.scoreBad, 0.06),
+    borderColor: withAlpha(Palette.scoreBad, 0.24),
+  },
+  info: {
+    backgroundColor: withAlpha(Palette.scoreMid, 0.08),
+    borderColor: withAlpha(Palette.scoreMid, 0.3),
+  },
+};
+
+export function GlassCard({
+  children,
+  className,
+  style,
+  tone = 'default',
+  variant = 'raised',
+  accessibilityLabel,
+}: GlassCardProps) {
   return (
-    <View className={className} style={[styles.base, TONE_STYLES[tone], style]}>
+    <View
+      className={className}
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.base, VARIANT_STYLES[variant], TONE_STYLES[tone], style]}
+    >
       {children}
     </View>
   );
@@ -38,12 +91,6 @@ export function GlassCard({ children, className, style, tone = 'default' }: Glas
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 24,
-    borderWidth: 1,
-    shadowColor: '#587858',
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    borderRadius: Radius.lg,
   },
 });

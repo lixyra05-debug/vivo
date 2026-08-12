@@ -14,11 +14,14 @@ describe('StreakCounter', () => {
     expect(getByText('1 semaine, impressionnant !')).toBeTruthy();
   });
 
-  it('mode compact affiche "🔥 N" si streak>0 ; null si streak=0', () => {
-    const { getByText } = render(<StreakCounter compact streak={3} />);
-    expect(getByText('🔥 3')).toBeTruthy();
+  it('mode compact affiche le chiffre si streak>0 ; null si streak=0', () => {
+    // L'emoji 🔥 du mode compact est passé en icône lucide (R4) : le pill ne
+    // porte plus que le chiffre, l'étiquette a11y restant la source de sens.
+    const { getByText, getByLabelText } = render(<StreakCounter compact streak={3} />);
+    expect(getByText('3')).toBeTruthy();
+    expect(getByLabelText('Streak de 3 jours')).toBeTruthy();
 
-    const { queryByText } = render(<StreakCounter compact streak={0} />);
-    expect(queryByText(/🔥/)).toBeNull();
+    const { toJSON } = render(<StreakCounter compact streak={0} />);
+    expect(toJSON()).toBeNull();
   });
 });

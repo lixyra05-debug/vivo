@@ -52,7 +52,7 @@ export default function RemediesIndexScreen() {
         <FadeIn delay={60}>
           <GradientHeader height={120}>
             <View style={styles.headerContent}>
-              <Text style={styles.title}>🌿 Chercheur de Remèdes</Text>
+              <Text style={styles.title}>Chercheur de Remèdes</Text>
               <Text style={styles.subtitle}>8 catégories de bien-être</Text>
             </View>
           </GradientHeader>

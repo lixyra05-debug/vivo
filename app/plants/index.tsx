@@ -97,7 +97,7 @@ export default function PlantsIndexScreen() {
 
         <FadeIn delay={60}>
           <View style={{ gap: 4 }}>
-            <Text style={styles.title}>🌿 Encyclopédie des Plantes</Text>
+            <Text style={styles.title}>Encyclopédie des Plantes</Text>
             <Text style={styles.subtitle}>40+ plantes médicinales</Text>
           </View>
         </FadeIn>

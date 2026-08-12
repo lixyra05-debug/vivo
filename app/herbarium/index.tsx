@@ -106,7 +106,7 @@ export default function HerbariumScreen() {
 
           <FadeIn delay={60}>
             <View style={{ gap: 4 }}>
-              <Text style={styles.title}>Mon Herbier 🌿</Text>
+              <Text style={styles.title}>Mon Herbier</Text>
               <Text style={styles.subtitle}>Tes plantes favorites</Text>
             </View>
           </FadeIn>
@@ -152,7 +152,7 @@ export default function HerbariumScreen() {
 
         <FadeIn delay={60}>
           <View style={{ gap: 4 }}>
-            <Text style={styles.title}>Mon Herbier 🌿</Text>
+            <Text style={styles.title}>Mon Herbier</Text>
             <Text style={styles.subtitle}>Tes plantes favorites</Text>
           </View>
         </FadeIn>

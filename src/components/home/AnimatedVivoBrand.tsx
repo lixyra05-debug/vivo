@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Colors } from '@/src/constants/colors';
+import { Palette, Spacing, Type, withAlpha } from '@/src/constants/theme';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 
 let entranceAnimationPlayed = false;
@@ -33,12 +33,20 @@ const LOGO_SIZE = 100;
 const BUBBLE_SIZE = 130;
 const GLOW_SIZE = 200;
 
+const DEFAULT_TAGLINE = 'Scanner intelligent';
+
 export interface AnimatedVivoBrandProps {
   onAnimationComplete?: () => void;
+  /**
+   * Ligne sous le wordmark. La home y injecte la phrase du moment ; sans
+   * elle, deux taglines cohabitaient sur l'écran et se neutralisaient.
+   */
+  tagline?: string;
 }
 
 export function AnimatedVivoBrand({
   onAnimationComplete,
+  tagline = DEFAULT_TAGLINE,
 }: AnimatedVivoBrandProps) {
   const reduceMotion = useReduceMotion();
 
@@ -257,7 +265,7 @@ export function AnimatedVivoBrand({
         accessibilityRole="text"
         style={[styles.tagline, taglineStyle]}
       >
-        Scanner intelligent
+        {tagline}
       </Animated.Text>
     </View>
   );
@@ -267,40 +275,41 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
-    paddingVertical: 16,
+    gap: Spacing.md,
   },
   logoZone: {
     width: GLOW_SIZE,
     height: GLOW_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
   },
+  /* Deux voiles sage empilés : la superposition crée seule le dégradé de halo,
+   * ce qui évite d'inventer une teinte claire hors palette pour le cercle
+   * intérieur. */
   glowOuter: {
     position: 'absolute',
     width: GLOW_SIZE,
     height: GLOW_SIZE,
     borderRadius: GLOW_SIZE / 2,
-    backgroundColor: '#8BAD8B',
+    backgroundColor: Palette.sage,
   },
   glowInner: {
     position: 'absolute',
     width: GLOW_SIZE * 0.78,
     height: GLOW_SIZE * 0.78,
     borderRadius: (GLOW_SIZE * 0.78) / 2,
-    backgroundColor: '#A8C4A8',
+    backgroundColor: Palette.sage,
   },
   bubble: {
     width: BUBBLE_SIZE,
     height: BUBBLE_SIZE,
     borderRadius: BUBBLE_SIZE / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: withAlpha(Palette.surfaceRaised, 0.85),
     borderWidth: 2,
-    borderColor: 'rgba(139, 173, 139, 0.3)',
+    borderColor: withAlpha(Palette.sage, 0.3),
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#8BAD8B',
+    shadowColor: Palette.forest,
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -310,21 +319,18 @@ const styles = StyleSheet.create({
     width: LOGO_SIZE,
     height: LOGO_SIZE,
   },
+  /* Le wordmark était en `sage` : 2,38:1, soit l'élément le plus délavé de
+   * l'app posé à 36px au centre de l'écran d'accueil. Il passe sur l'ancre
+   * `ink` — l'identité verte reste portée par le logo, le halo et la bulle
+   * juste au-dessus. */
   wordmark: {
-    fontFamily: 'BricolageGrotesque-Bold',
-    fontSize: 36,
-    color: Colors.sage,
-    letterSpacing: -1.2,
+    ...Type.display,
+    color: Palette.ink,
     textAlign: 'center',
-    lineHeight: 40,
   },
   tagline: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    color: Colors.sage,
-    letterSpacing: 0.4,
+    ...Type.body,
+    color: Palette.textSecondary,
     textAlign: 'center',
-    marginTop: -8,
-    opacity: 0.78,
   },
 });

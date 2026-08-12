@@ -42,8 +42,8 @@ export function NaturalityBadge({
   const count = matches.length;
   const titleText =
     count === 1
-      ? '🌿 1 plante bénéfique détectée'
-      : `🌿 ${count} plantes bénéfiques détectées`;
+      ? '1 plante bénéfique détectée'
+      : `${count} plantes bénéfiques détectées`;
 
   function handlePressBadge() {
     if (!isExpert) {
@@ -218,6 +218,6 @@ const styles = StyleSheet.create({
   plantArrow: {
     fontFamily: 'Inter',
     fontSize: 14,
-    color: Colors.sage,
+    color: Colors.sageVivid,
   },
 });

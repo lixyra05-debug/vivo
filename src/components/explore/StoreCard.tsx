@@ -89,6 +89,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 10,
     letterSpacing: 0.2,
-    color: Colors.sage,
+    color: Colors.sageVivid,
   },
 });

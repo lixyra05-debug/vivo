@@ -49,7 +49,7 @@ jest.mock('@/src/lib/herbarium/herbarium-store', () => ({
 describe('HerbariumScreen', () => {
   it('rend le titre et le message empty state quand l\'herbier est vide', async () => {
     const { getByText } = render(<HerbariumScreen />);
-    expect(getByText('Mon Herbier 🌿')).toBeTruthy();
+    expect(getByText('Mon Herbier')).toBeTruthy();
     expect(getByText('Tes plantes favorites')).toBeTruthy();
     await waitFor(() => {
       expect(getByText(/votre herbier est vide/i)).toBeTruthy();

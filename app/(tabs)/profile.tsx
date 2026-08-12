@@ -407,7 +407,7 @@ export default function ProfileScreen() {
         {tier === 'expert' ? (
           <FadeIn delay={240}>
             <View style={{ gap: 10 }}>
-              <Text style={styles.sectionLabel}>Mon espace Expert 🌿</Text>
+              <Text style={styles.sectionLabel}>Mon espace Expert</Text>
               <GlassCard style={{ padding: 0, overflow: 'hidden' }}>
                 <SettingsRow
                   icon={<BookOpen color={Colors.sage} size={18} strokeWidth={2.2} />}

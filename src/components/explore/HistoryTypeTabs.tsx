@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   badgeTextActive: {
-    color: Colors.sage,
+    color: Colors.sageVivid,
   },
   badgeTextInactive: {
     color: Colors.textMuted,

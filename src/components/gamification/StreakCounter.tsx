@@ -3,7 +3,11 @@
  *
  * Deux modes :
  *  - complet (défaut) : carte centrée avec emoji 🔥, nombre, libellé et message
- *  - compact          : pill inline horizontal "🔥 N", retourne null si streak === 0
+ *  - compact          : pill inline `<Flame> N`, retourne null si streak === 0
+ *
+ * Le mode compact n'apparaît que sur la home : son emoji d'interface est passé
+ * en icône lucide (R4). Le mode complet est rendu par l'écran profil, hors
+ * périmètre de cette phase — il garde son 🔥 jusqu'à la phase 2.
  */
 
 import { useEffect } from 'react';
@@ -17,7 +21,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { GlassCard } from '@/src/components/ui/GlassCard';
+import { Icon } from '@/src/components/ui/Icon';
 import { Colors } from '@/src/constants/colors';
+import { Palette, Radius, Spacing, Type, withAlpha } from '@/src/constants/theme';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { getStreakMessage } from '@/src/lib/gamification/streak-engine';
 
@@ -54,7 +60,8 @@ export function StreakCounter({ streak, compact = false, style }: StreakCounterP
         style={[styles.compactPill, style]}
         accessibilityLabel={`Streak de ${streak} jours`}
       >
-        <Text style={styles.compactText}>🔥 {streak}</Text>
+        <Icon name="Flame" size="sm" color="scorePoor" />
+        <Text style={styles.compactText}>{streak}</Text>
       </View>
     );
   }
@@ -126,18 +133,17 @@ const styles = StyleSheet.create({
   compactPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,152,0,0.10)',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    backgroundColor: withAlpha(Palette.scorePoor, 0.1),
     borderWidth: 1,
-    borderColor: 'rgba(255,152,0,0.3)',
+    borderColor: withAlpha(Palette.scorePoor, 0.28),
     alignSelf: 'flex-start',
   },
   compactText: {
-    fontFamily: 'BricolageGrotesque-SemiBold',
-    fontSize: 18,
-    color: Colors.text,
+    ...Type.h2,
+    color: Palette.ink,
   },
 });

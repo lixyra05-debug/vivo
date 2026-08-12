@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   rankText: {
     fontFamily: 'BricolageGrotesque-SemiBold',
     fontSize: 16,
-    color: Colors.sage,
+    color: Colors.sageVivid,
   },
   emoji: {
     fontSize: 24,

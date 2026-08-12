@@ -15,12 +15,13 @@
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Leaf } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '@/src/components/ui/GlassCard';
+import { Icon } from '@/src/components/ui/Icon';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { MiniScoreCircle } from '@/src/components/product/MiniScoreCircle';
-import { Colors } from '@/src/constants/colors';
+import { SectionLabel } from '@/src/components/home/SectionLabel';
+import { Palette, Radius, Spacing, Type } from '@/src/constants/theme';
 import type { TopCategoryBlock, TopCategoryItem } from '@/src/lib/api/top-by-category';
 
 interface TopByCategorySectionProps {
@@ -35,19 +36,6 @@ function lightHaptic(): void {
   if (Platform.OS !== 'web') {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
   }
-}
-
-interface SectionHeaderProps {
-  // Pas de props pour l'instant : titre + sous-titre fixes.
-}
-
-function SectionHeader(_props: SectionHeaderProps) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{SECTION_TITLE}</Text>
-      <Text style={styles.sectionSubtitle}>{SECTION_SUBTITLE}</Text>
-    </View>
-  );
 }
 
 interface ItemRowProps {
@@ -83,7 +71,7 @@ function ItemRow({ item, onPress }: ItemRowProps) {
           />
         ) : (
           <View style={styles.thumbFallback}>
-            <Leaf color={Colors.sage} size={20} strokeWidth={1.8} />
+            <Icon name="Leaf" color="sageVivid" />
           </View>
         )}
       </View>
@@ -128,7 +116,7 @@ function BlockCard({ block, onCategoryPress, onItemPress }: BlockCardProps) {
         <View style={styles.blockHeaderText}>
           <Text style={styles.blockTitle}>{block.category.name}</Text>
         </View>
-        <ChevronRight color={Colors.textMuted} size={18} strokeWidth={2} />
+        <Icon name="ChevronRight" size="sm" color="textMuted" />
       </Pressable>
 
       <View style={styles.itemsList}>
@@ -192,7 +180,7 @@ export function TopByCategorySection({ blocks, isLoading }: TopByCategorySection
 
   return (
     <View style={styles.section}>
-      <SectionHeader />
+      <SectionLabel hint={SECTION_SUBTITLE}>{SECTION_TITLE}</SectionLabel>
 
       {isLoading && visibleBlocks.length === 0 ? (
         <View style={styles.blocksList}>
@@ -218,37 +206,21 @@ export function TopByCategorySection({ blocks, isLoading }: TopByCategorySection
 
 const styles = StyleSheet.create({
   section: {
-    gap: 12,
-  },
-  sectionHeader: {
-    gap: 2,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: {
-    fontFamily: 'BricolageGrotesque-Bold',
-    fontSize: 20,
-    color: Colors.text,
-    letterSpacing: -0.4,
-  },
-  sectionSubtitle: {
-    fontFamily: 'Inter',
-    fontSize: 13,
-    color: Colors.textMuted,
+    gap: Spacing.md,
   },
   blocksList: {
-    gap: 12,
+    gap: Spacing.md,
   },
   blockCard: {
-    padding: 12,
-    borderRadius: 20,
-    gap: 4,
+    padding: Spacing.md,
+    gap: Spacing.xs,
   },
   blockHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
+    gap: Spacing.md,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
   },
   blockEmoji: {
     fontSize: 24,
@@ -258,32 +230,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   blockTitle: {
-    fontFamily: 'BricolageGrotesque-SemiBold',
-    fontSize: 15,
-    color: Colors.text,
-    letterSpacing: -0.2,
+    ...Type.h3,
+    color: Palette.ink,
   },
   itemsList: {
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
   },
   itemDivider: {
     height: 1,
-    backgroundColor: '#EFEFE6',
-    marginHorizontal: 4,
+    backgroundColor: Palette.borderSoft,
+    marginHorizontal: Spacing.xs,
   },
   thumbWrap: {
     width: 56,
     height: 56,
-    borderRadius: 14,
+    borderRadius: Radius.md,
     overflow: 'hidden',
-    backgroundColor: '#F3F3EC',
+    backgroundColor: Palette.surfaceInset,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -299,17 +269,15 @@ const styles = StyleSheet.create({
   },
   itemBody: {
     flex: 1,
-    gap: 2,
+    gap: Spacing.xs,
   },
   itemName: {
-    fontFamily: 'BricolageGrotesque-SemiBold',
-    fontSize: 14,
-    color: Colors.text,
-    letterSpacing: -0.2,
+    ...Type.h3,
+    color: Palette.ink,
   },
   itemBrand: {
+    ...Type.caption,
     fontFamily: 'Inter',
-    fontSize: 12,
-    color: Colors.textMuted,
+    color: Palette.textMuted,
   },
 });

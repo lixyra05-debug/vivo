@@ -94,7 +94,7 @@ export function RecipeTimer({ durationMinutes }: RecipeTimerProps) {
             <Play color="#FFFFFF" size={16} strokeWidth={2.4} />
           )}
           <Text style={styles.btnPrimaryText}>
-            {running ? 'Pause' : 'Lancer le timer ⏱️'}
+            {running ? 'Pause' : 'Lancer le timer'}
           </Text>
         </Pressable>
         <Pressable
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 12,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     letterSpacing: 0.2,
   },
 });

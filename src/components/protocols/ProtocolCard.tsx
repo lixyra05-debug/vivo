@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 11,
-    color: Colors.sage,
+    color: Colors.sageVivid,
     letterSpacing: 0.2,
   },
   activeBadge: {
@@ -184,6 +184,6 @@ const styles = StyleSheet.create({
   progressText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 12,
-    color: Colors.sage,
+    color: Colors.sageVivid,
   },
 });

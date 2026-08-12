@@ -135,7 +135,7 @@ export function BadgeUnlockedModal({ badge, onClose }: BadgeUnlockedModalProps) 
             <Animated.Text style={[styles.emoji, emojiStyle]}>
               {badge?.emoji ?? ''}
             </Animated.Text>
-            <Text style={styles.title}>Nouveau badge débloqué ! 🎉</Text>
+            <Text style={styles.title}>Nouveau badge débloqué !</Text>
             {badge ? (
               <>
                 <Text style={styles.name}>{badge.nameFr}</Text>
