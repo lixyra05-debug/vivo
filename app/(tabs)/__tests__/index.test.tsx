@@ -77,6 +77,36 @@ jest.mock('@/src/lib/family/family-store', () => ({
   useSetActiveFamilyProfile: () => ({ mutate: jest.fn(), isPending: false }),
 }));
 
+/**
+ * `PlantOfWeekCard` affiche l'emoji de la plante mise en avant — une DONNÉE,
+ * tirée de `PLANT_ENCYCLOPEDIA`, et non un libellé d'interface. Or 9 des 40
+ * plantes portent `emoji: '🌿'`, et `getPlantOfWeek` fait tourner le catalogue
+ * chaque semaine : le garde-fou anti-emoji ci-dessous échouait donc 9 semaines
+ * sur 40, sans qu'aucun code n'ait changé.
+ *
+ * On fige la donnée pour que l'assertion teste ce que son nom annonce : aucun
+ * emoji d'INTERFACE. Le catalogue botanique n'est pas le sujet de cet écran, il
+ * a ses propres tests.
+ */
+jest.mock('@/src/lib/plants/plant-of-week', () => ({
+  getPlantOfWeek: () => ({
+    id: 'test-plant',
+    nameFr: 'Plante de test',
+    nameLatin: 'Planta probationis',
+    emoji: '🍵',
+    category: 'general',
+    properties: 'Propriétés documentées, fixées pour le test.',
+    traditionalUse: 'Usage traditionnel reconnu.',
+    partUsed: 'Feuille',
+    preparation: 'Infusion.',
+    contraindications: 'Aucune connue à ce jour.',
+    interactions: null,
+    evidenceLevel: 'traditional',
+    source: 'EMA HMPC',
+    sourceUrl: 'https://www.ema.europa.eu/',
+  }),
+}));
+
 describe('HomeScreen', () => {
   beforeEach(() => {
     mockPush.mockClear();
