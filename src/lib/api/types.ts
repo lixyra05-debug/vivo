@@ -1,3 +1,5 @@
+import type { PackagingComponent } from '@/src/data/packaging-risks';
+
 export type HealthProfile =
   | 'standard'
   | 'diabetic'
@@ -89,7 +91,14 @@ export interface Product {
   fiber_100g: number | null;
   oil_types: string[];
   portion_grams: number | null;
+  /** Champ OFF brut hérité (texte libre). Ne jamais l'utiliser pour noter. */
   packaging_material: string | null;
+  /**
+   * Composants d'emballage structurés (`packagings[]` d'OFF), source du malus
+   * emballage. OPTIONNEL : les lignes en cache antérieures à la migration 016
+   * ne l'ont pas, et un `Product` construit à la main reste valide sans.
+   */
+  packaging_components?: PackagingComponent[];
   is_organic: boolean;
   off_last_updated: string | null;
   our_score: number | null;

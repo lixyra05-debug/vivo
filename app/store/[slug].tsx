@@ -28,6 +28,7 @@ import { getFeatureLimit } from '@/src/lib/premium/premium-gate';
 import { getOrFetchProduct, productToScoringInput } from '@/src/lib/api/openfoodfacts';
 import { getProductConfidence } from '@/src/lib/api/confidence';
 import { calculateScore } from '@/src/lib/scoring/engine';
+import { composeScore } from '@/src/lib/scoring/composite-score';
 import { isProductCompatible } from '@/src/lib/scoring/profile-filters';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
@@ -57,7 +58,10 @@ async function computeRankedItem(
   try {
     const product = await getOrFetchProduct(result.barcode);
     if (!product) return null;
-    const scoring = calculateScore(productToScoringInput(product), userProfile);
+    const scoring = composeScore(
+      calculateScore(productToScoringInput(product), userProfile),
+      product.packaging_components,
+    );
     return {
       result,
       product,

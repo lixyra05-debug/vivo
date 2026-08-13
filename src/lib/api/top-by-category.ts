@@ -23,6 +23,7 @@ import { searchByCategory } from './search';
 import { getOrFetchProduct, productToScoringInput } from './openfoodfacts';
 import { getCategoryBySlug } from './categories';
 import { calculateScore } from '@/src/lib/scoring/engine';
+import { composeScore } from '@/src/lib/scoring/composite-score';
 import { promiseAllWithConcurrency } from './store-ranking';
 import type {
   CategoryDef,
@@ -63,7 +64,10 @@ async function rankCategoryItems(
     results.map(async (result): Promise<TopCategoryItem | null> => {
       const product = await getOrFetchProduct(result.barcode);
       if (!product) return null;
-      const scoring = calculateScore(productToScoringInput(product), userProfile);
+      const scoring = composeScore(
+        calculateScore(productToScoringInput(product), userProfile),
+        product.packaging_components,
+      );
       return {
         result,
         product,

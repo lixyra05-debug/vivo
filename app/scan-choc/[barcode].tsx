@@ -29,11 +29,16 @@ import { Colors } from '@/src/constants/colors';
 import {
   fetchProductMultiSource,
   fetchProductCategoriesTags,
+  fetchProductPackagings,
   normalizeOFFProduct,
   productToScoringInput,
 } from '@/src/lib/api/openfoodfacts';
 import { findAlternatives } from '@/src/lib/api/smart-alternatives';
 import { calculateScore } from '@/src/lib/scoring/engine';
+import {
+  composeScore,
+  type CompositeScoringResult,
+} from '@/src/lib/scoring/composite-score';
 import { detectSeedOils } from '@/src/lib/scoring/seed-oils';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { usePremium } from '@/src/lib/hooks/usePremium';
@@ -139,24 +144,42 @@ export default function ScanChocScreen() {
     [],
   );
 
-  const result = useMemo<ScoringResult | null>(() => {
+  const packagingsQuery = useQuery({
+    queryKey: ['scan-choc-packagings', barcode] as const,
+    queryFn: () => fetchProductPackagings(barcode),
+    enabled: Boolean(barcode),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  // Cet écran produit une image partagée publiquement : afficher une note
+  // différente de celle de la fiche ferait circuler un chiffre que l'app
+  // elle-même contredit.
+  const result = useMemo<CompositeScoringResult | null>(() => {
     if (!productQuery.data) return null;
-    return calculateScore(productToScoringInput(productQuery.data), userProfile);
-  }, [productQuery.data, userProfile]);
+    return composeScore(
+      calculateScore(productToScoringInput(productQuery.data), userProfile),
+      packagingsQuery.data ?? productQuery.data.packaging_components ?? [],
+    );
+  }, [productQuery.data, userProfile, packagingsQuery.data]);
 
   const alternativesQuery = useQuery({
     queryKey: [
       'scan-choc-alts',
       barcode,
       categoriesTagsQuery.data ?? [],
-      result?.score_final ?? 0,
+      result?.formulationScore ?? result?.score_final ?? 0,
     ] as const,
     queryFn: async () => {
       if (!barcode || !result) return [];
+      // Axe de comparaison : la FORMULATION, pas la note composée. Les
+      // candidats de `findAlternatives` sont notés par un proxy Nutri-Score
+      // aveugle à l'emballage — les opposer à une note qui, elle, l'intègre
+      // remonterait des produits « meilleurs » uniquement parce que leur
+      // emballage n'a jamais été évalué. Même axe que FoodProductView.
       return findAlternatives(
         barcode,
         categoriesTagsQuery.data ?? [],
-        result.score_final,
+        result.formulationScore ?? result.score_final,
       );
     },
     enabled: Boolean(barcode) && Boolean(result) && tier !== 'free',

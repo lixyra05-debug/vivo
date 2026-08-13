@@ -29,6 +29,7 @@ import { getOrFetchProduct, productToScoringInput } from '@/src/lib/api/openfood
 import { getOrFetchCosmetic, cosmeticToScoringInput } from '@/src/lib/api/openbeautyfacts';
 import { getProductConfidence, getCosmeticConfidence } from '@/src/lib/api/confidence';
 import { calculateScore } from '@/src/lib/scoring/engine';
+import { composeScore } from '@/src/lib/scoring/composite-score';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
 import { isProductCompatible } from '@/src/lib/scoring/profile-filters';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
@@ -63,7 +64,10 @@ async function computeFoodScore(
   try {
     const product = await getOrFetchProduct(result.barcode);
     if (!product) return null;
-    const scoring = calculateScore(productToScoringInput(product), userProfile);
+    const scoring = composeScore(
+      calculateScore(productToScoringInput(product), userProfile),
+      product.packaging_components,
+    );
     return {
       result,
       score: scoring.score_final,

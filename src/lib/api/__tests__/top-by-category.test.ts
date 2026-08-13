@@ -9,6 +9,7 @@ import {
   fetchTopByCategoryHome,
   FEATURED_HOME_CATEGORIES,
 } from '../top-by-category';
+import { getCategoryBySlug } from '../categories';
 import * as searchModule from '../search';
 import * as offModule from '../openfoodfacts';
 import type { Product, SearchResult, UserProfile } from '../types';
@@ -197,5 +198,18 @@ describe('top-by-category', () => {
       'chocolats',
       'cereales-petit-dej',
     ]);
+  });
+
+  // D4 — le malus emballage est réservé à l'alimentaire : son barème est sourcé
+  // sur la migration au CONTACT ALIMENTAIRE (antimoine du PET, BPA des
+  // conserves). `rankCategoryItems` compose sans distinguer le type, donc la
+  // seule chose qui protège D4 ici est la nature des slugs mis en avant.
+  // Ce test casse le jour où un slug cosmétique entre dans la liste.
+  it('ne met en avant que des catégories ALIMENTAIRES (garde D4)', () => {
+    for (const slug of FEATURED_HOME_CATEGORIES) {
+      const category = getCategoryBySlug(slug);
+      expect(category).not.toBeNull();
+      expect(category?.type).toBe('food');
+    }
   });
 });

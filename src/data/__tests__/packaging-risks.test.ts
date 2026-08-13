@@ -1,7 +1,9 @@
 import {
   MAX_DETECTED_MATERIALS,
   PACKAGING_RISKS,
+  detectPackagingDetections,
   detectPackagingRisk,
+  isPlasticMaterial,
   normalizePackagings,
   type PackagingComponent,
 } from '../packaging-risks';
@@ -262,5 +264,69 @@ describe('normalizePackagings', () => {
     ]);
     expect(component.food_contact).toBeNull();
     expect(ids([component])).toEqual(['glass']);
+  });
+});
+
+describe('detectPackagingDetections', () => {
+  // Même packagings[] réel que l'ancrage Cristaline plus haut.
+  const CRISTALINE_DETECTIONS: PackagingComponent[] = [
+    {
+      material: 'en:pet-1-polyethylene-terephthalate',
+      shape: 'en:bottle',
+      food_contact: 1,
+    },
+    {
+      material: 'en:hdpe-2-high-density-polyethylene',
+      shape: 'en:bottle-cap',
+      food_contact: 1,
+    },
+    { material: 'en:plastic', shape: 'en:label', food_contact: 0 },
+  ];
+
+  // `detectPackagingRisk` en dérive : si cette égalité casse, l'affichage et le
+  // score ne parlent plus du même emballage.
+  it('produit exactement les matériaux de detectPackagingRisk, dans le même ordre', () => {
+    const cases: PackagingComponent[][] = [
+      CRISTALINE_DETECTIONS,
+      [{ material: 'en:pvc' }],
+      [{ material: 'en:glass', shape: 'en:jar', food_contact: 1 }],
+      [{ material: 'en:plastic' }],
+      [],
+    ];
+    for (const components of cases) {
+      expect(detectPackagingDetections(components).map((d) => d.entry)).toEqual(
+        detectPackagingRisk(components),
+      );
+    }
+  });
+
+  it('marque « confirmed » un composant à food_contact = 1', () => {
+    // Cristaline : bouteille PET et bouchon HDPE sont tous deux au contact.
+    expect(detectPackagingDetections(CRISTALINE_DETECTIONS)).toEqual([
+      expect.objectContaining({ foodContact: 'confirmed' }),
+      expect.objectContaining({ foodContact: 'confirmed' }),
+    ]);
+  });
+
+  it('marque « unknown » — et non « pas de contact » — un food_contact absent', () => {
+    // L'absence du champ est le cas majoritaire côté OFF. La traiter comme une
+    // négation reviendrait à sous-pénaliser la moitié du catalogue.
+    const [detection] = detectPackagingDetections([{ material: 'en:pvc' }]);
+    expect(detection.foodContact).toBe('unknown');
+
+    const [nullish] = detectPackagingDetections([
+      { material: 'en:pvc', food_contact: null },
+    ]);
+    expect(nullish.foodContact).toBe('unknown');
+  });
+});
+
+describe('isPlasticMaterial', () => {
+  it('distingue les polymères des matériaux inertes', () => {
+    expect(isPlasticMaterial('pet')).toBe(true);
+    expect(isPlasticMaterial('unknown_plastic')).toBe(true);
+    expect(isPlasticMaterial('glass')).toBe(false);
+    expect(isPlasticMaterial('cardboard')).toBe(false);
+    expect(isPlasticMaterial('aluminium')).toBe(false);
   });
 });

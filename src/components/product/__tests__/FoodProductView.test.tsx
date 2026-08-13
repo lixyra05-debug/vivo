@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react-native';
 import { FoodProductView } from '../FoodProductView';
+import { SCORE_FACTORS_TITLE } from '../ScoreFactorsCard';
 import type { Product, ScoringResult } from '@/src/lib/api/types';
 
 jest.mock('expo-image', () => {
@@ -105,5 +106,64 @@ describe('FoodProductView', () => {
       />,
     );
     expect(queryByText('Voir les alternatives')).toBeNull();
+  });
+
+  it('montre ce qui compose la note dès qu’un emballage pèse dessus', () => {
+    const { getByLabelText } = render(
+      <FoodProductView
+        product={baseProduct}
+        result={{ ...baseResult, score_final: 62 }}
+        educationalCards={[]}
+        categoriesTags={[]}
+        packagings={[]}
+        formulationScore={100}
+        factors={[
+          {
+            kind: 'formulation',
+            code: 'formulation',
+            label: 'Formulation',
+            points: 100,
+          },
+          {
+            kind: 'packaging',
+            code: 'pet',
+            label: 'PET',
+            detail: 'risque modéré · au contact',
+            points: -38,
+          },
+        ]}
+        isPremium={false}
+        onUnlockPremium={() => undefined}
+        onPressAlternative={() => undefined}
+        onPressMethodology={() => undefined}
+      />,
+    );
+    expect(getByLabelText(new RegExp(SCORE_FACTORS_TITLE))).toBeTruthy();
+  });
+
+  it('n’affiche aucune décomposition sans facteur emballage', () => {
+    // Sans emballage pénalisant, la carte ne répéterait que le score.
+    const { queryByLabelText } = render(
+      <FoodProductView
+        product={baseProduct}
+        result={baseResult}
+        educationalCards={[]}
+        categoriesTags={[]}
+        packagings={[]}
+        factors={[
+          {
+            kind: 'formulation',
+            code: 'formulation',
+            label: 'Formulation',
+            points: 72,
+          },
+        ]}
+        isPremium={false}
+        onUnlockPremium={() => undefined}
+        onPressAlternative={() => undefined}
+        onPressMethodology={() => undefined}
+      />,
+    );
+    expect(queryByLabelText(new RegExp(SCORE_FACTORS_TITLE))).toBeNull();
   });
 });

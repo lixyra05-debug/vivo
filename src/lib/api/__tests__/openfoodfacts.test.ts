@@ -2,6 +2,7 @@ import {
   fetchProductMultiSource,
   fetchProductCategoriesTags,
   fetchProductPackagings,
+  normalizeOFFProduct,
 } from '../openfoodfacts';
 
 describe('fetchProductMultiSource', () => {
@@ -189,5 +190,49 @@ describe('fetchProductPackagings', () => {
     expect(await fetchProductPackagings('1')).toEqual([]);
     expect(await fetchProductPackagings('2')).toEqual([]);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('normalizeOFFProduct — emballage', () => {
+  // La charge utile contient déjà `packagings[]` : on cessait simplement de la
+  // lire. Sans ce mappage, les écrans de classement noteraient la formulation
+  // seule et afficheraient une note différente de celle de la fiche.
+  it('conserve les composants d’emballage de la charge utile', () => {
+    const product = normalizeOFFProduct({
+      code: '3274080005003',
+      product_name: 'Cristaline',
+      packagings: [
+        {
+          material: 'en:pet-1-polyethylene-terephthalate',
+          shape: 'en:bottle',
+          food_contact: 1,
+          weight_measured: 20.24,
+        },
+      ],
+    });
+
+    expect(product.packaging_components).toEqual([
+      {
+        material: 'en:pet-1-polyethylene-terephthalate',
+        shape: 'en:bottle',
+        food_contact: 1,
+      },
+    ]);
+  });
+
+  it('renvoie une liste vide — jamais undefined — quand packagings est absent', () => {
+    // Le cache Supabase déclare la colonne NOT NULL DEFAULT '[]'.
+    expect(normalizeOFFProduct({ code: '1' }).packaging_components).toEqual([]);
+  });
+
+  it('ne déduit JAMAIS l’emballage du champ hérité `packaging`', () => {
+    // `packaging` est du texte libre notoirement faux ; il reste exposé tel
+    // quel mais ne doit alimenter aucun calcul.
+    const product = normalizeOFFProduct({
+      code: '1',
+      packaging: 'Canette,Aluminium',
+    });
+    expect(product.packaging_components).toEqual([]);
+    expect(product.packaging_material).toBe('Canette,Aluminium');
   });
 });

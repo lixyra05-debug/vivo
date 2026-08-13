@@ -9,8 +9,11 @@ import type { ScoringMethodology } from '../gamification/types';
 
 export const SCORING_METHODOLOGY: ScoringMethodology = {
   food: {
+    // Les poids ci-dessous décomposent la FORMULATION et somment à 100.
+    // L'emballage n'y figure pas : il n'est pas une part du 100, c'est un
+    // amortissement appliqué au résultat.
     formulaFr:
-      'Score = 100 - (NOVA + Additifs + Macros + Huiles) + Bonus',
+      'Formulation = 100 - (NOVA + Additifs + Macros + Huiles) + Bonus · Note = Formulation ajustée selon l’emballage',
     weights: {
       nova: 30,
       additives: 25,

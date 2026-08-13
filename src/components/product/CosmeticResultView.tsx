@@ -3,7 +3,10 @@ import { AlertTriangle, Leaf } from 'lucide-react-native';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { ProductHeader } from '@/src/components/product/ProductHeader';
-import { ScoreCircle } from '@/src/components/product/ScoreCircle';
+import {
+  ScoreCircle,
+  SCORE_LABEL_FORMULATION,
+} from '@/src/components/product/ScoreCircle';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { findCosmeticIngredient } from '@/src/lib/scoring/cosmetic-ingredients-db';
 import { getCosmeticProfileLabel } from '@/src/lib/scoring/cosmetic-profiles';
@@ -98,7 +101,17 @@ export function CosmeticResultView({ product, result, profile }: CosmeticResultV
         <View style={{ alignItems: 'center', gap: 12 }}>
           <View style={styles.scoreHaloWrap}>
             <View style={[styles.scoreHalo, { backgroundColor: `${scoreHex}14` }]} />
-            <ScoreCircle score={result.score_final} size={200} strokeWidth={14} />
+            {/*
+              Libellé explicite : le malus emballage ne s'applique qu'à
+              l'alimentaire (le barème est sourcé sur la migration au CONTACT
+              ALIMENTAIRE). Ce score reste la seule formulation, et le dit.
+            */}
+            <ScoreCircle
+              score={result.score_final}
+              size={200}
+              strokeWidth={14}
+              label={SCORE_LABEL_FORMULATION}
+            />
           </View>
           <Text
             style={{

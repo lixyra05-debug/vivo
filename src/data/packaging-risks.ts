@@ -64,6 +64,22 @@ export interface PackagingMaterial {
   qualifiedBy?: { materials: string[]; shapes: string[] };
 }
 
+/**
+ * Statut du contact alimentaire d'une détection.
+ *
+ * Volontairement une union et non un booléen : dans ce module, l'absence de
+ * `food_contact` signifie « on ne sait pas », JAMAIS « pas de contact » — les
+ * composants explicitement à 0 sont écartés en amont (cf. `detectPackagingDetections`).
+ * Un booléen nommé `foodContact` exporterait ce piège au lieu de le fermer.
+ */
+export type FoodContactStatus = 'confirmed' | 'unknown';
+
+export interface PackagingDetection {
+  /** Référence PARTAGÉE vers `PACKAGING_RISKS` — lecture seule, ne jamais muter. */
+  entry: PackagingMaterial;
+  foodContact: FoodContactStatus;
+}
+
 export const PACKAGING_RISKS: PackagingMaterial[] = [
   {
     id: 'pet',
@@ -365,6 +381,15 @@ const PLASTIC_IDS = new Set([
   'unknown_plastic',
 ]);
 
+/**
+ * Un polymère, par opposition au verre, au carton ou au métal. Consommé par le
+ * modificateur de score : la surcharge « plastique au contact » ne s'applique
+ * qu'à ces matériaux.
+ */
+export function isPlasticMaterial(id: string): boolean {
+  return PLASTIC_IDS.has(id);
+}
+
 /** Au-delà, la section devient un inventaire illisible. */
 export const MAX_DETECTED_MATERIALS = 3;
 
@@ -442,10 +467,14 @@ function matchesComponent(
  *
  * Renvoie `[]` si `packagings[]` est absent ou vide : la section disparaît,
  * elle ne retombe jamais sur `packaging_tags`.
+ *
+ * Cette variante conserve le statut de contact alimentaire de chaque détection,
+ * dont le modificateur de score a besoin pour pondérer. `detectPackagingRisk`
+ * en dérive et reste la porte d'entrée de l'affichage.
  */
-export function detectPackagingRisk(
+export function detectPackagingDetections(
   components: PackagingComponent[],
-): PackagingMaterial[] {
+): PackagingDetection[] {
   if (!Array.isArray(components) || components.length === 0) return [];
 
   // id → au moins un composant matché est au contact alimentaire
@@ -501,5 +530,19 @@ export function detectPackagingRisk(
       );
     })
     .slice(0, MAX_DETECTED_MATERIALS)
-    .map((d) => d.entry);
+    .map((d) => ({
+      entry: d.entry,
+      foodContact: (d.foodContact ? 'confirmed' : 'unknown') as FoodContactStatus,
+    }));
+}
+
+/**
+ * Matériaux détectés, sans le statut de contact alimentaire. Porte d'entrée de
+ * l'affichage (`PackagingSection`) : signature, ordre et objets renvoyés sont
+ * inchangés depuis l'origine.
+ */
+export function detectPackagingRisk(
+  components: PackagingComponent[],
+): PackagingMaterial[] {
+  return detectPackagingDetections(components).map((d) => d.entry);
 }

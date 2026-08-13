@@ -3,11 +3,15 @@
  *
  * Deux corrections de cohérence :
  *
- * 1. Le score est désormais NOMMÉ. Il ne mesurait rien d'explicite : « 100 »
- *    et « / 100 » se lisaient comme un verdict global sur le produit, alors
- *    que le moteur ne pèse que la formulation. Une fiche pouvait donc afficher
- *    100/100 juste au-dessus d'une section « Risques toxicologiques » portant
- *    sur l'emballage — deux affirmations vraies qui se contredisent à l'écran.
+ * 1. Le score est NOMMÉ. Il ne mesurait rien d'explicite : « 100 » et « / 100 »
+ *    se lisaient comme un verdict global alors que le moteur ne pesait que la
+ *    formulation — une fiche pouvait afficher 100/100 juste au-dessus d'une
+ *    section sur l'emballage, deux affirmations vraies qui se contredisent.
+ *
+ *    L'emballage entre désormais DANS la note (cf. `composite-score.ts`), et le
+ *    libellé par défaut le dit. La fiche cosmétique, dont le score reste
+ *    strictement la formulation, passe explicitement `label` pour ne pas
+ *    hériter d'une promesse que son moteur ne tient pas.
  *
  * 2. Le libellé lu par les lecteurs d'écran vient de `getScoreVerdict`, source
  *    unique du verdict. Il était calculé par une table locale décalée d'un
@@ -40,7 +44,10 @@ interface Props {
   label?: string;
 }
 
-export const SCORE_LABEL_DEFAULT = 'Qualité de la formulation';
+export const SCORE_LABEL_DEFAULT = 'Note globale';
+
+/** Pour les fiches dont le score ne pèse QUE la formulation (cosmétique). */
+export const SCORE_LABEL_FORMULATION = 'Qualité de la formulation';
 
 export function ScoreCircle({
   score,

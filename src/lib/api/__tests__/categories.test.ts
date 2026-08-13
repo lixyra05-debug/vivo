@@ -41,4 +41,14 @@ describe('categories', () => {
       expect(c.off_tag).toBeNull();
     }
   });
+
+  // D4 — l'écran catégorie aiguille sur `category.type === 'food'` pour choisir
+  // entre le score composé (avec malus emballage) et le score cosmétique. Cet
+  // aiguillage n'a de sens que si le type est correctement porté par la donnée :
+  // un `deodorants` requalifié en 'food' ferait prendre un malus emballage à un
+  // cosmétique, alors que sa fiche annonce « Qualité de la formulation ».
+  it('porte bien le type qui aiguille le calcul du score (garde D4)', () => {
+    expect(getCategoryBySlug('deodorants')?.type).toBe('cosmetic');
+    expect(getCategoryBySlug('boissons')?.type).toBe('food');
+  });
 });

@@ -37,6 +37,7 @@ import {
   getCosmeticConfidence,
 } from '@/src/lib/api/confidence';
 import { calculateScore } from '@/src/lib/scoring/engine';
+import { composeScore } from '@/src/lib/scoring/composite-score';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
 import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
@@ -125,10 +126,22 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
     [profile],
   );
 
+  // Source UNIQUE de l'emballage pour cet écran : la section affichée et le
+  // malus appliqué doivent décrire le même emballage. La requête dédiée fait
+  // autorité (toujours fraîche) ; le cache produit prend le relais tant qu'elle
+  // n'a pas répondu, et couvre les lignes antérieures à la migration 016.
+  const packagings = useMemo(
+    () => packagingsQuery.data ?? productQuery.data?.packaging_components ?? [],
+    [packagingsQuery.data, productQuery.data],
+  );
+
   const result = useMemo(() => {
     if (!productQuery.data) return null;
-    return calculateScore(productToScoringInput(productQuery.data), userProfile);
-  }, [productQuery.data, userProfile]);
+    return composeScore(
+      calculateScore(productToScoringInput(productQuery.data), userProfile),
+      packagings,
+    );
+  }, [productQuery.data, userProfile, packagings]);
 
   useEffect(() => {
     if (!user || !barcode || !result || scanRecorded) return;
@@ -386,7 +399,9 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
           result={result}
           educationalCards={educationalCards}
           categoriesTags={categoryTagsQuery.data ?? []}
-          packagings={packagingsQuery.data ?? []}
+          packagings={packagings}
+          formulationScore={result.formulationScore}
+          factors={result.factors}
           isPremium={isPremium}
           onUnlockPremium={() => router.push('/profile')}
           onPressAlternative={(bc) => router.push(`/product/${bc}?type=food`)}

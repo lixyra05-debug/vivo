@@ -27,6 +27,8 @@ import { getScoreVerdict } from '@/src/lib/scoring/display-helpers';
 import { useAlternatives } from '@/src/lib/api/use-alternatives';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { usePremium } from '@/src/lib/hooks/usePremium';
+import { ScoreFactorsCard } from './ScoreFactorsCard';
+import type { ScoreFactor } from '@/src/lib/scoring/composite-score';
 import type { PackagingComponent } from '@/src/data/packaging-risks';
 import type { Product, ScoringResult } from '@/src/lib/api/types';
 import type { EducationalCard as EducationalCardType } from '@/src/lib/gamification/types';
@@ -37,6 +39,22 @@ export interface FoodProductViewProps {
   educationalCards: EducationalCardType[];
   categoriesTags: string[];
   packagings: PackagingComponent[];
+  /**
+   * Sous-score de formulation, hors malus emballage. Sert à comparer les
+   * alternatives sur le même axe : leurs scores viennent d'un proxy Nutri-Score
+   * aveugle à l'emballage, donc les opposer à une note qui, elle, l'intègre
+   * ferait remonter des produits « meilleurs » uniquement parce que leur
+   * emballage n'a jamais été évalué. Par défaut, la note affichée.
+   *
+   * Sert aussi de repère à `ScoreBreakdownChart`, dont les barres décomposent
+   * la formulation et non la note composée.
+   */
+  formulationScore?: number;
+  /**
+   * Décomposition de la note (formulation, puis emballage). Prop ADDITIVE :
+   * absente, la fiche s'affiche exactement comme avant.
+   */
+  factors?: ScoreFactor[];
   isPremium: boolean;
   onUnlockPremium: () => void;
   onPressAlternative: (barcode: string) => void;
@@ -52,6 +70,8 @@ export function FoodProductView({
   educationalCards,
   categoriesTags,
   packagings,
+  formulationScore,
+  factors,
   isPremium,
   onUnlockPremium,
   onPressAlternative,
@@ -63,7 +83,7 @@ export function FoodProductView({
   const { alternatives, isLoading: alternativesLoading } = useAlternatives(
     product.barcode,
     categoriesTags,
-    result.score_final,
+    formulationScore ?? result.score_final,
   );
   const additivePenalties = result.penalties.filter((p) => p.category === 'additive');
   const otherPenalties = result.penalties.filter(
@@ -179,6 +199,12 @@ export function FoodProductView({
         </View>
       </FadeIn>
 
+      {factors && factors.length > 1 ? (
+        <FadeIn delay={180}>
+          <ScoreFactorsCard factors={factors} finalScore={result.score_final} />
+        </FadeIn>
+      ) : null}
+
       <FadeIn delay={220}>
         <ScoreComparison score={result.score_final} delay={0} />
       </FadeIn>
@@ -224,9 +250,16 @@ export function FoodProductView({
 
       {result.penalties.length > 0 ? (
         <FadeIn delay={340}>
+          {/*
+            Ses barres décomposent la FORMULATION (NOVA, additifs, macros,
+            huiles) : les adosser à la note composée ferait un total faux — les
+            barres compteraient les points perdus sur le contenu, le cercle en
+            afficherait davantage sans que rien ne l'explique. L'emballage est
+            traité au-dessus, par ScoreFactorsCard.
+          */}
           <ScoreBreakdownChart
             penalties={result.penalties}
-            finalScore={result.score_final}
+            finalScore={formulationScore ?? result.score_final}
             delay={0}
           />
         </FadeIn>

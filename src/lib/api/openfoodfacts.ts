@@ -31,6 +31,11 @@ export interface OFFProduct {
   nutriments?: Record<string, number>;
   serving_size?: string;
   packaging?: string;
+  /**
+   * Composants d'emballage structurés. Déjà présent dans la charge utile :
+   * `fetchProductByBarcode` télécharge la fiche sans filtre `fields=`.
+   */
+  packagings?: unknown[];
   labels_tags?: string[];
   categories_tags?: string[];
   ingredients?: Array<{ id?: string; text?: string; percent?: number }>;
@@ -184,6 +189,7 @@ export function normalizeOFFProduct(off: OFFProduct): Product {
     oil_types: extractOilTypes(off),
     portion_grams: parsePortionGrams(off.serving_size),
     packaging_material: off.packaging ?? null,
+    packaging_components: normalizePackagings(off.packagings),
     is_organic: labels.some((l) => l === 'en:organic' || l === 'fr:bio'),
     off_last_updated: now,
     our_score: null,

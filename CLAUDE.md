@@ -251,7 +251,7 @@ Bouclage du tier Expert avec 5 features pensées rétention quotidienne et engag
 - **Frontend** (Agents 2 + 3) :
   - `src/components/naturality/NaturalityBadge.tsx` (223 lignes) — Auto-gating via `usePremium()`. Si `detectNaturalIngredients(...).length === 0` → `null`. Sinon, GlassCard `<Leaf>` sage avec count pluriel adaptatif ("1 plante bénéfique détectée" / "N plantes bénéfiques détectées"). Expert : tap révèle inline une liste expandable, chaque plante Pressable → `/plants/[id]`. Free/premium : opacity 0.4 + icône `<Lock>` + tap → paywall inline `featureKey="naturality_score"`.
   - `src/components/herbarium/HerbariumNoteModal.tsx` (168 lignes) — Modal RN slide-from-bottom, TextInput multiline maxLength=200, compteur live, boutons Annuler/Enregistrer.
-  - `src/components/home/PlantOfWeekCard.tsx` (166 lignes) — GlassCard sage avec chip "🌿 Plante de la semaine" + emoji 32 + nameFr Bricolage-Bold + nameLatin italic + 2 lignes properties. Expert tap → `/plants/[id]`. Free/premium : opacity 0.3 + overlay `<Lock>` + tap → écran abonnement.
+  - `src/components/home/PlantOfWeekCard.tsx` (166 lignes) — GlassCard sage avec chip "Plante de la semaine" (libellé en texte nu — l'emoji d'interface a été retiré par le design system v2) + emoji de la plante 32 (donnée, issue de `PLANT_ENCYCLOPEDIA`) + nameFr Bricolage-Bold + nameLatin italic + 2 lignes properties. Expert tap → `/plants/[id]`. Free/premium : opacity 0.3 + overlay `<Lock>` + tap → écran abonnement.
   - `src/components/recipes/RecipeTimer.tsx` (166 lignes) — Countdown `mm:ss` via `useState` + `setInterval` avec cleanup `clearInterval` strict dans `useEffect` return. Boutons Lancer/Pause/Réinitialiser. Auto-stop à 0 (pas de Vibration → R9).
   - `app/herbarium/index.tsx` (372 lignes) — Liste `<PlantListCard>` + note Inter 12 italic + boutons `<Trash2>`/`<Edit3>` (Alert.alert confirm). Empty state CTA "Voir l'encyclopédie". Expert gate via `<PremiumPaywall featureKey="my_herbarium" />`. Disclaimer médical.
   - `app/reminders/index.tsx` (773 lignes) — Liste cures GlassCard avec emoji + "Jour X/Y" + barre progression sage + status badge + boutons "Pris ✅" (désactivé si `isMarkedToday`) / `<Trash2>`. Bouton flottant `+` ouvre modal create (picker plante ScrollView + 4 chips durée 7/14/21/30j). Expert gate. Disclaimer.
@@ -338,7 +338,62 @@ Deux features GRATUITES qui enrichissent la fiche produit avec des données toxi
 - **Tests** : 691 → **723 verts** (+32 net : 12 packaging-risks data layer + 13 conglomerate API [4 countryCodeToFlag + 9 getConglomerateOwner avec cache positif/négatif/network-error] + 3 PackagingSection UI + 4 ConglomerateSection UI). `tsc --noEmit` clean. `npx expo export --platform web` OK (7MB bundle web).
 - **GRATUIT** : aucune des deux features n'est gatée premium/expert. Cohérent avec règle "Les filtres allergènes sont GRATUITS" — la transparence sur l'emballage et la maison-mère relève du même principe.
 
+## L'emballage entre dans le score (août 2026)
+Le packaging cesse d'être informatif : il devient un **modificateur appliqué AU-DESSUS** du score de formulation. `engine.ts` n'est pas touché (`git diff` vide) — la composition vit dans une couche neuve. 830 → **895 verts**.
+
+- **Modèle — amortissement proportionnel** : `note = round(formulation × (1 − plafonné/100))`. Trois propriétés démontrées par balayage sur les 101 valeurs de formulation, pas par sondage :
+  - `note === 0` ⟺ `formulation === 0` — le zéro reste RÉSERVÉ aux additifs bloquants (chemin `buildResult(0, …)`). Un biscuit sous plastique ne devient jamais indiscernable d'un produit à l'aspartame.
+  - L'emballage seul ne fait jamais descendre une formulation parfaite sous **55** : le contenu reste dominant, et c'est prouvable.
+  - À emballage constant la note reste croissante avec la formulation → aucun classement ne peut s'inverser.
+- **Barème** (`src/constants/scoring-rules.ts`) : `PACKAGING_RISK_POINTS {high:40, moderate:26, low:0}` · surcharge plastique-au-contact `+6` · surcharge non-recyclable `+6` (sur `recyclable === false` UNIQUEMENT → jamais sur `null`) · contact inconnu `×0.5` · plafond brut `45`.
+  - **`low` vaut 0 délibérément** : verre et carton ne coûtent rien. `PackagingSection` affiche déjà « Verre — Risque faible · Recyclable » ; une ligne « Verre −12 » dessous serait deux affirmations vraies qui se contredisent.
+  - Ancre Cristaline : PET `26+6=32` + PEHD `0+6=6` = 38 → **62/100**.
+- **`src/lib/scoring/packaging-modifier.ts`** — `computePackagingPenalty(packagings)` pur. Les matériaux à 0 point sont exclus des `factors` (pas de ligne fantôme).
+- **`src/lib/scoring/composite-score.ts`** — `composeScore(formulation, packagings) → CompositeScoringResult extends ScoringResult`. `ScoringResult` n'est PAS modifié (`history.tsx` en construit un littéral, 3 écrans le déclarent). La note composée est écrite dans `score_final` existant → rétrocompatibilité à diff nul. **Le packaging n'entre PAS dans `penalties[]`** : ce tableau est sérialisé dans `penalties_snapshot`, que `advanced-stats` agrège en « exposition toxique » — y verser `pet` le compterait comme un additif.
+- **`detectPackagingDetections`** extrait de `detectPackagingRisk` (`packaging-risks.ts`) : le flag food-contact était calculé, utilisé pour trier, puis **jeté** au `.map` final. `detectPackagingRisk` délègue désormais — ses 20 tests passent sans une retouche. Type `FoodContactStatus = 'confirmed' | 'unknown'` et non un booléen : ici `false` veut dire « on ne sait pas », les `food_contact === 0` étant déjà écartés en amont.
+- **Migration 016** `products.packaging_components jsonb NOT NULL DEFAULT '[]'` — `fetchProductByBarcode` télécharge sans filtre `fields=`, donc `packagings[]` était déjà dans la charge utile et jeté. Zéro requête réseau ajoutée. Obligatoire : `writeProductToCache` upsert l'objet entier.
+- **UI — `ScoreFactorsCard`** (delay 180, entre le score 140 et `ScoreComparison` 220, aucune renumérotation) : « CE QUI INFLUENCE LA NOTE », ligne Formulation puis une ligne par matériau, total « Note globale ». Σ des lignes === note affichée exactement (répartition plus-fort-reste). Auto-garde `factors.length < 2 → null`.
+- **`ScoreBreakdownChart` reçoit `formulationScore`, pas la note** : ses barres décomposent la formulation (NOVA/additifs/macros/huiles). Les adosser à la note composée afficherait un total faux.
+- **Libellés** : `SCORE_LABEL_DEFAULT = 'Note globale'` ; nouveau `SCORE_LABEL_FORMULATION` passé explicitement par `CosmeticResultView` — le score cosmétique reste la seule formulation et le dit.
+- **D4 — les cosmétiques sont EXCLUS** : le barème est sourcé sur la migration au CONTACT ALIMENTAIRE (antimoine du PET, BPA des conserves — EFSA/ANSES/eur-lex). L'appliquer à un flacon de shampoing sortirait du domaine de validité des sources citées. Gardes vérifiées sur les 5 call sites + 2 tests de non-régression (`FEATURED_HOME_CATEGORIES` tous `type: 'food'`, `deodorants` reste `cosmetic`).
+- **D14 — les alternatives se comparent sur `formulationScore`** : les candidats de `findAlternatives` sont notés par `nutriScoreToProxy`, aveugle à l'emballage. Garde-fou source-level `alternatives-axis.test.ts` (modèle `theme-guard`) sur les DEUX appelants — la régression initiale venait précisément d'un second call site oublié dans `scan-choc`.
+- **`scan_history` : discontinuité assumée.** Pas de backfill — le packaging des scans passés n'a jamais été stocké. `score_at_scan` est par définition le score montré ce jour-là ; le réécrire falsifierait l'historique. Les seuils de badges étant cumulatifs, aucun badge accordé ne peut être révoqué.
+
 ## Dette identifiée (non corrigée, à arbitrer)
+
+### LIMITE CONNUE ET ASSUMÉE — les listes trient sur `score_final`, donc l'absence de donnée avantage
+`category/[slug].tsx:112`, `store/[slug].tsx:84` et `top-by-category.ts:86` trient tous sur
+`scoring.score_final`, c'est-à-dire la note **avec** malus emballage.
+
+Conséquence : un produit dont OFF ne renseigne pas `packagings[]` ne prend **aucun malus — par absence
+de donnée, pas par propreté réelle**. Il devance donc, dans une liste, un produit par ailleurs
+identique dont l'emballage PET est documenté. Le mieux-noté peut n'être que le moins documenté.
+
+**Pourquoi c'est assumé** : trier sur `formulationScore` — un axe que rien n'affiche — produirait une
+liste visiblement désordonnée (un produit à 62 au-dessus d'un produit à 70). Entre une incohérence
+invisible et une incohérence visible, on garde l'invisible.
+
+**À revisiter** en exposant `hasPackagingData` dans l'UI de liste (une puce « emballage non renseigné »),
+ce qui rendrait l'écart lisible sans changer l'axe de tri. Le champ existe déjà sur
+`CompositeScoringResult`, il n'est simplement pas consommé.
+
+### `ExploreScreen › debounce` est instable en parallèle
+`app/__tests__/explore.test.tsx` — le test « affiche les résultats de recherche après la frappe
+(>2 caractères) et debounce » passe systématiquement seul
+(`npx jest --runTestsByPath app/__tests__/explore.test.tsx --runInBand`) mais tombe par intermittence
+dans un run complet. Il enchaîne un debounce réel et plusieurs `waitFor` ; sous charge parallèle les
+délais dérivent.
+
+**Conséquence pratique** : le compte de tests d'un run complet varie d'une exécution à l'autre. Avant
+de conclure à une régression sur ce test, le relancer SEUL. Non corrigé — hors périmètre du lot score.
+
+### `accessibilityElementsHidden` est iOS-only sur deux composants
+`ScoreCircle.tsx` (3 nœuds) et `ScoreBreakdownChart.tsx` masquent leurs enfants avec
+`accessibilityElementsHidden`, qui n'a **aucun effet sur Android**. TalkBack lit donc l'étiquette
+groupée du conteneur PUIS chaque enfant, une fois de plus que nécessaire.
+
+`ScoreFactorsCard` double correctement avec `importantForAccessibility="no-hide-descendants"` — les
+deux autres restent à aligner. Correctif mécanique, sans risque, mais hors périmètre du lot score.
 
 ### Le filtre « Ce que je peux manger » compte les produits non vérifiés comme compatibles
 `checkCompatibility` expose depuis mai 2026 un champ `verificationStatus: 'verified' | 'insufficient_data'`
