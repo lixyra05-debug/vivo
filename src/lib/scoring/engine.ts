@@ -39,7 +39,7 @@ const GLUTEN_RE = /(bl[ée]|froment|gluten|seigle|orge|[ée]peautre|kamut)/i;
 
 function buildResult(
   score: number,
-  input: ScoringInput,
+  input: ScoringInput & { nova_group: 1 | 2 | 3 | 4 },
   penalties: PenaltyDetail[],
   blockers: string[],
   seedOils: SeedOilDetection[],
@@ -78,7 +78,7 @@ export function calculateScore(input: ScoringInput, profile: UserProfile): Scori
   const profileAdjustments: string[] = [];
 
   const novaGroup = (input.nova_group ?? classifyNova(input.ingredients_raw, input.additives_tags)) as 1 | 2 | 3 | 4;
-  const resolvedInput: ScoringInput = { ...input, nova_group: novaGroup };
+  const resolvedInput = { ...input, nova_group: novaGroup };
 
   const additives = collectAdditives(input.additives_tags);
   const seedOils = detectSeedOils(input.ingredients_raw, input.oil_types);

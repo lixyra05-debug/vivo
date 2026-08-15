@@ -22,7 +22,13 @@ export interface ScoringInput {
   barcode: string;
   ingredients_raw: string;
   additives_tags: string[];
-  nova_group: 1 | 2 | 3 | 4;
+  /**
+   * `null` = OFF n'a pas renseigné le champ (ou a servi une valeur
+   * aberrante) : le moteur classifie alors LUI-MÊME via `classifyNova`
+   * (engine.ts:80). Ne jamais coalescer à 4 — l'absence punirait — ni à 1 —
+   * l'absence absoudrait (bloquant 4 de l'audit, les deux faces).
+   */
+  nova_group: 1 | 2 | 3 | 4 | null;
   macros_100g: Macros100g;
   portion_grams: number;
   oil_types: string[];

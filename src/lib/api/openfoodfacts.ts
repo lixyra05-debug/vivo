@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Product } from './types';
+import type { Product, ScoringInput } from './types';
 import { fetchCosmeticByBarcode, type OBFProduct } from './openbeautyfacts';
 import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 import {
@@ -260,24 +260,18 @@ export async function getOrFetchProduct(barcode: string): Promise<Product | null
   return writeProductToCache(normalized);
 }
 
-export function productToScoringInput(product: Product): {
-  barcode: string;
-  ingredients_raw: string;
-  additives_tags: string[];
-  nova_group: 1 | 2 | 3 | 4;
-  macros_100g: {
-    sugars: number;
-    saturated_fat: number;
-    salt: number;
-    proteins: number;
-    fiber: number;
-  };
-  portion_grams: number;
-  oil_types: string[];
-  is_organic: boolean;
-} {
-  const novaRaw = product.nova_group ?? 4;
-  const nova = (novaRaw >= 1 && novaRaw <= 4 ? novaRaw : 4) as 1 | 2 | 3 | 4;
+export function productToScoringInput(product: Product): ScoringInput {
+  // Absence (null) ET valeur aberrante (hors [1,4], non entière — bruit OFF)
+  // → null : le moteur classifie lui-même via `classifyNova` (engine.ts:80).
+  // Ne JAMAIS coalescer à 4 (l'absence punirait : bloquant 4, 28/299 produits
+  // dont 14 eaux minérales « à éviter ») ni à 1 (l'absence absoudrait).
+  // Une aberrante n'est pas une absence — le traitement est identique, le
+  // signalement est distinct (audit, racine C).
+  const novaRaw = product.nova_group;
+  const nova: ScoringInput['nova_group'] =
+    novaRaw != null && Number.isInteger(novaRaw) && novaRaw >= 1 && novaRaw <= 4
+      ? (novaRaw as 1 | 2 | 3 | 4)
+      : null;
   return {
     barcode: product.barcode,
     ingredients_raw: product.ingredients_raw ?? '',
