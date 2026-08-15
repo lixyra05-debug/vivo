@@ -498,6 +498,36 @@ function replaceDrinkableBorageDays(days: ProtocolDay[]): ProtocolDay[] {
   });
 }
 
+/**
+ * Aloès : la fiche (`plant-encyclopedia.ts:524`) ne documente AUCUNE voie
+ * orale — `traditionalUse` : « Usage traditionnel externe du gel » ;
+ * `preparation` (:535) : « Application locale du gel pur. Voie orale du latex
+ * (anthraquinones) déconseillée par l'EFSA » ; `contraindications` (:537) :
+ * « voie orale fortement déconseillée. Grossesse, allaitement ». Le smoothie
+ * du jour 11 (cycle 2) invoquait une « qualité alimentaire » qui n'existe
+ * nulle part dans la base : la distinction gel alimentaire / latex n'était
+ * écrite qu'ici, dans la surface qui l'affirmait. Les jours 4 et 18
+ * (applications externes) sont conformes à la fiche et restent.
+ *
+ * Remplacement : la mauve, par sa SECONDE route documentée — « Macération à
+ * froid ou infusion tiède 1,5-2 g par tasse, 1-3 fois par jour » (dose et
+ * route de la fiche ; la durée de repos est opérationnelle). La mauve tient
+ * ainsi un jour par cycle (3, 11, 17). Verrouillé par le test général
+ * « aucune recette buvable × fiche voie orale déconseillée » de
+ * protocols.test.ts.
+ */
+function replaceDrinkableAloeDay(days: ProtocolDay[]): ProtocolDay[] {
+  return days.map((d) => {
+    if (d.plantId !== 'aloe_vera' || d.day !== 11) return d;
+    return {
+      ...d,
+      plantId: 'mallow',
+      recipeFr:
+        "Macération à froid de mauve : 2g de fleurs séchées dans 250ml d'eau froide, laisser reposer 45 min, filtrer. À boire dans la journée.",
+    };
+  });
+}
+
 // ─── EXPORT FINAL ──────────────────────────────────────────────────────────
 const SLEEP_PROTOCOL: Protocol = {
   id: 'sleep',
@@ -578,15 +608,17 @@ const SKIN_PROTOCOL: Protocol = {
   descriptionFr:
     "Programme de 21 jours pour favoriser une peau saine de l'intérieur.",
   durationDays: 21,
-  days: replaceDrinkableBorageDays(
-    buildDays({
-      id: 'skin',
-      titleFr: 'Peau Saine',
-      emoji: '🧴',
-      descriptionFr: '',
-      rotation: SKIN_ROTATION,
-      build: buildSkinDay,
-    }),
+  days: replaceDrinkableAloeDay(
+    replaceDrinkableBorageDays(
+      buildDays({
+        id: 'skin',
+        titleFr: 'Peau Saine',
+        emoji: '🧴',
+        descriptionFr: '',
+        rotation: SKIN_ROTATION,
+        build: buildSkinDay,
+      }),
+    ),
   ),
   disclaimer: DISCLAIMER,
 };

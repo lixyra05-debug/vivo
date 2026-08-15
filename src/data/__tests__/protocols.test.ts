@@ -83,14 +83,80 @@ describe('PROTOCOLS — Programmes 21 jours', () => {
     }
   });
 
-  it('les jours 3 et 17 du protocole Peau servent la mauve (usage interne documenté)', () => {
+  it('les jours 3, 11 et 17 du protocole Peau servent la mauve (usage interne documenté)', () => {
     const skin = getProtocolById('skin')!;
     const day3 = skin.days.find((d) => d.day === 3)!;
+    const day11 = skin.days.find((d) => d.day === 11)!;
     const day17 = skin.days.find((d) => d.day === 17)!;
     expect(day3.plantId).toBe('mallow');
+    expect(day11.plantId).toBe('mallow');
     expect(day17.plantId).toBe('mallow');
-    // Fidélité à la fiche mauve : mucilages → infusion TIÈDE, pas d'eau bouillante.
+    // Fidélité à la fiche mauve : mucilages → infusion TIÈDE, pas d'eau
+    // bouillante ; le jour 11 emploie l'autre route documentée par la fiche,
+    // la macération à froid.
     expect(day3.recipeFr).toMatch(/tiède|70\s?°C/i);
+    expect(day11.recipeFr).toMatch(/macération à froid/i);
     expect(day17.recipeFr).toMatch(/70\s?°C/i);
+  });
+
+  /**
+   * VERROU SANTÉ GÉNÉRAL — aucun protocole ne sert par voie buvable une
+   * plante dont la fiche encyclopédie déconseille la voie orale. Deux cas en
+   * deux jours (bourrache, aloès) : ce verrou couvre TOUTES les plantes, pas
+   * la dernière tombée.
+   *
+   * Critère « fiche déconseille la voie orale » : /voie orale[^.]*(déconseillée|
+   * non recommandée)/i sur `preparation` + `contraindications`. Calibré sur
+   * les 40 fiches : attrape aloe_vera (:535, :537) et witch_hazel (:557) ;
+   * exclut à raison calendula (« Voie orale possible », :474) et la lavande
+   * (:188 — « strictement encadrée » vise la forme huile essentielle, la
+   * fiche documente l'infusion). L'ancre ci-dessous fige ce calibrage : si
+   * elle tombe après l'ajout d'une fiche, vérifier chaque usage de la
+   * nouvelle plante AVANT d'ajuster quoi que ce soit.
+   *
+   * Critère « recette buvable » (repris du verrou bourrache, documenté) :
+   * explicitement bue (boire|boisson|smoothie|jus) OU forme infusée
+   * (infusion|tisane|décoction|macération) sans marqueur externe
+   * (appliqu|compresse|externe|rincer|vapeur|lotion|sur peau).
+   * LIMITES ASSUMÉES : « avaler », « consommer », ou une huile essentielle
+   * prise par voie orale passeraient sous le radar — aucune recette actuelle
+   * n'emploie ces formes (seule huile essentielle du fichier : en diffusion,
+   * protocole stress). Élargir le critère exigera un recalibrage documenté,
+   * pas un patch aveugle.
+   */
+  const ORAL_DISCOURAGED = /voie orale[^.]*(déconseillée|non recommandée)/i;
+  function oralDiscouragedIds(): string[] {
+    return PLANT_ENCYCLOPEDIA.filter(
+      (p) =>
+        ORAL_DISCOURAGED.test(p.preparation) ||
+        ORAL_DISCOURAGED.test(p.contraindications),
+    ).map((p) => p.id);
+  }
+
+  const DRINKABLE_EXPLICIT = /\bboire\b|boisson|smoothie|\bjus\b/i;
+  const INFUSION_LIKE = /infusion|tisane|décoction|macération/i;
+  const EXTERNAL_MARKERS = /appliqu|compresse|externe|rincer|vapeur|lotion|sur peau/i;
+  function isDrinkable(recipe: string): boolean {
+    return (
+      DRINKABLE_EXPLICIT.test(recipe) ||
+      (INFUSION_LIKE.test(recipe) && !EXTERNAL_MARKERS.test(recipe))
+    );
+  }
+
+  it("le prédicat fiche est calibré : exactement aloe_vera et witch_hazel aujourd'hui", () => {
+    expect(oralDiscouragedIds().sort()).toEqual(['aloe_vera', 'witch_hazel']);
+  });
+
+  it('aucune recette buvable ne sert une plante dont la fiche déconseille la voie orale', () => {
+    const flagged = new Set(oralDiscouragedIds());
+    const offenders: string[] = [];
+    for (const protocol of PROTOCOLS) {
+      for (const d of protocol.days) {
+        if (flagged.has(d.plantId) && isDrinkable(d.recipeFr)) {
+          offenders.push(`${protocol.id} jour ${d.day} (${d.plantId}) : ${d.recipeFr}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
