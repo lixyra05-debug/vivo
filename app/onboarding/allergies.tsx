@@ -11,7 +11,26 @@ import { Colors } from '@/src/constants/colors';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 
-const ALLERGENS = ['Gluten', 'Lactose', 'Arachides', 'Fruits à coque', 'Œufs', 'Soja'];
+/**
+ * Allergènes proposés à l'onboarding — clés canoniques de `compatibility-engine`
+ * (modèle : `app/family/edit.tsx`). Le LABEL est affiché, la CLÉ est stockée :
+ * c'est le contrat verrouillé par `app/__tests__/allergen-key-contract.test.ts`.
+ * Avant août 2026 cet écran stockait les libellés (« Œufs ») — ces profils
+ * restent en base et sont rattrapés par `normalizeAllergenKey` côté moteur.
+ */
+export interface AllergenOption {
+  key: string;
+  label: string;
+}
+
+export const ALLERGENS: readonly AllergenOption[] = [
+  { key: 'gluten', label: 'Gluten' },
+  { key: 'lactose', label: 'Lactose' },
+  { key: 'arachides', label: 'Arachides' },
+  { key: 'fruits_a_coque', label: 'Fruits à coque' },
+  { key: 'oeufs', label: 'Œufs' },
+  { key: 'soja', label: 'Soja' },
+];
 
 export default function OnboardingAllergiesScreen() {
   const router = useRouter();
@@ -76,12 +95,12 @@ export default function OnboardingAllergiesScreen() {
 
         <FadeIn delay={180}>
           <View className="flex-row flex-wrap" style={{ gap: 10 }}>
-            {ALLERGENS.map((allergen) => (
+            {ALLERGENS.map(({ key, label }) => (
               <TappableChip
-                key={allergen}
-                label={allergen}
-                selected={draftAllergies.includes(allergen)}
-                onPress={() => toggleAllergy(allergen)}
+                key={key}
+                label={label}
+                selected={draftAllergies.includes(key)}
+                onPress={() => toggleAllergy(key)}
               />
             ))}
           </View>

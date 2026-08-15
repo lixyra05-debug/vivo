@@ -22,6 +22,7 @@ import { HealthConsentModal } from '@/src/components/health/HealthConsentModal';
 import { Colors } from '@/src/constants/colors';
 import { upsertUserProfile } from '@/src/lib/api/auth';
 import { hasHealthConsent, saveHealthConsent } from '@/src/lib/api/health-consent';
+import { normalizeAllergenKey } from '@/src/lib/scoring/compatibility-engine';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import type { HealthProfile } from '@/src/lib/api/types';
@@ -42,7 +43,26 @@ const OPTIONS: ProfileOption[] = [
   { value: 'intolerant', title: 'Intolérances', description: 'Pénalité lactose / gluten', Icon: ShieldAlert },
 ];
 
-const ALLERGENS = ['Gluten', 'Lactose', 'Arachides', 'Fruits à coque', 'Œufs', 'Soja'];
+/**
+ * Allergènes — clés canoniques de `compatibility-engine` (modèle :
+ * `app/family/edit.tsx`). Le LABEL est affiché, la CLÉ est stockée : contrat
+ * verrouillé par `app/__tests__/allergen-key-contract.test.ts`. Doit rester
+ * identique à la liste de `app/onboarding/allergies.tsx` (même verrou).
+ */
+export interface AllergenOption {
+  key: string;
+  label: string;
+}
+
+export const ALLERGENS: readonly AllergenOption[] = [
+  { key: 'gluten', label: 'Gluten' },
+  { key: 'lactose', label: 'Lactose' },
+  { key: 'arachides', label: 'Arachides' },
+  { key: 'fruits_a_coque', label: 'Fruits à coque' },
+  { key: 'oeufs', label: 'Œufs' },
+  { key: 'soja', label: 'Soja' },
+];
+
 const INTOLERANCES = [
   { value: 'gluten', label: 'Gluten' },
   { value: 'lactose', label: 'Lactose' },
@@ -58,7 +78,13 @@ export default function SettingsHealthProfileScreen() {
   const [healthProfile, setHealthProfile] = useState<HealthProfile>(
     profile?.health_profile ?? 'standard',
   );
-  const [allergies, setAllergies] = useState<string[]>(profile?.allergies ?? []);
+  // Migration paresseuse : les profils enregistrés avant l'alignement des
+  // écrans (août 2026) stockent des libellés (« Gluten », « Œufs »). On les
+  // ramène aux clés canoniques À LA LECTURE pour que les chips s'affichent
+  // sélectionnées — et l'enregistrement réécrira des clés.
+  const [allergies, setAllergies] = useState<string[]>(
+    (profile?.allergies ?? []).map(normalizeAllergenKey),
+  );
   const [intolerances, setIntolerances] = useState<string[]>(profile?.intolerances ?? []);
   const [saving, setSaving] = useState(false);
   const [consentGranted, setConsentGranted] = useState(false);
@@ -68,7 +94,7 @@ export default function SettingsHealthProfileScreen() {
     if (!profile) return;
     setDisplayName(profile.display_name ?? '');
     setHealthProfile(profile.health_profile);
-    setAllergies(profile.allergies ?? []);
+    setAllergies((profile.allergies ?? []).map(normalizeAllergenKey));
     setIntolerances(profile.intolerances ?? []);
   }, [profile]);
 
@@ -200,12 +226,12 @@ export default function SettingsHealthProfileScreen() {
           <View style={{ gap: 8 }}>
             <Text style={styles.sectionLabel}>Allergies</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {ALLERGENS.map((a) => (
+              {ALLERGENS.map(({ key, label }) => (
                 <TappableChip
-                  key={a}
-                  label={a}
-                  selected={allergies.includes(a)}
-                  onPress={() => setAllergies(toggle(allergies, a))}
+                  key={key}
+                  label={label}
+                  selected={allergies.includes(key)}
+                  onPress={() => setAllergies(toggle(allergies, key))}
                 />
               ))}
             </View>

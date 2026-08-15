@@ -10,13 +10,22 @@ import { checkCompatibility } from './compatibility-engine';
 /**
  * Wrapper booléen autour de `checkCompatibility` pour usage en filtre de liste
  * (ex. écran store/[slug]).
+ *
+ * « Pas de blocker » ne suffit pas à affirmer un produit compatible : un
+ * produit dont les allergènes n'ont pas pu être contrôlés (pas de liste
+ * d'ingrédients, allergène inconnu du moteur) répond `isCompatible: true`
+ * avec `verificationStatus: 'insufficient_data'`. Il sort du filtre « Ce que
+ * je peux manger » — au doute, on exclut. La sémantique de `isCompatible`
+ * (blockers.length === 0), consommée ailleurs, reste inchangée : l'exclusion
+ * vit ici, dans le wrapper.
  */
 export function isProductCompatible(
   product: Product | CosmeticProduct,
   scoringResult: ScoringResult | CosmeticScoringResult,
   profile: CompatibilityProfile
 ): boolean {
-  return checkCompatibility(product, scoringResult, profile).isCompatible;
+  const result = checkCompatibility(product, scoringResult, profile);
+  return result.isCompatible && result.verificationStatus !== 'insufficient_data';
 }
 
 /**

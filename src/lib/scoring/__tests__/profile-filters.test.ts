@@ -1,4 +1,5 @@
 import { isProductCompatible, getIncompatibilityReasons } from '../profile-filters';
+import { checkCompatibility } from '../compatibility-engine';
 import type {
   CompatibilityProfile,
   Product,
@@ -75,6 +76,53 @@ describe('isProductCompatible', () => {
     const product = makeProduct({ salt_100g: 2 });
     const profile = emptyProfile({ conditions: ['hypertension'] });
     expect(isProductCompatible(product, makeScoring(), profile)).toBe(true);
+  });
+});
+
+/**
+ * VERROU SÉMANTIQUE — ne pas retirer, ne pas « simplifier ».
+ *
+ * Deux questions différentes, deux réponses différentes :
+ *  - `checkCompatibility(...).isCompatible` répond à « existe-t-il un
+ *    blocker ? » (blockers.length === 0). Cette sémantique est GELÉE : elle
+ *    est consommée ailleurs et ne doit pas changer.
+ *  - `isProductCompatible` répond à « peut-on AFFIRMER ce produit compatible ? »
+ *    — ce qui exige que la vérification ait eu lieu. Un produit sans liste
+ *    d'ingrédients n'a pas de blocker parce qu'on n'a rien pu chercher :
+ *    il sort du filtre « Ce que je peux manger ». Au doute, on exclut.
+ *
+ * Barrière de score inerte par construction : `makeScoring()` pose
+ * `score_final: 80` contre `minScore: 0` — si ces tests tombent, c'est par
+ * le chemin de la vérification, jamais par le score.
+ */
+describe('isProductCompatible — « pas vérifié » n\'est pas « compatible »', () => {
+  it('6. exclut un produit invérifiable malgré isCompatible=true côté moteur', () => {
+    const product = makeProduct({ ingredients_raw: null });
+    const profile = emptyProfile({ allergies: ['gluten'] });
+
+    // Pré-condition (R2) : la sémantique du MOTEUR est inchangée — pas de
+    // blocker trouvé, donc isCompatible=true, mais vérification impossible.
+    const engine = checkCompatibility(product, makeScoring(), profile);
+    expect(engine.isCompatible).toBe(true);
+    expect(engine.verificationStatus).toBe('insufficient_data');
+
+    // …et pourtant le filtre ne doit PAS l'affirmer compatible.
+    expect(isProductCompatible(product, makeScoring(), profile)).toBe(false);
+  });
+
+  it('7. garde un produit vérifié ET compatible (pas de sur-exclusion)', () => {
+    const product = makeProduct({ ingredients_raw: 'eau, sel' });
+    const profile = emptyProfile({ allergies: ['gluten'] });
+    expect(checkCompatibility(product, makeScoring(), profile).verificationStatus).toBe(
+      'verified'
+    );
+    expect(isProductCompatible(product, makeScoring(), profile)).toBe(true);
+  });
+
+  it('8. profil sans rien à vérifier : un produit sans ingrédients reste compatible', () => {
+    // Aucun contrôle demandé → rien d'invérifiable → aucune raison d'exclure.
+    const product = makeProduct({ ingredients_raw: null });
+    expect(isProductCompatible(product, makeScoring(), emptyProfile())).toBe(true);
   });
 });
 

@@ -82,7 +82,13 @@ export default function HistoryScreen() {
         profile_adjustments: [],
       };
       const compat = checkCompatibility(row.product, fakeResult, compatProfile);
-      if (!compat.isCompatible) set.add(row.barcode);
+      // Un produit dont la vérification n'a pas pu avoir lieu
+      // (`insufficient_data` : pas de liste d'ingrédients) rejoint les
+      // incompatibles — au doute, il s'affiche dans le filtre d'alerte
+      // plutôt que de passer pour compatible par omission.
+      if (!compat.isCompatible || compat.verificationStatus === 'insufficient_data') {
+        set.add(row.barcode);
+      }
     }
     return set;
   }, [query.data, compatProfile]);
