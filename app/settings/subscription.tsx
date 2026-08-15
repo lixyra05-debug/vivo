@@ -46,13 +46,19 @@ const PREMIUM_RENEWAL_TEXT =
 const EXPERT_RENEWAL_TEXT =
   "Abonnement annuel de 49,99 €/an. L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Vous pouvez gérer votre abonnement et désactiver le renouvellement automatique dans les Réglages de votre compte App Store.";
 
+// `shipped !== false` : une feature cataloguée mais non livrée ne doit
+// apparaître sur AUCUNE surface d'achat (App Store 2.3.1 / 3.1.2).
 const PREMIUM_FEATURE_KEYS = (
   Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[]
-).filter((k) => FEATURE_TIER[k] === 'premium');
+).filter(
+  (k) => FEATURE_TIER[k] === 'premium' && PREMIUM_FEATURES[k].shipped !== false,
+);
 
 const EXPERT_FEATURE_KEYS = (
   Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[]
-).filter((k) => FEATURE_TIER[k] === 'expert');
+).filter(
+  (k) => FEATURE_TIER[k] === 'expert' && PREMIUM_FEATURES[k].shipped !== false,
+);
 
 const STACK_BREAKPOINT = 380;
 
@@ -440,9 +446,9 @@ function ExpertStateCard() {
           <Text style={styles.confirmTitle}>Tu es Expert 🌿</Text>
         </View>
         <Text style={styles.confirmBody}>
-          Tu as accès à toutes les fonctionnalités Vivo : Premium + plantes
-          médicinales, sécurité grossesse & enfants, interactions
-          plantes-médicaments. Merci pour ton soutien !
+          Tu as accès à toutes les fonctionnalités Vivo : Premium + encyclopédie
+          de plantes, protocoles 21 jours, herbier, rappels de cure et recettes
+          bien-être. Merci pour ton soutien !
         </Text>
       </GlassCard>
     </FadeIn>

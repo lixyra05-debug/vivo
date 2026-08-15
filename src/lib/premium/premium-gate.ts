@@ -95,6 +95,13 @@ export interface PremiumFeatureDef {
   labelFr: string;
   descriptionFr: string;
   freeLimit: number;
+  /**
+   * `false` = feature cataloguée mais NON livrée (aucun call-site dans
+   * l'app) : elle ne doit apparaître sur AUCUNE surface d'achat — la vendre
+   * est un motif de rejet App Store (2.3.1 / 3.1.2). Absent = livrée.
+   * Verrouillé par premium-gate.test.ts (liste UNSHIPPED_KEYS).
+   */
+  shipped?: boolean;
 }
 
 export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
@@ -163,7 +170,7 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
   plant_database: {
     labelFr: 'Base de données plantes médicinales',
     descriptionFr:
-      'Accès à plus de 200 plantes avec usages, dosages et précautions sourcés EFSA/EMA/ANSM.',
+      '40 fiches plantes documentées, enrichies régulièrement — usages, préparations et précautions.',
     freeLimit: 0,
   },
   herbal_remedies: {
@@ -172,46 +179,56 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
       'Suggestions de remèdes traditionnels validés par les agences de santé européennes.',
     freeLimit: 0,
   },
+  // ── Features Expert NON LIVRÉES (`shipped: false`) ────────────────────
+  // Zéro call-site dans l'app (bloquant 6 de l'audit). Exclues de toute
+  // surface d'achat tant qu'elles ne sont pas réellement implémentées.
   plant_alternatives: {
-    labelFr: 'Alternatives plantes aux médicaments',
+    labelFr: 'Plantes traditionnellement associées',
     descriptionFr:
-      "Suggestions d'alternatives naturelles avec niveau de preuve scientifique.",
+      'Usages traditionnels documentés par plante, avec leur niveau de preuve.',
     freeLimit: 0,
+    shipped: false,
   },
   cosmetic_actives: {
     labelFr: 'Analyse des actifs cosmétiques',
     descriptionFr:
       'Décryptage des INCI et des actifs réellement efficaces vs marketing.',
     freeLimit: 0,
+    shipped: false,
   },
   pregnancy_safety: {
     labelFr: 'Sécurité grossesse renforcée',
     descriptionFr:
       'Alertes spécifiques grossesse sur additifs, plantes et cosmétiques contre-indiqués.',
     freeLimit: 0,
+    shipped: false,
   },
   children_safety: {
     labelFr: 'Sécurité enfants & nourrissons',
     descriptionFr: 'Filtrage adapté aux moins de 3 ans avec sources ANSES.',
     freeLimit: 0,
+    shipped: false,
   },
   interaction_warnings: {
     labelFr: 'Interactions plantes-médicaments',
     descriptionFr:
       'Détection des interactions à risque (millepertuis, pamplemousse, etc.) sourcée ANSM.',
     freeLimit: 0,
+    shipped: false,
   },
   expert_articles: {
     labelFr: 'Articles experts mensuels',
     descriptionFr:
       'Dossiers approfondis rédigés par des pharmaciens et nutritionnistes.',
     freeLimit: 0,
+    shipped: false,
   },
   expert_consultation: {
     labelFr: 'Consultation expert (1/an)',
     descriptionFr:
       'Une consultation visio par an avec un pharmacien spécialisé phytothérapie.',
     freeLimit: 0,
+    shipped: false,
   },
   protocols_21days: {
     labelFr: 'Protocoles bien-être 21 jours',

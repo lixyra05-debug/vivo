@@ -182,6 +182,46 @@ describe('premium-gate', () => {
         expect(def.labelFr.length).toBeGreaterThan(0);
       }
     });
+
+    /**
+     * VERROU CONFORMITÉ App Store 2.3.1 / 3.1.2 — bloquant 6 de l'audit.
+     * Sept features cataloguées n'ont AUCUN call-site dans l'app : elles
+     * portent `shipped: false` et ne doivent apparaître sur aucune surface
+     * d'achat. Toute nouvelle feature non livrée rejoint cette liste ; toute
+     * livraison réelle l'en retire dans le même commit que son call-site.
+     */
+    const UNSHIPPED_KEYS: PremiumFeatureKey[] = [
+      'plant_alternatives',
+      'cosmetic_actives',
+      'pregnancy_safety',
+      'children_safety',
+      'interaction_warnings',
+      'expert_articles',
+      'expert_consultation',
+    ];
+
+    it('les 7 features non livrées portent shipped: false', () => {
+      for (const key of UNSHIPPED_KEYS) {
+        expect(PREMIUM_FEATURES[key].shipped).toBe(false);
+      }
+    });
+
+    it('aucune feature livrée ne porte shipped: false', () => {
+      const others = (Object.keys(PREMIUM_FEATURES) as PremiumFeatureKey[]).filter(
+        (k) => !UNSHIPPED_KEYS.includes(k),
+      );
+      expect(others).toHaveLength(18);
+      for (const key of others) {
+        expect(PREMIUM_FEATURES[key].shipped).not.toBe(false);
+      }
+    });
+
+    it("plant_alternatives ne promet plus d'alternative aux médicaments (R5 / Apple 1.4.1)", () => {
+      const def = PREMIUM_FEATURES.plant_alternatives;
+      expect(def.labelFr).toBe('Plantes traditionnellement associées');
+      expect(def.labelFr).not.toMatch(/médicament|alternative/i);
+      expect(def.descriptionFr).not.toMatch(/médicament|alternative/i);
+    });
   });
 
   describe('canAccessFeature', () => {

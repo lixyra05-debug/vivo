@@ -149,6 +149,11 @@ export default function PrivacyScreen() {
                   ['Streak, badges, gamification', 'Usage', 'Automatique'],
                   ['Consentement CGU (date + version)', 'Conformité', 'Automatique'],
                   ['Signalements de produits', 'Contribution', 'Optionnel'],
+                  [
+                    'Image du scan OCR (photo de l’étiquette)',
+                    'Analyse ponctuelle (non stockée)',
+                    'Optionnel',
+                  ],
                   ['Erreurs techniques anonymisées', 'Diagnostic', 'Automatique (Sentry)'],
                 ]}
               />
@@ -164,8 +169,8 @@ export default function PrivacyScreen() {
               <Bullet>la géolocalisation de l&apos;utilisateur,</Bullet>
               <Bullet>les contacts du téléphone,</Bullet>
               <Bullet>
-                les photos de la galerie ou les images prises au scan (le scan n&apos;enregistre
-                que le code-barres décodé, jamais l&apos;image),
+                les photos de la galerie ; le scan de code-barres n&apos;enregistre que le code
+                décodé, jamais l&apos;image,
               </Bullet>
               <Bullet>
                 les données financières (numéros de carte bancaire, IBAN) — celles-ci sont gérées
@@ -173,6 +178,13 @@ export default function PrivacyScreen() {
               </Bullet>
               <Bullet>les données comportementales en dehors de l&apos;Application,</Bullet>
               <Bullet>les identifiants publicitaires (IDFA / AAID).</Bullet>
+              <Paragraph>
+                Cas particulier du Scan OCR (analyse d&apos;étiquette par photo) : l&apos;image
+                est transmise de manière chiffrée à notre sous-traitant Anthropic (voir Article
+                6) pour analyse automatisée des ingrédients, puis le résultat texte est renvoyé
+                à l&apos;Application. L&apos;image n&apos;est conservée ni par LYXIRIA, ni en
+                base de données — elle est transmise uniquement pour la durée de l&apos;analyse.
+              </Paragraph>
               <Paragraph>
                 Aucune donnée n&apos;est revendue à des tiers. Aucune donnée n&apos;est utilisée à
                 des fins publicitaires.
@@ -215,6 +227,14 @@ export default function PrivacyScreen() {
                   ],
                   ['Diagnostic d’erreurs Sentry', 'Intérêt légitime (art. 6.1.f RGPD)'],
                   [
+                    'Analyse OCR des étiquettes (Anthropic)',
+                    'Exécution du contrat (art. 6.1.b RGPD)',
+                  ],
+                  [
+                    'Gestion des abonnements (RevenueCat)',
+                    'Exécution du contrat (art. 6.1.b RGPD)',
+                  ],
+                  [
                     'Conservation de la preuve de consentement',
                     'Obligation légale (art. 6.1.c RGPD)',
                   ],
@@ -250,16 +270,35 @@ export default function PrivacyScreen() {
                     'États-Unis (DPF UE/US)',
                   ],
                   [
+                    'Anthropic PBC',
+                    'Analyse automatisée des images du scan OCR',
+                    'États-Unis (clauses contractuelles types, art. 46 RGPD)',
+                  ],
+                  [
+                    'RevenueCat Inc.',
+                    'Gestion des abonnements (App Store / Play Store)',
+                    'États-Unis (clauses contractuelles types, art. 46 RGPD)',
+                  ],
+                  [
                     'Open Food Facts / Open Beauty Facts',
                     'Base produits ouverte (ODbL)',
                     'Union Européenne',
+                  ],
+                  [
+                    'Wikimedia Foundation (Wikidata)',
+                    'Recherche de la maison-mère des marques',
+                    'États-Unis',
                   ],
                 ]}
               />
               <Paragraph>
                 Toutes les données utilisateur identifiantes sont hébergées au sein de l&apos;Union
                 Européenne (Irlande). Sentry reçoit uniquement des données techniques anonymisées
-                (pas d&apos;email, pas d&apos;adresse IP, pas de code-barres scannés).
+                (pas d&apos;email, pas d&apos;adresse IP, pas de code-barres scannés). Anthropic
+                reçoit uniquement l&apos;image de l&apos;étiquette photographiée lors d&apos;un
+                Scan OCR, sans identifiant de compte. RevenueCat reçoit l&apos;identifiant
+                technique de l&apos;utilisateur et l&apos;état de son abonnement, jamais son
+                profil santé. Wikidata reçoit uniquement le nom de la marque recherchée.
               </Paragraph>
             </Article>
 
@@ -289,6 +328,10 @@ export default function PrivacyScreen() {
                     'Aucune donnée stockée par LYXIRIA — gérées par Stripe / Apple / Google',
                   ],
                   ['Logs Sentry', '90 jours maximum'],
+                  [
+                    'Image du scan OCR',
+                    'Non conservée — transmise pour la seule durée de l’analyse',
+                  ],
                 ]}
               />
             </Article>

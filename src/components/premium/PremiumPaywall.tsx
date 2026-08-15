@@ -62,10 +62,12 @@ const PREMIUM_BULLETS: readonly string[] = [
   'Alternatives intelligentes au scan',
 ];
 
+// Puces LIVRÉES uniquement — jamais de feature `shipped: false` ici
+// (App Store 2.3.1 / 3.1.2), jamais de compte gonflé (40 fiches réelles).
 const EXPERT_BULLETS: readonly string[] = [
   'Tout le Premium inclus',
-  'Base plantes médicinales (200+ sourcées EFSA/EMA/ANSM)',
-  'Sécurité grossesse, enfants, interactions plantes-médicaments',
+  '40 fiches plantes documentées, enrichies régulièrement',
+  'Protocoles 21 jours, rappels de cure, herbier & recettes',
 ];
 
 function triggerHaptic() {
@@ -412,8 +414,8 @@ function ExpertCard({ compact, price, loading, disabled, onPress }: CardProps) {
       </View>
 
       <Text style={styles.description}>
-        Toute la puissance Premium plus l'accès aux plantes médicinales sourcées
-        EFSA/EMA/ANSM et aux alertes interactions médicamenteuses.
+        Toute la puissance Premium plus l'encyclopédie de 40 plantes
+        documentées, les protocoles 21 jours et les recettes bien-être.
       </Text>
 
       <View style={styles.featuresList}>
@@ -478,8 +480,8 @@ function ExpertTeaser({ price, disabled, onPress }: TeaserProps) {
       <View style={{ flex: 1 }}>
         <Text style={styles.teaserTitle}>Aller plus loin — Vivo Expert</Text>
         <Text style={styles.teaserBody}>
-          Plantes médicinales, sécurité grossesse & enfants, interactions
-          plantes-médicaments. {price.label}.
+          Encyclopédie de plantes, protocoles 21 jours, herbier et rappels de
+          cure. {price.label}.
         </Text>
       </View>
     </Pressable>

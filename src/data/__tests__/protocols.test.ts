@@ -62,4 +62,35 @@ describe('PROTOCOLS — Programmes 21 jours', () => {
     expect(sleep?.titleFr).toBe('Sommeil Naturel');
     expect(getProtocolById('inexistant')).toBeUndefined();
   });
+
+  /**
+   * VERROU SANTÉ — bloquant 5 de l'audit. La base de l'app déclare les
+   * parties aériennes de bourrache impropres à la consommation interne
+   * (alcaloïdes pyrrolizidiniques hépatotoxiques — fiche `borage`, carte
+   * `borage_pa_warning`, EFSA pub/4908). Seule l'huile de graines en capsule
+   * (jour 10, cycle 2) peut être servie ; les anciens jours d'infusion (3 et
+   * 17) sont tenus par la mauve — seule fiche de la base sans
+   * contre-indication documentée, usage interne documenté (infusion tiède).
+   */
+  it("la bourrache n'est jamais servie par voie buvable (EFSA pub/4908)", () => {
+    const skin = getProtocolById('skin');
+    expect(skin).toBeDefined();
+    const borageDays = skin!.days.filter((d) => d.plantId === 'borage');
+    expect(borageDays.map((d) => d.day)).toEqual([10]);
+    for (const d of borageDays) {
+      expect(d.recipeFr).toMatch(/capsule/i);
+      expect(d.recipeFr).not.toMatch(/infusion|tisane|décoction|à boire|boire/i);
+    }
+  });
+
+  it('les jours 3 et 17 du protocole Peau servent la mauve (usage interne documenté)', () => {
+    const skin = getProtocolById('skin')!;
+    const day3 = skin.days.find((d) => d.day === 3)!;
+    const day17 = skin.days.find((d) => d.day === 17)!;
+    expect(day3.plantId).toBe('mallow');
+    expect(day17.plantId).toBe('mallow');
+    // Fidélité à la fiche mauve : mucilages → infusion TIÈDE, pas d'eau bouillante.
+    expect(day3.recipeFr).toMatch(/tiède|70\s?°C/i);
+    expect(day17.recipeFr).toMatch(/70\s?°C/i);
+  });
 });

@@ -470,6 +470,34 @@ function buildSkinDay(day: number, plantId: string): { recipeFr: string; tipFr: 
   };
 }
 
+/**
+ * Bourrache : seule l'huile de graines en capsule (jour 10, cycle 2) peut
+ * être servie. Les infusions de fleurs des cycles 1 et 3 (jours 3 et 17)
+ * contredisaient la propre base de l'app : les parties aériennes contiennent
+ * des alcaloïdes pyrrolizidiniques hépatotoxiques (EFSA pub/4908 — fiche
+ * `borage` : « éviter les parties aériennes », contre-indiquées grossesse,
+ * allaitement, enfant ; carte éducative `borage_pa_warning`).
+ *
+ * Remplacement : la mauve (`mallow`) — seule fiche de la base sans
+ * contre-indication documentée (`interactions: null`), voie interne
+ * documentée (« macération à froid ou infusion tiède 1,5-2 g par tasse »).
+ * L'eau à 70 °C et non 95 °C respecte la fiche : les mucilages ne supportent
+ * pas l'eau bouillante. Le jour 17 associe le souci, dont la fiche documente
+ * la voie orale (« infusion 1-2 g par tasse »). Les tips restent indexés par
+ * jour et ne bougent pas. Verrouillé par protocols.test.ts.
+ */
+function replaceDrinkableBorageDays(days: ProtocolDay[]): ProtocolDay[] {
+  const MALLOW_BY_DAY: Record<number, string> = {
+    3: "Infusion tiède de mauve : 2g de fleurs séchées dans 200ml d'eau à 70°C, infusion 10 min. À boire le matin.",
+    17: "Mauve + souci : 1g de mauve + 1g de souci dans 200ml d'eau à 70°C, infusion 10 min. Le matin.",
+  };
+  return days.map((d) => {
+    const recipeFr = MALLOW_BY_DAY[d.day];
+    if (d.plantId !== 'borage' || !recipeFr) return d;
+    return { ...d, plantId: 'mallow', recipeFr };
+  });
+}
+
 // ─── EXPORT FINAL ──────────────────────────────────────────────────────────
 const SLEEP_PROTOCOL: Protocol = {
   id: 'sleep',
@@ -550,14 +578,16 @@ const SKIN_PROTOCOL: Protocol = {
   descriptionFr:
     "Programme de 21 jours pour favoriser une peau saine de l'intérieur.",
   durationDays: 21,
-  days: buildDays({
-    id: 'skin',
-    titleFr: 'Peau Saine',
-    emoji: '🧴',
-    descriptionFr: '',
-    rotation: SKIN_ROTATION,
-    build: buildSkinDay,
-  }),
+  days: replaceDrinkableBorageDays(
+    buildDays({
+      id: 'skin',
+      titleFr: 'Peau Saine',
+      emoji: '🧴',
+      descriptionFr: '',
+      rotation: SKIN_ROTATION,
+      build: buildSkinDay,
+    }),
+  ),
   disclaimer: DISCLAIMER,
 };
 
