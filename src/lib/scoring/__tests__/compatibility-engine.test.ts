@@ -2,6 +2,7 @@ import {
   checkCompatibility,
   FODMAP_TRIGGERS,
   INSUFFICIENT_DATA_LABEL_FR,
+  normalizeAllergenKey,
 } from '../compatibility-engine';
 import type {
   CompatibilityProfile,
@@ -395,4 +396,207 @@ describe('FODMAP_TRIGGERS', () => {
     expect(FODMAP_TRIGGERS).toContain('oignon');
     expect(FODMAP_TRIGGERS).toContain('lactose');
   });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Les allergies déclarées doivent être vérifiées, quelle que soit la FORME sous
+ * laquelle le profil les a stockées.
+ *
+ * Les écrans de profil ont longtemps stocké des LIBELLÉS d'affichage
+ * (« Gluten », « Fruits à coque », « Œufs ») là où le moteur indexe des CLÉS
+ * (`gluten`, `fruits_a_coque`, `oeufs`). Le lookup échouait, et le `continue`
+ * qui suivait sortait de la boucle AVANT tout signalement : ni vérification,
+ * ni aveu. La bannière annonçait « Compatible avec votre profil » à un
+ * allergique dont l'allergène était dans le produit.
+ *
+ * Ces profils sont déjà en base et ne peuvent pas être réécrits : la
+ * normalisation est donc DÉFENSIVE, appliquée à la lecture, dans le moteur —
+ * le seul point de passage commun à tous les producteurs de profil
+ * (`profile-adapter`, `compatibility-presets`, Mode Famille).
+ *
+ * NOTE DE CONCEPTION DES FIXTURES — `emptyProfile()` pose `minScore: 0` et
+ * `makeScoring()` un `score_final: 80`. La barrière de score (« Score sous le
+ * seuil ») est donc INERTE ici : un `isCompatible: false` ne peut venir que du
+ * chemin testé. Les assertions portent malgré tout sur le blocker de type
+ * `allergy` précis, pour qu'aucun autre chemin ne puisse se déguiser en succès.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('checkCompatibility — clés d’allergènes tolérantes à la forme stockée', () => {
+  /** Les 6 libellés que les écrans de profil ont réellement stockés. */
+  const LIBELLES_STOCKES: ReadonlyArray<[string, string, string]> = [
+    // [valeur stockée par l'écran, ingrédient du produit, clé moteur attendue]
+    ['Gluten', 'farine de blé, eau, sel', 'gluten'],
+    ['Lactose', 'lait entier, sucre', 'lactose'],
+    ['Arachides', "huile d'arachide, sel", 'arachides'],
+    ['Fruits à coque', 'éclats de noisette, sucre', 'fruits_a_coque'],
+    ['Œufs', 'oeuf entier, farine', 'oeufs'],
+    ['Soja', 'lécithine de soja, cacao', 'soja'],
+  ];
+
+  it.each(LIBELLES_STOCKES)(
+    'un profil stockant « %s » bloque un produit qui en contient',
+    (stocke, ingredients) => {
+      const product = makeProduct({ ingredients_raw: ingredients });
+      const profile = emptyProfile({ allergies: [stocke] });
+
+      const result = checkCompatibility(product, makeScoring(), profile);
+
+      const allergyBlockers = result.incompatibilities.filter(
+        (i) => i.type === 'allergy' && i.severity === 'blocker',
+      );
+      expect(allergyBlockers).toHaveLength(1);
+      expect(result.isCompatible).toBe(false);
+    },
+  );
+
+  // Idempotence : les clés déjà correctes (Mode Famille, presets, profils
+  // migrés) doivent continuer de fonctionner à l'identique.
+  it('bloque toujours un profil stockant déjà la clé canonique', () => {
+    const product = makeProduct({ ingredients_raw: 'farine de blé, eau' });
+    const result = checkCompatibility(
+      product,
+      makeScoring(),
+      emptyProfile({ allergies: ['gluten'] }),
+    );
+    expect(
+      result.incompatibilities.filter((i) => i.type === 'allergy'),
+    ).toHaveLength(1);
+  });
+
+  // Un allergène que le moteur ne sait pas chercher n'est pas une bonne
+  // nouvelle : c'est une vérification qui n'a pas eu lieu, et elle doit se dire.
+  it('avoue son ignorance sur un allergène inconnu au lieu de passer en silence', () => {
+    const product = makeProduct({ ingredients_raw: 'kiwi, sucre' });
+    const result = checkCompatibility(
+      product,
+      makeScoring(),
+      emptyProfile({ allergies: ['Kiwi'] }),
+    );
+    expect(result.verificationStatus).toBe('insufficient_data');
+  });
+
+  it('avoue son ignorance quand le produit n’a aucun texte d’ingrédients', () => {
+    const product = makeProduct({ ingredients_raw: null });
+    const result = checkCompatibility(
+      product,
+      makeScoring(),
+      emptyProfile({ allergies: ['Gluten'] }),
+    );
+    expect(result.verificationStatus).toBe('insufficient_data');
+  });
+});
+
+describe('normalizeAllergenKey', () => {
+  /** Les 14 clés de l'Annexe II telles qu'indexées par le moteur. */
+  const CLES_CANONIQUES = [
+    'gluten',
+    'lactose',
+    'arachides',
+    'fruits_a_coque',
+    'soja',
+    'oeufs',
+    'poisson',
+    'crustaces',
+    'celeri',
+    'moutarde',
+    'sesame',
+    'sulfites',
+    'lupin',
+    'mollusques',
+  ];
+
+  // Sans idempotence, la normalisation défensive casserait tous les appelants
+  // déjà corrects — c'est la condition qui rend le correctif sûr.
+  it.each(CLES_CANONIQUES)('laisse « %s » inchangée (idempotence)', (cle) => {
+    expect(normalizeAllergenKey(cle)).toBe(cle);
+  });
+
+  it('met en minuscules', () => {
+    expect(normalizeAllergenKey('Gluten')).toBe('gluten');
+  });
+
+  it('retire les diacritiques et remplace les espaces par des underscores', () => {
+    expect(normalizeAllergenKey('Fruits à coque')).toBe('fruits_a_coque');
+    expect(normalizeAllergenKey('Céleri')).toBe('celeri');
+  });
+
+  // Œ (U+0152) n'a pas de décomposition CANONIQUE : NFD la laisse intacte.
+  // Seul un remplacement explicite la casse — d'où ce test dédié.
+  it('décompose la ligature œ', () => {
+    expect(normalizeAllergenKey('Œufs')).toBe('oeufs');
+    expect(normalizeAllergenKey('œufs')).toBe('oeufs');
+  });
+
+  it('normalise tirets et espaces multiples', () => {
+    expect(normalizeAllergenKey('Fruits-à-coque')).toBe('fruits_a_coque');
+    expect(normalizeAllergenKey('  Fruits   à  coque  ')).toBe('fruits_a_coque');
+  });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Une donnée ABSENTE n'est pas une donnée à ZÉRO.
+ *
+ * Les critères quantitatifs lisaient `product.sugars_100g ?? 0` : un produit
+ * dont la teneur en sucres est INCONNUE était traité comme un produit à 0 g de
+ * sucres, donc « compatible », et `verificationStatus` sortait `'verified'`.
+ * Un diabétique lisait « Compatible avec votre profil » sur un produit dont
+ * aucune donnée nutritionnelle n'existait.
+ *
+ * Le type dit pourtant la vérité : `sugars_100g: number | null`. C'est le
+ * `?? 0` qui détruisait l'information à la lecture.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('checkCompatibility — absence de donnée ≠ valeur zéro', () => {
+  const CAS_ABSENCE: ReadonlyArray<[string, string, Partial<Product>]> = [
+    ['diabete', 'sucres', { sugars_100g: null }],
+    ['bebe', 'sel', { salt_100g: null }],
+    ['bebe', 'sucres', { sugars_100g: null }],
+    ['bebe', 'NOVA', { nova_group: null }],
+    ['hypertension', 'sel', { salt_100g: null }],
+    ['cholesterol', 'graisses saturées', { saturated_fat_100g: null }],
+  ];
+
+  it.each(CAS_ABSENCE)(
+    'condition « %s » : ne prétend pas avoir vérifié quand %s est absent',
+    (condition, _champ, overrides) => {
+      const product = makeProduct({
+        ingredients_raw: 'eau, sucre',
+        ...overrides,
+      });
+      const result = checkCompatibility(
+        product,
+        makeScoring(),
+        emptyProfile({ conditions: [condition] }),
+      );
+      expect(result.verificationStatus).toBe('insufficient_data');
+    },
+  );
+
+  // LE test de non-régression du correctif : s'il tombe, c'est que la
+  // correction a confondu absence et zéro — c'est-à-dire qu'elle a reproduit
+  // le bug qu'elle prétend corriger.
+  const CAS_VRAI_ZERO: ReadonlyArray<[string, Partial<Product>]> = [
+    ['diabete', { sugars_100g: 0 }],
+    ['bebe', { salt_100g: 0, sugars_100g: 0, nova_group: 1 }],
+    ['hypertension', { salt_100g: 0 }],
+    ['cholesterol', { saturated_fat_100g: 0 }],
+  ];
+
+  it.each(CAS_VRAI_ZERO)(
+    'condition « %s » : un VRAI zéro reste une vérification faite',
+    (condition, overrides) => {
+      const product = makeProduct({
+        ingredients_raw: 'eau, sucre',
+        ...overrides,
+      });
+      const result = checkCompatibility(
+        product,
+        makeScoring(),
+        emptyProfile({ conditions: [condition] }),
+      );
+      expect(result.verificationStatus).toBe('verified');
+    },
+  );
 });

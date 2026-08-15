@@ -57,6 +57,33 @@ export const FODMAP_TRIGGERS: string[] = [
 // === Internal types & helpers ===
 
 /**
+ * Ramène un allergène déclaré à la clé sous laquelle le moteur l'indexe.
+ *
+ * Les écrans de profil ont stocké des LIBELLÉS d'affichage (« Fruits à coque »,
+ * « Œufs ») là où ce fichier indexe des CLÉS (`fruits_a_coque`, `oeufs`). Ces
+ * profils sont déjà en base et ne peuvent pas être réécrits : la conversion se
+ * fait donc à la LECTURE, ici, au seul point de passage commun à tous les
+ * producteurs de profil (adaptateur, presets, Mode Famille).
+ *
+ * La fonction est IDEMPOTENTE — c'est ce qui la rend sûre : appliquée à une clé
+ * déjà canonique, elle la rend telle quelle.
+ *
+ * `œ` est remplacée explicitement plutôt que via NFKD : cette ligature n'a pas
+ * de décomposition canonique (NFD la laisse intacte), et NFKD casserait au
+ * passage bien d'autres caractères sans qu'on l'ait demandé.
+ */
+export function normalizeAllergenKey(allergen: string): string {
+  return allergen
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .replace(/['’\s-]+/g, '_');
+}
+
+/**
  * Carte de mots-clés par allergène (FR + EN).
  * Sources : Annexe II du Règlement (UE) n°1169/2011 (allergènes obligatoires).
  */
@@ -306,9 +333,19 @@ export function checkCompatibility(
   }
 
   // === 1. Allergies (text-based, blockers) ===
-  for (const allergy of profile.allergies) {
+  for (const rawAllergy of profile.allergies) {
+    // Les profils enregistrés avant l'alignement des écrans portent des
+    // libellés (« Œufs ») et non des clés (`oeufs`) : on les ramène ici.
+    const allergy = normalizeAllergenKey(rawAllergy);
     const keywords = ALLERGEN_KEYWORDS[allergy];
-    if (!keywords) continue;
+    // Un allergène que le moteur ne sait pas chercher n'est pas une bonne
+    // nouvelle : c'est une vérification qui n'a pas eu lieu, et elle doit se
+    // dire. Sortir en silence ici est précisément ce qui faisait annoncer
+    // « Compatible avec votre profil » à un allergique jamais contrôlé.
+    if (!keywords) {
+      flagInsufficientData();
+      continue;
+    }
     if (!hasText) {
       flagInsufficientData();
       continue;
@@ -390,14 +427,20 @@ export function checkCompatibility(
     if (condition === 'diabete') {
       // food only
       if (!isCosmetic(product)) {
-        const sugars = product.sugars_100g ?? 0;
-        if (sugars > 20) {
+        // Teneur INCONNUE ≠ teneur nulle. Le `?? 0` d'avant transformait un
+        // produit non renseigné en produit sans sucres, donc « compatible ».
+        const sugars = product.sugars_100g;
+        if (sugars == null) {
+          flagInsufficientData();
+        } else if (sugars > 20) {
           incompatibilities.push({
             type: 'condition',
             labelFr: `Sucres élevés (${sugars.toFixed(1)}g/100g)`,
             severity: 'warning',
           });
         }
+        // Le contrôle de score ne dépend d'aucune donnée nutritionnelle : il
+        // reste évalué même quand la teneur en sucres est absente.
         if (scoringResult.score_final < 40) {
           incompatibilities.push({
             type: 'condition',
@@ -449,23 +492,34 @@ export function checkCompatibility(
           });
         }
       } else {
-        const salt = product.salt_100g ?? 0;
-        const sugars = product.sugars_100g ?? 0;
-        if (salt > 1) {
+        // Trois contrôles indépendants : chacun avoue sa propre absence de
+        // donnée. `flagInsufficientData` étant idempotente, plusieurs manques
+        // ne produisent qu'un seul avertissement.
+        const salt = product.salt_100g;
+        const sugars = product.sugars_100g;
+        if (salt == null) {
+          flagInsufficientData();
+        } else if (salt > 1) {
           incompatibilities.push({
             type: 'condition',
             labelFr: `Sel trop élevé pour bébé (${salt.toFixed(2)}g/100g)`,
             severity: 'warning',
           });
         }
-        if (sugars > 10) {
+        if (sugars == null) {
+          flagInsufficientData();
+        } else if (sugars > 10) {
           incompatibilities.push({
             type: 'condition',
             labelFr: `Sucres trop élevés pour bébé (${sugars.toFixed(1)}g/100g)`,
             severity: 'warning',
           });
         }
-        if (product.nova_group === 4) {
+        // `nova_group === 4` sur un NOVA absent valait `false`, soit exactement
+        // la réponse rassurante — pour un profil bébé.
+        if (product.nova_group == null) {
+          flagInsufficientData();
+        } else if (product.nova_group === 4) {
           incompatibilities.push({
             type: 'condition',
             labelFr: 'Aliment ultra-transformé non recommandé pour bébé (NOVA 4)',
@@ -518,8 +572,10 @@ export function checkCompatibility(
       }
     } else if (condition === 'hypertension') {
       if (!isCosmetic(product)) {
-        const salt = product.salt_100g ?? 0;
-        if (salt > 1.5) {
+        const salt = product.salt_100g;
+        if (salt == null) {
+          flagInsufficientData();
+        } else if (salt > 1.5) {
           incompatibilities.push({
             type: 'condition',
             labelFr: `Sel trop élevé pour hypertension (${salt.toFixed(2)}g/100g)`,
@@ -529,8 +585,10 @@ export function checkCompatibility(
       }
     } else if (condition === 'cholesterol') {
       if (!isCosmetic(product)) {
-        const sat = product.saturated_fat_100g ?? 0;
-        if (sat > 5) {
+        const sat = product.saturated_fat_100g;
+        if (sat == null) {
+          flagInsufficientData();
+        } else if (sat > 5) {
           incompatibilities.push({
             type: 'condition',
             labelFr: `Graisses saturées élevées (${sat.toFixed(1)}g/100g)`,
@@ -648,10 +706,15 @@ export function checkCompatibility(
     const passed = Math.max(0, totalCriteria - failedCriteria);
     compatibilityPercentage = Math.round((passed / totalCriteria) * 100);
   }
-  // Cas limite : aucun ingrédient à inspecter et aucune autre incompat → 100 %.
-  // Équivalent strict à l'ancien test sur le libellé : `flagInsufficientData`
-  // est le seul producteur de ce motif, et chacun de ses appels est gardé par
-  // `!hasText`. Comportement inchangé, chaîne magique en moins.
+  // Cas limite : rien n'a pu être vérifié, et rien d'autre n'a échoué → 100 %.
+  // `flagInsufficientData` est le seul producteur de ce motif, et la condition
+  // `sorted.length === 1` dit que ce motif est la SEULE incompatibilité — donc
+  // qu'aucun critère réellement évalué n'est en échec.
+  //
+  // Ce drapeau ne se limite plus au texte d'ingrédients manquant : il couvre
+  // aussi un allergène inconnu du moteur et une donnée nutritionnelle absente.
+  // La condition reste la bonne pour autant, puisqu'elle porte sur le décompte
+  // et non sur la cause.
   if (dataInsufficientFlagged && sorted.length === 1) {
     compatibilityPercentage = 100;
   }
