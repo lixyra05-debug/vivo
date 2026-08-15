@@ -28,6 +28,7 @@ import { useAlternatives } from '@/src/lib/api/use-alternatives';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { usePremium } from '@/src/lib/hooks/usePremium';
 import { ScoreFactorsCard } from './ScoreFactorsCard';
+import { MissingNutritionBanner } from './MissingNutritionBanner';
 import type { ScoreFactor } from '@/src/lib/scoring/composite-score';
 import type { PackagingComponent } from '@/src/data/packaging-risks';
 import type { Product, ScoringResult } from '@/src/lib/api/types';
@@ -197,6 +198,10 @@ export function FoodProductView({
             </Text>
           </Pressable>
         </View>
+      </FadeIn>
+
+      <FadeIn delay={160}>
+        <MissingNutritionBanner product={product} />
       </FadeIn>
 
       {factors && factors.length > 1 ? (

@@ -277,6 +277,15 @@ export function productToScoringInput(product: Product): ScoringInput {
     ingredients_raw: product.ingredients_raw ?? '',
     additives_tags: product.additives_tags ?? [],
     nova_group: nova,
+    // DÉCISION voie (i) — bloquant 4, face 2. Une macro ABSENTE (null) est
+    // lue 0 par le moteur : la note n'invente ni risque (pénaliser
+    // l'inconnu) ni innocence (c'était le bug — l'absence absoute en
+    // silence). Elle reste calculée sur ce que la source fournit, et
+    // l'absence est DÉCLARÉE au même niveau que la note par
+    // `MissingNutritionBanner` (via `getMissingNutritionFields`). Changer la
+    // note elle-même — pénalité d'incertitude, plancher — est du CALIBRAGE :
+    // lot 3, jamais ici. Verrouillé par missing-nutrition.test.ts (« les
+    // deux moitiés ensemble »).
     macros_100g: {
       sugars: product.sugars_100g ?? 0,
       saturated_fat: product.saturated_fat_100g ?? 0,

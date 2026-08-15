@@ -171,3 +171,22 @@ export function getCosmeticConfidence(product: CosmeticProduct): ProductConfiden
     reasons: reasons.slice(0, 3),
   };
 }
+
+/**
+ * FACE 2 du bloquant 4, voie (i) — nomme les macros PÉNALISABLES absentes
+ * (sucres, gras saturés, sel : les trois que le moteur pénalise). Absent =
+ * `null` ; zéro est une VALEUR et n'est jamais listé.
+ *
+ * Complète `getProductConfidence` sans le remplacer : le badge agrège six
+ * critères en un niveau — trop grossier pour porter la face 2 (racine A de
+ * l'audit : « l'app avoue l'incertitude dans un badge de 11 px pendant que
+ * le chiffre de 72 px affirme »). Ici on nomme précisément CE QUI manque,
+ * pour que `MissingNutritionBanner` l'affiche au même niveau que la note.
+ */
+export function getMissingNutritionFields(product: Product): string[] {
+  const missing: string[] = [];
+  if (product.sugars_100g == null) missing.push('sucres');
+  if (product.saturated_fat_100g == null) missing.push('gras saturés');
+  if (product.salt_100g == null) missing.push('sel');
+  return missing;
+}
