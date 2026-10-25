@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import ExploreScreen from '../(tabs)/explore';
@@ -22,6 +22,15 @@ jest.mock('react-native-safe-area-context', () => {
     SafeAreaView: ({ children }: { children: ReactNode }) => children,
   };
 });
+
+// FadeIn et Skeleton animent l'écran via Reanimated. Sous minuteurs simulés, avancer le temps
+// rejoue ces animations en JS (~150 minuteurs) et le premier Skeleton charge LinearGradient en
+// plein test : plusieurs secondes réelles, au-delà du plafond de 5 s de Jest sous charge.
+// L'animation n'est pas l'objet de ces tests.
+jest.mock('@/src/components/ui/FadeIn', () => ({
+  FadeIn: ({ children }: { children: ReactNode }) => children,
+}));
+jest.mock('@/src/components/ui/Skeleton', () => ({ Skeleton: () => null }));
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -96,12 +105,16 @@ describe('ExploreScreen', () => {
     const input = getByLabelText('Rechercher un produit');
     fireEvent.changeText(input, 'coca');
 
-    // Avance le timer pour le debounce (400ms)
-    await act(async () => {
-      jest.advanceTimersByTime(500);
+    // Debounce de 400 ms : aucun appel avant l'échéance, un seul à l'échéance.
+    act(() => {
+      jest.advanceTimersByTime(399);
     });
-
-    await waitFor(() => expect(mockSearchProducts).toHaveBeenCalled());
+    expect(mockSearchProducts).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(mockSearchProducts).toHaveBeenCalledTimes(1);
+    expect(mockSearchProducts).toHaveBeenCalledWith({ query: 'coca', type: 'all' });
     expect(await findByText('Coca-Cola')).toBeTruthy();
   });
 
