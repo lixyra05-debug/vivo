@@ -600,3 +600,162 @@ describe('checkCompatibility — absence de donnée ≠ valeur zéro', () => {
     },
   );
 });
+
+// === Lot S1 — un allergène se lit dans toutes ses graphies d'étiquette ===
+
+/**
+ * Listes d'ingrédients RÉELLES, recopiées telles quelles depuis Open Food Facts
+ * (champ `ingredients_text_fr`, licence ODbL, relevées le 27 octobre 2026) :
+ * allergènes en majuscules, accents omis, ligature œ, pluriels, soulignés _x_.
+ *
+ * Avant ce lot, un mot-clé ne se reconnaissait qu'au singulier et avec ses
+ * accents : « NOISETTES » (Nutella), « CREME » (crème fraîche), « Œufs »,
+ * « (SULFITES) » passaient pour absents, et l'allergique lisait « Compatible
+ * avec votre profil ».
+ */
+const VRAIES_LISTES = {
+  // Lentilles cuisinées à l'Auvergnate
+  '3021690201123': 'Eau, lentilles précuites 28%, couenne de porc, saindoux, oignons 1%, arôme naturel, farine de BLE, carottes 0,7%, graisse de canard, plante aromatique, arôme naturel de poivre avec autres arômes naturels, affermissant: chlorure de calcium, arôme naturel de CELERI. Traces éventuelles de : œuf, lait, moutarde.',
+  // Crème fraîche épaisse entière Elle & Vire
+  '3451790439353': 'CREME de Normandie, ferments lactiques.',
+  // Napolitain l'Original
+  '7622201809638': 'Farine de blé, Sucre, Huile de palme, Sirop de glucose-fructose, Œufs, Chocolat en poudre (Sucre, Poudre de cacao), Stabilisants (Glycérol, Sorbitols), Lactosérum en poudre (de Lait), Alcool, Sirop de glucose, Cacao maigre en poudre, Poudres à lever (Carbonates d\'ammonium, Diphosphates, Carbonates de sodium), Huile de colza, Graisse de karité, Sel, Arômes, Amidon, Émulsifiants (E472b, E472a, Lécithines de soja, E471), Lait écrémé en poudre, colorant (E160a), Épaississant (Gomme xanthane), Beurre concentré, Correcteurs d\'acidité (Citrates de sodium, Acide citrique), Conservateur (Sorbate de potassium)',
+  // Brioche tressée nature Harrys
+  '3228857001231': 'Farine de BLÉ 51,8%, eau, OEUFS frais 12,2%, sucre 11,5%, huile de colza 10,8%, sucre perlé 2,3% (sucre, graisse végétale : karité, arôme), gluten de BLÉ, arômes dont fleur d\'oranger (contient alcool), extraits végétaux à pouvoir colorant (curcuma, paprika), levure, fibre de BLÉ, sel, farine d\'ORGE maltée, extrait d\'acérola. Peut contenir des traces de LAIT, GRAINES DE SÉSAME, FRUITS A COQUE et SOJA.',
+  // La Madeleine Pur beurre
+  '3178530402728': 'Beurre 26%, farine de blé tendre, Sucre, œufs 21%, sirop de sucre inverti, amandes en poudre, arôme naturel de vanille (contient alcool), poudres à lever: carbonates et citrates de sodium (blé), sel, arôme naturel. Traces éventuelles de: fruits à coque, soja.',
+  // Nutella
+  '3017620422003': 'Sucre, huile de palme, NOISETTES 13%, cacao maigre 7,4%, LAIT écrémé en poudre 6,6%, LACTOSERUM en poudre, émulsifiants: lécithines [SOJA), vanilline. Sans gluten.',
+  // Snickers
+  '5000159461122': 'Sucre, sirop de glucose, _cacahuètes_, _lait_ écrémé en poudre, beurre de cacao, pâte de cacao, huile de tournesol, _lactose_, matière grasse du _lait_, petit-_lait_ en poudre, matière grasse de palme, sel, émulsifiant (lécithine de _soja_), blanc d’_œuf_ en poudre, protéine de _lait_, extrait naturel de vanille.',
+  // Brandade à la morue
+  '3571492210019': 'Pommes de terre 37%, morue 30% (Gadus spp), huile de tournesol, églefin 8% (Melanogrammus aeglefinus), eau, oignons, flocons de pommes de terre (pommes de terre, extrait de curcuma), Lait en poudre, ail sec 0,29%, sel, persil 0,06%, poivre. Traces possibles d\'arachides, céleri, crustacés, fruits à coque, gluten, mollusques, moutarde, œuf, sésame et soja.',
+  // Sardines à l'huile d'olive vierge extra
+  '3019081238643': '_Sardines_, huile d\'olive vierge extra, sel',
+  // Harengs moutarde à l'ancienne
+  '3700260700746': 'Harengs 70%, eau, moutarde de Dijon 6.4% (eau, graines de moutarde, vinaigre d\'alcool, sel), huile de colza, moutarde à l\'ancienne 3.4% (eau, graines de moutarde, vinaigre d\'alcool, sel), vinaigre d\'alcool, sucre, amidon transformé de maïs, vin blanc, sel, arôme naturel, curcuma, arôme naturel de poivre, épaississant: gomme guar, gomme xanthane.',
+  // Bâtonnets de surimi saveur crabe
+  '3256220125772': 'Chair de POISSON 38%, eau, amidon de BLE et fécule de pomme de terre, blanc d\'OEUF réhydraté, huile de colza, sucre, sel, LAIT ÉCRÉMÉ réhydraté, arômes naturels (contient CRUSTACES, POISSONS et MOLLUSQUES), colorant : extrait de paprika.',
+  // Quenelles de brochet sauce Nantua
+  '3038353911909': 'Sauce: eau, CRÈME (stabilisant : E407), concentré de tomate, amidon transformé de riz, LAIT en poudre, amidon transformé de pomme de terre, cognac (dont sel, arôme), extrait d\'ECREVISSE, persil, poudre de CREVETTES grises (contient mollusques), ail, épice. \n\nQuenelles (36%): farine de BLE, matière grasse de porc, OEUFS frais (14%), BROCHET (13%), eau, sel, arôme,',
+  // Salade Manhattan Sodebo
+  '3242274030056': 'Salade composée 80% : spécialités céréalières cuites (eau, semoule de BLE dur, OEUF, curcuma), OEUF, salade 11%, viande de poulet, carottes, FROMAGE à pâte dure, jus de citron, huile de colza et/ou tournesol, eau, amidon et/ou fécule, dextrose, ferments, sel, arôme naturel, persil. \nSauce vinaigrette balsamique 7% : huile de colza, huile d\'olive vierge, vinaigre de vin (SULFITES), moût de raisin, sel. Cookie au chocolat 7% : sucre, farine de BLE, OEUF, BEURRE, huile de colza, pâte et beurre de cacao, poudre de cacao maigre, poudre à lever : bicarbonate de sodium, émulsifiants : lécithines (SOJA), arôme naturel, sel. \nGressins 4% et fourchette 2% : farine de BLE, fibre de BLE, semoule de BLE dur, BEURRE, huile d\'olive vierge, huile de colza et/ou tournesol, eau, levure boulangère, sucre, amidon et/ou fécule, sel, graines de pavot.',
+  // Filets de maquereaux vin blanc et aromates
+  '3019081241216': 'Filets de maquereaux (60%), eau, carottes (5%), oignons (5%), vinaigre d\'alcool, cornichons (cornichons, vinaigre d\'alcool, sel) (dont sulfites) (1,7%), vinaigre de vin blanc, vin blanc (1%), sel, jus de citron concentré, poivre noir, laurier, thym.',
+  // Poisson à l'andalouse, riz safrané
+  '3166352967037': 'Poisson 33,3% (merlu blanc), riz cuit 20,8% (eau, riz), courgettes grillées 14,4%, eau, poivrons rouges 6,5%, oignons 4,8%, petits pois 4,8%, huile d\'olive vierge 2,5%, chorizo 1,6% (viande de porc origine France, gras de porc, épices et plantes aromatiques, sel, arômes naturels), farine de blé, épices et plantes aromatiques, sel, huile de tournesol, purée d\'ail, concentré de tomates, safran. \n\nTraces possibles de: crustacés, mollusques, soja, œuf, lait, moutarde, céleri.',
+  // Chamonix
+  '3017760819121': 'Sirop de glucose-fructose, farine de BLÉ 36 %, sucre, purée d\'orange 5 %, jus d\'orange concentré 1,4%, huile de colza, jaune d\'OEUF en poudre, stabilisant (glycérol), poudre à lever (carbonates d\'ammonium), correcteur d\'acidité (acide citrique), gélifiant (pectines), arômes, colorant (norbixine de rocou), conservateur (sorbate de potassium). PEUT CONTENIR LAIT, SÉSAME ET FRUITS À COQUE.',
+  // Riz soufflé au chocolat
+  '4021700900021': 'Sucre, graisses végétales (palmiste, palme), riz soufflé, semoule de maïs, semoule de riz, farine de froment, farine de malt, extrait de malt), dextrose, beurre de cacao, lait entier en poudre, pâte de cacao, lactosérum doux en poudre, farine de lupin, cacao en poudre maigre, beurre de karité, lactose, émulsifiant: lécithines (soja), E476; sel, arômes.',
+  // Muesli croustillant
+  '20775018': '46% flocons d\'avoine complète, sucre, 11% graines de blé, 7% petits rouleaux de hc.olat au lan et de cocolat lancucre, laite poudre entier, beurre de cacao*, pâte de cacao*, poudre de lactosérum doux (lait), émulsifiant lé cithines), huile de palme. 4% petits rouleau de chocolat noir (sucre, pâte de cacao*, beurre de cacao*, émulsifiant: lécithines), 2% farine de riz 25 noisettes, cacao en po id % maïs, sel de cuisine, 0,1% gluten de blé, 0,1% farine de malt (orge, blé), 0,08% extrait de malt d\'orge. *Certifié Rainforest Alliance. Pour en savoir plus, rendez-vous sur ra.org. Peut contenir des traces d\'autres fruits à coque (amandes, noix, noix de cajou, noix de pécan, noix du Brésil, pistaches, noix de Macadamia), d\'arachides, de soja, de graines de sésame, de moutarde et de lupin.',
+} as const;
+
+type CodeBarres = keyof typeof VRAIES_LISTES;
+
+describe('checkCompatibility — allergènes : pluriel, accent omis, ligature œ (lot S1)', () => {
+  function verifier(allergie: string, ingredients: string) {
+    return checkCompatibility(
+      makeProduct({ ingredients_raw: ingredients }),
+      makeScoring(),
+      emptyProfile({ allergies: [allergie] }),
+    );
+  }
+
+  function bloquantsAllergie(result: ReturnType<typeof checkCompatibility>) {
+    return result.incompatibilities.filter(
+      (i) => i.type === 'allergy' && i.severity === 'blocker',
+    );
+  }
+
+  // [allergie déclarée, code-barres, graphie qui échappait au moteur]
+  const GRAPHIES_MANQUEES: ReadonlyArray<[string, CodeBarres, string]> = [
+    ['gluten', '3021690201123', 'farine de BLE'],
+    ['lactose', '3451790439353', 'CREME de Normandie'],
+    ['oeufs', '7622201809638', 'Œufs'],
+    ['oeufs', '3228857001231', 'OEUFS frais'],
+    ['oeufs', '3178530402728', 'œufs 21%'],
+    ['fruits_a_coque', '3017620422003', 'NOISETTES 13%'],
+    ['fruits_a_coque', '3178530402728', 'amandes en poudre'],
+    ['arachides', '5000159461122', '_cacahuètes_'],
+    ['arachides', '3571492210019', "Traces possibles d'arachides"],
+    ['poisson', '3019081238643', '_Sardines_'],
+    ['poisson', '3700260700746', 'Harengs 70%'],
+    ['crustaces', '3256220125772', 'CRUSTACES'],
+    ['crustaces', '3038353911909', 'CREVETTES grises'],
+    ['sulfites', '3242274030056', '(SULFITES)'],
+    ['sulfites', '3019081241216', '(dont sulfites)'],
+    ['mollusques', '3166352967037', 'Traces possibles de : …, mollusques'],
+    ['mollusques', '3038353911909', '(contient mollusques)'],
+  ];
+
+  it.each(GRAPHIES_MANQUEES)(
+    '« %s » est bloqué dans %s, qui écrit « %s »',
+    (allergie, code) => {
+      const result = verifier(allergie, VRAIES_LISTES[code]);
+      expect(bloquantsAllergie(result)).toHaveLength(1);
+      expect(result.isCompatible).toBe(false);
+      // D11 : la liste était lisible, la vérification a bien eu lieu.
+      expect(result.verificationStatus).toBe('verified');
+    },
+  );
+
+  // Ce que le moteur reconnaissait déjà doit le rester.
+  const GRAPHIES_DEJA_LUES: ReadonlyArray<[string, CodeBarres, string]> = [
+    ['soja', '3017620422003', 'lécithines [SOJA)'],
+    ['celeri', '3021690201123', 'arôme naturel de CELERI'],
+    ['moutarde', '3700260700746', 'moutarde de Dijon'],
+    ['sesame', '3017760819121', 'SÉSAME'],
+    ['lupin', '4021700900021', 'farine de lupin'],
+    ['fruits_a_coque', '20775018', 'noix, noix de cajou, noix de pécan'],
+    ['oeufs', '5000159461122', 'blanc d’_œuf_ en poudre'],
+  ];
+
+  it.each(GRAPHIES_DEJA_LUES)(
+    '« %s » reste bloqué dans %s (« %s »)',
+    (allergie, code) => {
+      const result = verifier(allergie, VRAIES_LISTES[code]);
+      expect(bloquantsAllergie(result)).toHaveLength(1);
+      expect(result.isCompatible).toBe(false);
+      expect(result.verificationStatus).toBe('verified');
+    },
+  );
+
+  // Mots voisins qui ne doivent PAS déclencher l'alerte. Ce sont des fragments,
+  // pas des listes complètes : chacun isole le mot piège.
+  const VOISINS: ReadonlyArray<[string, string, string]> = [
+    ['oeufs', 'viande de bœuf, sel', 'bœuf n’est pas œuf'],
+    ['oeufs', 'BŒUF haché 98%, sel', 'en majuscules non plus'],
+    ['oeufs', 'eggplant, olive oil, salt', 'eggplant n’est pas egg'],
+    ['lactose', 'laitue, tomate, concombre', 'laitue n’est pas lait'],
+    ['arachides', 'acide arachidonique (ARA), acide docosahexaénoïque (DHA)', 'acide gras des laits infantiles'],
+    ['gluten', "sirop d'orgeat", 'orgeat n’est pas orge'],
+    ['mollusques', 'lait cru, sel, ferments lactiques. Moulé à la louche.', 'moulé n’est pas moule'],
+    ['sulfites', 'eau minérale naturelle, sulfate de magnésium', 'sulfate n’est pas sulfite'],
+  ];
+
+  it.each(VOISINS)(
+    '« %s » n’est pas déclenché par « %s » (%s)',
+    (allergie, ingredients) => {
+      const result = verifier(allergie, ingredients);
+      expect(result.incompatibilities.filter((i) => i.type === 'allergy')).toHaveLength(0);
+      expect(result.isCompatible).toBe(true);
+      expect(result.verificationStatus).toBe('verified');
+    },
+  );
+
+  // Le profil cœliaque lit la même liste de mots-clés que l'allergie au gluten :
+  // les deux doivent conclure pareil sur la même étiquette.
+  it('le profil cœliaque bloque aussi « farine de BLE »', () => {
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: VRAIES_LISTES['3021690201123'] }),
+      makeScoring(),
+      emptyProfile({ conditions: ['coeliaque'] }),
+    );
+    expect(
+      result.incompatibilities.filter((i) => i.labelFr.startsWith('Contient du gluten')),
+    ).toHaveLength(1);
+    expect(result.isCompatible).toBe(false);
+  });
+});

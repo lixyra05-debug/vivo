@@ -287,6 +287,61 @@ function textContainsAny(text: string, keywords: string[]): string | null {
   return null;
 }
 
+/**
+ * Accents qu'une étiquette peut omettre (« BLE », « CREME », « CRUSTACES ») :
+ * dans un mot-clé d'allergène, chacun devient FACULTATIF dans le texte. Le sens
+ * est unique — un accent présent dans le texte n'est jamais ignoré — sans quoi
+ * « moulé » (fromage moulé à la louche) se lirait « moule », le mollusque.
+ */
+const OPTIONAL_ACCENTS: Record<string, string> = {
+  à: '[aà]',
+  â: '[aâ]',
+  é: '[eé]',
+  è: '[eè]',
+  ê: '[eê]',
+  ë: '[eë]',
+  î: '[iî]',
+  ï: '[iï]',
+  ô: '[oô]',
+  ù: '[uù]',
+  û: '[uû]',
+  ü: '[uü]',
+  ç: '[cç]',
+};
+
+/**
+ * Motif d'un mot-clé d'ALLERGÈNE, tolérant aux seules graphies d'étiquette du
+ * même mot : casse, accent omis, ligature œ ↔ oe, pluriel en -s (« ŒUFS »,
+ * « NOISETTES », « (SULFITES) »). Un mot-clé terminé par s, x ou z est
+ * invariable (« noix ») et un code (« e220 ») ne prend pas de pluriel. Les
+ * frontières sont celles de `matchesWord` : « bœuf » ne contient pas « œuf »,
+ * ni « laitue » « lait ».
+ */
+function allergenPattern(keyword: string): RegExp {
+  let body = '';
+  for (let i = 0; i < keyword.length; i += 1) {
+    const c = keyword[i];
+    if (c === 'œ') {
+      body += '(?:œ|oe)';
+    } else if (c === 'o' && keyword[i + 1] === 'e') {
+      body += '(?:oe|œ)';
+      i += 1;
+    } else {
+      body += OPTIONAL_ACCENTS[c] ?? escapeRegExp(c);
+    }
+  }
+  const plural = /[sxz\d]$/.test(keyword) ? '' : 's?';
+  return new RegExp(`(?<!\\p{L})${body}${plural}(?!\\p{L})`, 'iu');
+}
+
+/** `textContainsAny` réservée aux mots-clés d'allergènes (motif tolérant). */
+function textContainsAllergen(text: string, keywords: string[]): string | null {
+  for (const kw of keywords) {
+    if (kw && allergenPattern(kw).test(text)) return kw;
+  }
+  return null;
+}
+
 /** Extrait le numéro E d'un tag OFF (en:e150d → 150). Retourne null sinon. */
 function parseEcode(tag: string): number | null {
   const match = /e(\d+)/i.exec(tag);
@@ -351,7 +406,7 @@ export function checkCompatibility(
       continue;
     }
     // Cas spécial sulfites : on regarde aussi additives_tags pour les produits food
-    let found = textContainsAny(ingredientText, keywords);
+    let found = textContainsAllergen(ingredientText, keywords);
     if (!found && !isCosmetic(product) && allergy === 'sulfites') {
       for (const tag of product.additives_tags ?? []) {
         const code = parseEcode(tag);
@@ -544,7 +599,7 @@ export function checkCompatibility(
         flagInsufficientData();
         continue;
       }
-      const hit = textContainsAny(ingredientText, ALLERGEN_KEYWORDS.gluten);
+      const hit = textContainsAllergen(ingredientText, ALLERGEN_KEYWORDS.gluten);
       if (hit) {
         incompatibilities.push({
           type: 'condition',
