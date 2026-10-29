@@ -31,13 +31,26 @@ import type { CompatibilityResult, IncompatibilityReason } from '@/src/lib/api/t
 
 interface CompatibilityBannerProps {
   result: CompatibilityResult | null;
+  /**
+   * Constat propre au produit, qui remplace la phrase générique sur la liste
+   * d'ingrédients dans l'état « Vérification impossible » (fiche d'un
+   * cosmétique dont aucun ingrédient n'a été évalué, S3-3). Le message de
+   * sécurité et les points d'attention suivent toujours. Sans effet dans les
+   * deux autres états.
+   */
+  unverifiedLead?: string;
 }
 
 const VISIBLE_LIMIT = 3;
 
 export const UNVERIFIED_TITLE = 'Vérification impossible';
-export const UNVERIFIED_BODY =
-  "La liste d'ingrédients de ce produit n'est pas disponible. Vos allergies et restrictions n'ont pas pu être vérifiées.";
+/**
+ * Le message de sécurité de l'état « Vérification impossible ». Il ne
+ * disparaît jamais : un bloc qui porte cet état à la place du bandeau le
+ * reprend mot pour mot.
+ */
+export const UNVERIFIED_SAFETY = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
+export const UNVERIFIED_BODY = `La liste d'ingrédients de ce produit n'est pas disponible. ${UNVERIFIED_SAFETY}`;
 const WARNINGS_LABEL = "Points d'attention";
 
 interface WarningsBlockProps {
@@ -78,14 +91,21 @@ function WarningsBlock({ warnings, expanded, onToggle }: WarningsBlockProps) {
   );
 }
 
-export function CompatibilityBanner({ result }: CompatibilityBannerProps) {
+/**
+ * L'état « Vérification impossible » : aucun blocker levé, mais la
+ * vérification n'a pas eu lieu. Exporté pour qu'un écran qui porte cet état
+ * ailleurs que dans le bandeau le reconnaisse exactement comme lui.
+ */
+export function isUnverifiedCompatibility(result: CompatibilityResult): boolean {
+  return result.isCompatible && result.verificationStatus === 'insufficient_data';
+}
+
+export function CompatibilityBanner({ result, unverifiedLead }: CompatibilityBannerProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!result) {
     return null;
   }
-
-  const unverified = result.verificationStatus === 'insufficient_data';
 
   // Le motif « données insuffisantes » est déjà le titre de l'état dédié :
   // le répéter dans la liste ne dirait rien de plus.
@@ -103,7 +123,7 @@ export function CompatibilityBanner({ result }: CompatibilityBannerProps) {
   // ── Vérification impossible ──────────────────────────────────────────────
   // Un blocker reste un verdict déterminé : s'il y en a un, `isCompatible` est
   // false et on tombe dans la branche incompatible, qui a le sens le plus sûr.
-  if (result.isCompatible && unverified) {
+  if (isUnverifiedCompatibility(result)) {
     return (
       <FadeIn>
         <View style={styles.unverified} accessibilityLabel={UNVERIFIED_TITLE}>
@@ -111,7 +131,14 @@ export function CompatibilityBanner({ result }: CompatibilityBannerProps) {
             <Icon name="AlertCircle" color="textMuted" />
             <View style={styles.headerBody}>
               <Text style={styles.unverifiedTitle}>{UNVERIFIED_TITLE}</Text>
-              <Text style={styles.unverifiedBody}>{UNVERIFIED_BODY}</Text>
+              {unverifiedLead ? (
+                <>
+                  <Text style={styles.unverifiedBody}>{unverifiedLead}</Text>
+                  <Text style={styles.unverifiedBody}>{UNVERIFIED_SAFETY}</Text>
+                </>
+              ) : (
+                <Text style={styles.unverifiedBody}>{UNVERIFIED_BODY}</Text>
+              )}
             </View>
           </View>
           <WarningsBlock warnings={warnings} expanded={expanded} onToggle={toggle} />

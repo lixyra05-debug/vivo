@@ -173,6 +173,23 @@ export function getCosmeticConfidence(product: CosmeticProduct): ProductConfiden
 }
 
 /**
+ * S3-3 — le niveau de confiance à afficher, ou `null` pour n'en afficher aucun.
+ *
+ * « Vérifié fabricant » dit que les champs essentiels sont renseignés, pas que
+ * la formule a été évaluée. À côté d'un cosmétique dont aucun ingrédient n'a été
+ * évalué (« Vérification impossible » sur la fiche, « Non évalué » dans la
+ * liste catégorie), il affirmerait le contraire : il n'est pas montré. Les
+ * autres niveaux ne contredisent rien et restent ; un produit évalué garde
+ * toujours son badge.
+ */
+export function confidenceToDisplay(
+  confidence: ProductConfidence,
+  evaluated: boolean,
+): ProductConfidence | null {
+  return !evaluated && confidence.level === 'verified' ? null : confidence;
+}
+
+/**
  * FACE 2 du bloquant 4, voie (i) — nomme les macros PÉNALISABLES absentes
  * (sucres, gras saturés, sel : les trois que le moteur pénalise). Absent =
  * `null` ; zéro est une VALEUR et n'est jamais listé.

@@ -123,3 +123,47 @@ describe('CompatibilityBanner', () => {
     expect(getByText('Compatible avec votre profil')).toBeTruthy();
   });
 });
+
+/**
+ * S3-3 — un bloc qui porte l'état « Vérification impossible » à la place du
+ * bandeau (cosmétique dont aucun ingrédient n'a été évalué) remplace la phrase
+ * générique par son propre constat. Le message de sécurité, lui, ne change
+ * jamais : il est figé ici mot pour mot.
+ */
+describe('CompatibilityBanner — S3-3, constat propre au produit', () => {
+  const SECURITE = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
+  const CONSTAT = "Aucun ingrédient de ce produit n'a pu être évalué.";
+  const unverifiedResult: CompatibilityResult = {
+    isCompatible: true,
+    score: 100,
+    incompatibilities: [
+      { type: 'condition', labelFr: INSUFFICIENT_DATA_LABEL_FR, severity: 'warning' },
+    ],
+    compatibilityPercentage: 100,
+    verificationStatus: 'insufficient_data',
+  };
+
+  it('le corps générique se termine par le message de sécurité, mot pour mot', () => {
+    expect(UNVERIFIED_BODY.endsWith(SECURITE)).toBe(true);
+  });
+
+  it('avec un constat : il remplace la phrase générique, le message de sécurité reste', () => {
+    const { queryAllByText, queryByText } = render(
+      <CompatibilityBanner result={unverifiedResult} unverifiedLead={CONSTAT} />,
+    );
+    expect(queryAllByText(UNVERIFIED_TITLE)).toHaveLength(1);
+    expect(queryByText(CONSTAT)).toBeTruthy();
+    expect(queryByText(SECURITE)).toBeTruthy();
+    expect(queryByText(UNVERIFIED_BODY)).toBeNull();
+  });
+
+  it('le constat ne change rien aux états compatible et incompatible', () => {
+    for (const result of [compatibleResult, incompatibleResult]) {
+      const { queryByText, unmount } = render(
+        <CompatibilityBanner result={result} unverifiedLead={CONSTAT} />,
+      );
+      expect([result.isCompatible, queryByText(CONSTAT)]).toEqual([result.isCompatible, null]);
+      unmount();
+    }
+  });
+});

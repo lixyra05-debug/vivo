@@ -3,7 +3,11 @@ import { AlertTriangle, Leaf } from 'lucide-react-native';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Icon } from '@/src/components/ui/Icon';
-import { UNVERIFIED_TITLE } from '@/src/components/product/CompatibilityBanner';
+import {
+  CompatibilityBanner,
+  isUnverifiedCompatibility,
+  UNVERIFIED_TITLE,
+} from '@/src/components/product/CompatibilityBanner';
 import { ProductHeader } from '@/src/components/product/ProductHeader';
 import {
   ScoreCircle,
@@ -15,6 +19,7 @@ import { findCosmeticIngredient } from '@/src/lib/scoring/cosmetic-ingredients-d
 import { getCosmeticProfileLabel } from '@/src/lib/scoring/cosmetic-profiles';
 import { getCosmeticVerificationStatus } from '@/src/lib/scoring/cosmetic-verification';
 import type {
+  CompatibilityResult,
   CosmeticIngredientRisk,
   CosmeticProduct,
   CosmeticProfile,
@@ -25,6 +30,8 @@ interface CosmeticResultViewProps {
   product: CosmeticProduct;
   result: CosmeticScoringResult;
   profile: CosmeticProfile;
+  /** Compatibilité du profil, s'il y en a un — lue seulement par `compatibilityInStatus`. */
+  compatibilityResult?: CompatibilityResult | null;
 }
 
 const RISK_COLOR: Record<CosmeticIngredientRisk, string> = {
@@ -88,16 +95,44 @@ export function verdictFromScore(score: number): { label: string; description: s
  * chaque cas que `getCosmeticVerificationStatus` couvre : liste absente, vide,
  * ou dont aucun nom n'est reconnu. Constat sur la donnée, jamais sur le
  * produit : le 100 du moteur dit qu'aucune pénalité n'a été relevée, pas
- * qu'il n'y avait rien à relever.
+ * qu'il n'y avait rien à relever. Il ouvre aussi le bandeau de compatibilité
+ * quand celui-ci prend la place du statut (`compatibilityInStatus`), juste
+ * avant son message de sécurité.
  */
 export const COSMETIC_UNVERIFIED_BODY =
   "Aucun ingrédient de ce produit n'a pu être évalué : la liste INCI est absente ou n'est pas reconnue par Vivo. Vérifie la composition sur l'emballage.";
 
-export function CosmeticResultView({ product, result, profile }: CosmeticResultViewProps) {
+/**
+ * S3-3 — le bandeau de compatibilité que porte le statut « Vérification
+ * impossible », ou `null`.
+ *
+ * Quand aucun ingrédient n'a été évalué ET que le profil (allergie, grossesse,
+ * enfant) n'a pas pu être vérifié non plus (D11), la fiche montrait deux blocs
+ * sous ce même titre. Il n'en reste qu'un, en tête de fiche : le bandeau, qui
+ * garde son titre, son message de sécurité et ses points d'attention, et dit
+ * le constat S3-3 à la place de sa phrase générique. `isCompatible` et
+ * `verificationStatus` ne changent pas ; « Incompatible » garde son bandeau.
+ */
+export function compatibilityInStatus(
+  product: Pick<CosmeticProduct, 'ingredients_inci' | 'ingredients_list'>,
+  compatibilityResult: CompatibilityResult | null,
+): CompatibilityResult | null {
+  if (getCosmeticVerificationStatus(product) === 'verified') return null;
+  if (compatibilityResult === null || !isUnverifiedCompatibility(compatibilityResult)) return null;
+  return compatibilityResult;
+}
+
+export function CosmeticResultView({
+  product,
+  result,
+  profile,
+  compatibilityResult = null,
+}: CosmeticResultViewProps) {
   // S3-3 : sans ingrédient évalué, le 100 du moteur ne mesure rien — ni
   // verdict, ni « Formule propre », ni cercle, ni couleur. Le moteur, lui,
   // n'est pas modifié.
   const evaluated = getCosmeticVerificationStatus(product) === 'verified';
+  const statusBanner = compatibilityInStatus(product, compatibilityResult);
   const scoreHex = scoreColor(result.score_final);
   const verdict = verdictFromScore(result.score_final);
   const topRisky = result.risky_ingredients.slice(0, 8);
@@ -162,6 +197,10 @@ export function CosmeticResultView({ product, result, profile }: CosmeticResultV
               </View>
             ) : null}
           </View>
+        </FadeIn>
+      ) : statusBanner ? (
+        <FadeIn delay={140}>
+          <CompatibilityBanner result={statusBanner} unverifiedLead={COSMETIC_UNVERIFIED_BODY} />
         </FadeIn>
       ) : (
         <FadeIn delay={140}>

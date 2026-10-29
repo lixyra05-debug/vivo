@@ -1,7 +1,11 @@
 import { isProductCompatible, getIncompatibilityReasons } from '../profile-filters';
 import { checkCompatibility } from '../compatibility-engine';
+import { calculateCosmeticScore } from '../cosmetic-engine';
+import { cosmeticToScoringInput, normalizeOBFProduct } from '../../api/openbeautyfacts';
 import type {
   CompatibilityProfile,
+  CosmeticProduct,
+  CosmeticScoringResult,
   Product,
   ScoringResult,
 } from '../../api/types';
@@ -123,6 +127,52 @@ describe('isProductCompatible — « pas vérifié » n\'est pas « compatible �
     // Aucun contrôle demandé → rien d'invérifiable → aucune raison d'exclure.
     const product = makeProduct({ ingredients_raw: null });
     expect(isProductCompatible(product, makeScoring(), emptyProfile())).toBe(true);
+  });
+});
+
+/**
+ * S3-3 — un cosmétique dont aucun ingrédient n'a été évalué n'est pas
+ * affirmable compatible, même quand le moteur conclut « compatible et
+ * vérifié » : son 100 ne mesure rien et franchit la barrière de score faute de
+ * relevé, et sa fiche ne lui pose pas le bandeau vert. La liste « Compatibles »
+ * et le compteur « X / Y » ne disent pas plus que la fiche. `checkCompatibility`
+ * n'est pas touché (D11).
+ */
+describe('isProductCompatible — S3-3, un cosmétique non évalué n’est pas « compatible »', () => {
+  const GLUTEN = emptyProfile({ allergies: ['gluten'], minScore: 50 });
+  const DIABETE = emptyProfile({ conditions: ['diabete'], minScore: 50 });
+
+  /** Le produit tel que l'app le construit : réponse OBF → note du moteur cosmétique. */
+  function cosmetique(inci: string): { product: CosmeticProduct; scoring: CosmeticScoringResult } {
+    const product = normalizeOBFProduct({ code: '3401520107313', ingredients_text: inci });
+    return { product, scoring: calculateCosmeticScore(cosmeticToScoringInput(product), 'standard') };
+  }
+
+  // [cas, texte INCI, profil] — le moteur répond « compatible et vérifié » à chacun.
+  const NON_EVALUES: ReadonlyArray<[string, string, CompatibilityProfile]> = [
+    ['noms non reconnus, allergie au gluten', 'AQUA (WATER), PARFUM (FRAGRANCE)', GLUTEN],
+    ['texte marketing, allergie au gluten', 'Un soin doux pour toute la famille', GLUTEN],
+    ['liste vide, profil diabète seul', '', DIABETE],
+  ];
+
+  it.each(NON_EVALUES)('%s : exclu du filtre', (_cas, inci, profil) => {
+    const { product, scoring } = cosmetique(inci);
+    // Pré-condition (D11 inchangé) : aucun blocker, vérification déclarée faite…
+    const engine = checkCompatibility(product, scoring, profil);
+    expect([engine.isCompatible, engine.verificationStatus]).toEqual([true, 'verified']);
+    // …sur un 100 que rien n'a mesuré.
+    expect(scoring.score_final).toBe(100);
+    expect(isProductCompatible(product, scoring, profil)).toBe(false);
+  });
+
+  it('garde : un cosmétique évalué et compatible reste compté', () => {
+    const { product, scoring } = cosmetique('Aqua, Glycerin');
+    expect(isProductCompatible(product, scoring, GLUTEN)).toBe(true);
+  });
+
+  it('garde : un aliment n’est pas touché — même profil diabète, sans liste, il reste compatible', () => {
+    const product = makeProduct({ ingredients_raw: null });
+    expect(isProductCompatible(product, makeScoring(), DIABETE)).toBe(true);
   });
 });
 

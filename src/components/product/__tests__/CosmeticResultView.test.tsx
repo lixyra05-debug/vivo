@@ -3,8 +3,9 @@ import { StyleSheet } from 'react-native';
 import { CosmeticResultView, verdictFromScore } from '../CosmeticResultView';
 import { Colors, scoreColor } from '@/src/constants/colors';
 import { cosmeticToScoringInput, normalizeOBFProduct } from '@/src/lib/api/openbeautyfacts';
+import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
-import type { CosmeticProduct } from '@/src/lib/api/types';
+import type { CompatibilityProfile, CosmeticProduct } from '@/src/lib/api/types';
 
 jest.mock('expo-image', () => {
   const { View } = require('react-native');
@@ -182,5 +183,57 @@ describe('S3-3 — aucun ingrédient évalué : « Vérification impossible »',
     expect(getByText('Vérification impossible')).toBeTruthy();
     expect(getByText('METHYLPARABEN')).toBeTruthy();
     expect(queryByText(/Formule propre/)).toBeNull();
+  });
+});
+
+/**
+ * S3-3 — quand le profil n'a pas pu être vérifié non plus (D11), le statut
+ * « Vérification impossible » porte le bandeau : un seul bloc sous ce titre,
+ * qui dit le constat S3-3 et garde le message de sécurité, mot pour mot.
+ */
+describe('S3-3 — statut et bandeau « Vérification impossible » ne font qu’un', () => {
+  const CORPS =
+    "Aucun ingrédient de ce produit n'a pu être évalué : la liste INCI est absente ou n'est pas reconnue par Vivo. Vérifie la composition sur l'emballage.";
+  const SECURITE = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
+  const ALLERGIQUE: CompatibilityProfile = {
+    allergies: ['gluten'],
+    dietary: [],
+    conditions: [],
+    avoid: [],
+    minScore: 50,
+  };
+
+  function rendreAvecProfil(inci: string) {
+    const product = normalizeOBFProduct({ code: '3401520107313', ingredients_text: inci });
+    const result = calculateCosmeticScore(cosmeticToScoringInput(product), 'standard');
+    const compatibilityResult = checkCompatibility(product, result, ALLERGIQUE);
+    const ecran = render(
+      <CosmeticResultView
+        product={product}
+        result={result}
+        profile="standard"
+        compatibilityResult={compatibilityResult}
+      />,
+    );
+    return { compatibilityResult, ...ecran };
+  }
+
+  it('liste vide, allergie déclarée : un seul titre, le constat et le message de sécurité', () => {
+    const { compatibilityResult, queryAllByText, queryByText } = rendreAvecProfil('');
+    expect(compatibilityResult.verificationStatus).toBe('insufficient_data');
+    expect(queryAllByText('Vérification impossible')).toHaveLength(1);
+    expect(queryByText(CORPS)).toBeTruthy();
+    expect(queryByText(SECURITE)).toBeTruthy();
+  });
+
+  it('allergène lu dans une liste non reconnue : le statut reste celui de S3-3, le verdict reste au bandeau', () => {
+    const { compatibilityResult, getByText, queryByText } = rendreAvecProfil(
+      'AQUA (WATER), TRITICUM VULGARE (WHEAT) GERM OIL',
+    );
+    expect(compatibilityResult.isCompatible).toBe(false);
+    expect(getByText(CORPS)).toBeTruthy();
+    // « Incompatible » n'est pas absorbé : la fiche le rend plus bas, à sa place.
+    expect(queryByText('Incompatible avec votre profil')).toBeNull();
+    expect(queryByText(SECURITE)).toBeNull();
   });
 });

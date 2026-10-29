@@ -1,6 +1,8 @@
 import { render } from '@testing-library/react-native';
 import { CosmeticProductView } from '../CosmeticProductView';
 import { CompatibilityBanner, UNVERIFIED_BODY, UNVERIFIED_TITLE } from '../CompatibilityBanner';
+import { COSMETIC_UNVERIFIED_BODY } from '../CosmeticResultView';
+import { getCosmeticConfidence } from '@/src/lib/api/confidence';
 import { cosmeticToScoringInput, normalizeOBFProduct } from '@/src/lib/api/openbeautyfacts';
 import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
@@ -9,6 +11,7 @@ import type {
   CompatibilityProfile,
   CosmeticProduct,
   CosmeticScoringResult,
+  ProductConfidence,
 } from '@/src/lib/api/types';
 
 jest.mock('expo-image', () => {
@@ -98,9 +101,17 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
     minScore: 50,
   };
   const GLUTEN: CompatibilityProfile = { ...DIABETE, allergies: ['gluten'], conditions: [] };
+  const ENCEINTE: CompatibilityProfile = { ...DIABETE, conditions: ['enceinte'] };
+  const BEBE: CompatibilityProfile = { ...DIABETE, conditions: ['bebe'] };
+  /** Le message de sécurité de D11, mot pour mot : il ne doit jamais disparaître. */
+  const SECURITE = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
 
   /** Toute la chaîne de l'écran : OBF → note → compatibilité → cartes. */
-  function rendre(inci: string, profil: CompatibilityProfile) {
+  function rendre(
+    inci: string,
+    profil: CompatibilityProfile,
+    confidence: ProductConfidence | null = null,
+  ) {
     // Sans marque : la section maison-mère n'interroge pas Wikidata.
     const product = normalizeOBFProduct({ code: '3401520107313', ingredients_text: inci });
     const result = calculateCosmeticScore(cosmeticToScoringInput(product), 'standard');
@@ -119,7 +130,7 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
       <CosmeticProductView
         product={product}
         result={result}
-        confidence={null}
+        confidence={confidence}
         compatibilityResult={compatibilityResult}
         educationalCards={educationalCards}
         packagings={[]}
@@ -150,10 +161,64 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
     },
   );
 
-  it('allergie déclarée, liste vide : le bandeau D11 « Vérification impossible » reste rendu', () => {
-    const { compatibilityResult, getByText } = rendre('', GLUTEN);
+  // [cas, profil] — sur une liste vide, D11 répond « Vérification impossible » à chacun.
+  const PROFIL_INVERIFIABLE: ReadonlyArray<[string, CompatibilityProfile]> = [
+    ['allergie au gluten', GLUTEN],
+    ['grossesse', ENCEINTE],
+    ['enfant', BEBE],
+  ];
+
+  it.each(PROFIL_INVERIFIABLE)(
+    '%s, liste vide : un seul « Vérification impossible », qui garde le message de sécurité de D11',
+    (_cas, profil) => {
+      const { compatibilityResult, queryAllByText, queryByText } = rendre('', profil);
+      // D11 inchangé : le profil n'a pas pu être vérifié.
+      expect([compatibilityResult.isCompatible, compatibilityResult.verificationStatus]).toEqual([
+        true,
+        'insufficient_data',
+      ]);
+      // Un seul bloc sous ce titre…
+      expect(queryAllByText(UNVERIFIED_TITLE)).toHaveLength(1);
+      // …qui dit le constat S3-3 ET le message de sécurité : rien n'a disparu.
+      expect(queryByText(COSMETIC_UNVERIFIED_BODY)).toBeTruthy();
+      expect(queryByText(SECURITE)).toBeTruthy();
+    },
+  );
+
+  it('profil non vérifié, liste non reconnue : son point d’attention reste rendu', () => {
+    // « kiwi » : allergène que le moteur ne sait pas chercher, donc D11 dit
+    // « Vérification impossible » même avec une liste. « MEL (HONEY) » n'est pas
+    // reconnu par la base INCI (non évalué) mais déclenche un point FODMAP.
+    const KIWI_FODMAP: CompatibilityProfile = {
+      ...DIABETE,
+      allergies: ['kiwi'],
+      conditions: ['ibs_fodmap'],
+    };
+    const { compatibilityResult, getByText } = rendre('AQUA (WATER), MEL (HONEY)', KIWI_FODMAP);
     expect(compatibilityResult.verificationStatus).toBe('insufficient_data');
+    expect(getByText('Déclencheur FODMAP détecté : honey')).toBeTruthy();
+  });
+
+  it('liste évaluée, profil non vérifié : le bandeau D11 garde sa place et son texte', () => {
+    const KIWI: CompatibilityProfile = { ...DIABETE, allergies: ['kiwi'], conditions: [] };
+    const { compatibilityResult, getByText, getByLabelText, queryAllByText } = rendre(
+      'Aqua, Glycerin',
+      KIWI,
+    );
+    expect(compatibilityResult.verificationStatus).toBe('insufficient_data');
+    expect(queryAllByText(UNVERIFIED_TITLE)).toHaveLength(1);
     expect(getByText(UNVERIFIED_BODY)).toBeTruthy();
+    // La note, elle, a bien été mesurée et reste affichée.
+    expect(getByLabelText(/ sur 100\./)).toBeTruthy();
+  });
+
+  it('non évalué ET incompatible : le statut et le bandeau « Incompatible » restent deux blocs', () => {
+    const { queryAllByText, getByText } = rendre(
+      'AQUA (WATER), TRITICUM VULGARE (WHEAT) GERM OIL',
+      GLUTEN,
+    );
+    expect(queryAllByText(UNVERIFIED_TITLE)).toHaveLength(1);
+    expect(getByText('Incompatible avec votre profil')).toBeTruthy();
   });
 
   it('allergène lu dans le texte : « Incompatible avec votre profil » reste rendu', () => {
@@ -203,5 +268,41 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
     expect(queryByText(UNVERIFIED_TITLE)).toBeNull();
     expect(queryByText('Incompatible avec votre profil')).toBeNull();
     expect(getByText('Excellent choix !')).toBeTruthy();
+  });
+
+  /** Ce que `getCosmeticConfidence` rend quand les cinq champs sont renseignés. */
+  const VERIFIE_FABRICANT = getCosmeticConfidence(
+    normalizeOBFProduct({
+      code: '3401520107313',
+      product_name: 'Crème hydratante',
+      brands: 'Marque test',
+      image_url: 'https://images.openbeautyfacts.org/creme.jpg',
+      categories_tags: ['en:moisturizers'],
+      ingredients_text: 'AQUA (WATER), PARFUM (FRAGRANCE)',
+    }),
+  );
+
+  it('ni « Comment ce score est calculé ? » ni « Vérifié fabricant » : il n’y a pas de note', () => {
+    // Les cinq champs sont renseignés, la complétude dit « Vérifié fabricant »…
+    expect(VERIFIE_FABRICANT.labelFr).toBe('Vérifié fabricant');
+    // …mais aucun ingrédient de cette liste n'a été évalué.
+    const { queryByText } = rendre('AQUA (WATER), PARFUM (FRAGRANCE)', DIABETE, VERIFIE_FABRICANT);
+    expect(queryByText('Comment ce score est calculé ? →')).toBeNull();
+    expect(queryByText('Vérifié fabricant')).toBeNull();
+  });
+
+  it('un niveau de confiance qui ne contredit rien reste : « À vérifier »', () => {
+    const aVerifier = getCosmeticConfidence(
+      normalizeOBFProduct({ code: '3401520107313', ingredients_text: '' }),
+    );
+    expect(aVerifier.labelFr).toBe('À vérifier');
+    const { getByText } = rendre('', DIABETE, aVerifier);
+    expect(getByText('À vérifier')).toBeTruthy();
+  });
+
+  it('contrôle : liste évaluée → le lien de méthode et « Vérifié fabricant » restent', () => {
+    const { getByText } = rendre('Aqua, Glycerin', DIABETE, VERIFIE_FABRICANT);
+    expect(getByText('Comment ce score est calculé ? →')).toBeTruthy();
+    expect(getByText('Vérifié fabricant')).toBeTruthy();
   });
 });

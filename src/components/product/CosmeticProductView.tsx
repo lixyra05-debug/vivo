@@ -1,7 +1,7 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FadeIn } from '@/src/components/ui/FadeIn';
-import { CosmeticResultView } from './CosmeticResultView';
+import { CosmeticResultView, compatibilityInStatus } from './CosmeticResultView';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { CompatibilityBanner } from './CompatibilityBanner';
 import { ReportButton } from './ReportButton';
@@ -13,7 +13,7 @@ import { NaturalityBadge } from '@/src/components/naturality/NaturalityBadge';
 import { Colors } from '@/src/constants/colors';
 import type { PackagingComponent } from '@/src/data/packaging-risks';
 import type { CosmeticProduct, CosmeticScoringResult } from '@/src/lib/api/types';
-import type { getCosmeticConfidence } from '@/src/lib/api/confidence';
+import { confidenceToDisplay, type getCosmeticConfidence } from '@/src/lib/api/confidence';
 import type { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { getCosmeticVerificationStatus } from '@/src/lib/scoring/cosmetic-verification';
 import type { EducationalCard as EducationalCardType } from '@/src/lib/gamification/types';
@@ -47,26 +47,39 @@ export function CosmeticProductView({
   const greenBanner =
     compatibilityResult?.isCompatible === true &&
     compatibilityResult.verificationStatus !== 'insufficient_data';
+  // Quand le profil n'a pas pu être vérifié non plus, le statut en tête de
+  // fiche porte le bandeau « Vérification impossible » : pas une seconde fois.
+  const bannerInStatus = compatibilityInStatus(product, compatibilityResult) !== null;
+  // Sans évaluation, ni lien vers le calcul d'une note absente, ni « Vérifié
+  // fabricant » à côté de « Vérification impossible ».
+  const shownConfidence = confidence ? confidenceToDisplay(confidence, evaluated) : null;
   const cards = evaluated
     ? educationalCards
     : educationalCards.filter((card) => card.trigger.type !== 'score');
   return (
     <>
-      <CosmeticResultView product={product} result={result} profile="standard" />
-      <FadeIn delay={80}>
-        <View style={{ alignItems: 'center' }}>
-          <Pressable
-            onPress={onPressMethodology}
-            accessibilityRole="link"
-            accessibilityLabel="Comment ce score est calculé"
-            hitSlop={6}
-          >
-            <Text style={styles.methodologyLink}>
-              Comment ce score est calculé ? →
-            </Text>
-          </Pressable>
-        </View>
-      </FadeIn>
+      <CosmeticResultView
+        product={product}
+        result={result}
+        profile="standard"
+        compatibilityResult={compatibilityResult}
+      />
+      {evaluated ? (
+        <FadeIn delay={80}>
+          <View style={{ alignItems: 'center' }}>
+            <Pressable
+              onPress={onPressMethodology}
+              accessibilityRole="link"
+              accessibilityLabel="Comment ce score est calculé"
+              hitSlop={6}
+            >
+              <Text style={styles.methodologyLink}>
+                Comment ce score est calculé ? →
+              </Text>
+            </Pressable>
+          </View>
+        </FadeIn>
+      ) : null}
       {product.ingredients_inci ? (
         <FadeIn delay={180}>
           <NaturalityBadge
@@ -81,14 +94,14 @@ export function CosmeticProductView({
       <FadeIn delay={220}>
         <ConglomerateSection brandName={product.brand} />
       </FadeIn>
-      {confidence ? (
+      {shownConfidence ? (
         <FadeIn delay={120}>
           <View style={{ alignItems: 'center' }}>
-            <ConfidenceBadge confidence={confidence} size="small" />
+            <ConfidenceBadge confidence={shownConfidence} size="small" />
           </View>
         </FadeIn>
       ) : null}
-      {compatibilityResult && (evaluated || !greenBanner) ? (
+      {compatibilityResult && !bannerInStatus && (evaluated || !greenBanner) ? (
         <FadeIn delay={160}>
           <CompatibilityBanner result={compatibilityResult} />
         </FadeIn>

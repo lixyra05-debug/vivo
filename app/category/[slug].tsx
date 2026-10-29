@@ -27,7 +27,7 @@ import { getCategoryBySlug } from '@/src/lib/api/categories';
 import { searchByCategory } from '@/src/lib/api/search';
 import { getOrFetchProduct, productToScoringInput } from '@/src/lib/api/openfoodfacts';
 import { getOrFetchCosmetic, cosmeticToScoringInput } from '@/src/lib/api/openbeautyfacts';
-import { getProductConfidence, getCosmeticConfidence } from '@/src/lib/api/confidence';
+import { confidenceToDisplay, getProductConfidence, getCosmeticConfidence } from '@/src/lib/api/confidence';
 import { calculateScore } from '@/src/lib/scoring/engine';
 import { composeScore } from '@/src/lib/scoring/composite-score';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
@@ -361,7 +361,7 @@ export default function CategoryScreen() {
                       score={item.evaluated ? item.score : null}
                       rank={index + 1}
                       medal={medal}
-                      confidence={item.confidence}
+                      confidence={confidenceToDisplay(item.confidence, item.evaluated) ?? undefined}
                       onPress={() => handleItemPress(item)}
                     />
                   </FadeIn>
