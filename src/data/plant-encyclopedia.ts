@@ -185,7 +185,7 @@ export const PLANT_ENCYCLOPEDIA: PlantEntry[] = [
     preparation:
       "Infusion 1-2 g par tasse, 5-10 min, 1-3 fois par jour. Huile essentielle uniquement après avis professionnel.",
     contraindications:
-      "Huile essentielle déconseillée chez les enfants de moins de 6 ans et en grossesse. Voie orale strictement encadrée.",
+      "Huile essentielle déconseillée chez les enfants de moins de 6 ans et en grossesse. Voie orale strictement encadrée. Huile essentielle uniquement après avis professionnel.",
     interactions: null,
     evidenceLevel: 'traditional',
     source: 'EMA HMPC monograph 2012 (Lavandulae flos)',
@@ -704,7 +704,7 @@ export const PLANT_ENCYCLOPEDIA: PlantEntry[] = [
     contraindications:
       "Grossesse, allaitement, enfant de moins de 12 ans, pathologie rénale. Pas plus de 7 jours d'affilée ni 5 cures par an.",
     interactions:
-      "Éviter avec aliments acidifiant l'urine (peut réduire l'efficacité).",
+      "Éviter avec aliments acidifiant l'urine.",
     evidenceLevel: 'traditional',
     source: 'EMA HMPC monograph 2018 (Uvae ursi folium)',
     sourceUrl: EMA_HMPC_BASE,
@@ -764,7 +764,7 @@ export const PLANT_ENCYCLOPEDIA: PlantEntry[] = [
       "Usage bien établi contre les nausées et le mal des transports, et usage traditionnel pour le confort digestif.",
     partUsed: 'Rhizome frais ou séché',
     preparation:
-      "Infusion 0,5-1 g de poudre ou décoction de rhizome frais (1-2 g) par tasse, 3 fois par jour.",
+      "Infusion 0,5-1 g de poudre ou décoction de rhizome frais (1-2 g) par tasse, 3 fois par jour. Grossesse : voir les contre-indications.",
     contraindications:
       "Lithiase biliaire, ulcère gastrique. Prudence avant chirurgie. Grossesse : limiter à 2 g/jour selon avis médical.",
     interactions:
@@ -829,7 +829,7 @@ export const PLANT_ENCYCLOPEDIA: PlantEntry[] = [
     preparation:
       "Décoction ou poudre 0,5-2 g par jour, le matin de préférence. Cure de 4-12 semaines max.",
     contraindications:
-      "Hypertension non contrôlée, troubles cardiaques, troubles psychiatriques, grossesse, allaitement, enfant.",
+      "Hypertension non contrôlée, troubles cardiaques, troubles psychiatriques, grossesse, allaitement, enfant. Cure de 4-12 semaines max.",
     interactions:
       "Prudence avec anticoagulants (warfarine), hypoglycémiants, antidépresseurs (IMAO), corticoïdes.",
     evidenceLevel: 'well-established',

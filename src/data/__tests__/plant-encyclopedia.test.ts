@@ -225,3 +225,89 @@ describe('Bourrache — la fiche dit ce que dit la carte EFSA', () => {
     },
   );
 });
+
+/**
+ * VERROU SANTÉ — lot S3, C2b. Depuis C2, `contraindications` et
+ * `interactions` sont rendues à tous les paliers ; `preparation` reste Expert
+ * (`ExpertSections`, app/plants/[id].tsx). Deux limites de sécurité n'étaient
+ * écrites que dans `preparation` : hors Expert, personne ne les lisait. Elles
+ * sont recopiées mot pour mot à la fin de `contraindications` — texte
+ * existant, aucun contenu médical nouveau — et restent dans `preparation`.
+ * Une fréquence journalière est une posologie, pas une limite : elle n'est
+ * pas recopiée. Le bouleau est reporté au lot contenu : sa consigne
+ * d'hydratation, lue sous « Contre-indications » à côté de l'œdème cardiaque
+ * ou rénal, dirait l'inverse de ce qu'elle veut dire.
+ */
+describe('C2b — les limites de la Préparation se lisent dans les contre-indications', () => {
+  function plant(id: string): PlantEntry {
+    const found = PLANT_ENCYCLOPEDIA.find((p) => p.id === id);
+    if (!found) throw new Error(`Fiche ${id} introuvable`);
+    return found;
+  }
+
+  // [id, limite telle qu'écrite dans la Préparation, contre-indications avant C2b]
+  const LIMITS: Array<[string, string, string]> = [
+    [
+      'ginseng',
+      'Cure de 4-12 semaines max.',
+      'Hypertension non contrôlée, troubles cardiaques, troubles psychiatriques, grossesse, allaitement, enfant.',
+    ],
+    [
+      'lavender',
+      'Huile essentielle uniquement après avis professionnel.',
+      'Huile essentielle déconseillée chez les enfants de moins de 6 ans et en grossesse. Voie orale strictement encadrée.',
+    ],
+  ];
+
+  it.each(LIMITS)(
+    '%s : « %s » figure dans la Préparation et, mot pour mot, dans les contre-indications',
+    (id, limit, contraindicationsBefore) => {
+      const { preparation, contraindications } = plant(id);
+      expect(preparation).toContain(limit);
+      // Rien d'autre ne change : la reprise s'ajoute après le texte existant.
+      expect(contraindications).toBe(`${contraindicationsBefore} ${limit}`);
+    },
+  );
+
+  it("busserole : les interactions ne parlent plus d'efficacité — suppression seule", () => {
+    const { interactions } = plant('bearberry');
+    expect(interactions).not.toContain('efficacité');
+    expect(interactions).toBe("Éviter avec aliments acidifiant l'urine.");
+  });
+
+  it('gingembre : la Préparation renvoie aux contre-indications pour la grossesse', () => {
+    const { preparation, contraindications } = plant('ginger');
+    expect(preparation).toContain('Grossesse : voir les contre-indications');
+    // Le renvoi mène quelque part : les contre-indications, rendues à tous
+    // sous ce titre, parlent de grossesse.
+    expect(contraindications).toContain('Grossesse');
+    // Rien d'autre ne change : le renvoi s'ajoute après la préparation existante.
+    expect(preparation).toBe(
+      'Infusion 0,5-1 g de poudre ou décoction de rhizome frais (1-2 g) par tasse, 3 fois par jour. Grossesse : voir les contre-indications.',
+    );
+  });
+
+  // [id, fréquence journalière écrite dans la Préparation]
+  const FREQUENCIES: Array<[string, string]> = [
+    ['bearberry', "jusqu'à 4 fois par jour"],
+    ['melissa', "jusqu'à 3 fois par jour"],
+  ];
+
+  it.each(FREQUENCIES)(
+    'garde %s : « %s » reste dans la Préparation, pas dans les contre-indications',
+    (id, frequency) => {
+      const { preparation, contraindications } = plant(id);
+      expect(preparation).toContain(frequency);
+      expect(contraindications).not.toContain(frequency);
+      expect(contraindications).not.toMatch(/fois par jour/);
+    },
+  );
+
+  // Bouleau reporté au lot contenu : rien n'est recopié tant que la consigne
+  // d'hydratation n'est pas réécrite pour l'œdème cardiaque ou rénal.
+  it('garde bouleau (reporté) : « consommation hydrique » reste hors des contre-indications', () => {
+    const { preparation, contraindications } = plant('birch');
+    expect(preparation).toContain('consommation hydrique abondante');
+    expect(contraindications).not.toContain('consommation hydrique');
+  });
+});

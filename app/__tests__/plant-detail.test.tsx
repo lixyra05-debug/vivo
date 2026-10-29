@@ -214,4 +214,25 @@ describe('Fiche plante — précautions visibles à tous les paliers', () => {
     expect(texts).toContain('Aucune interaction renseignée sur cette fiche.');
     expect(texts).not.toContain('Aucune interaction notable documentée.');
   });
+
+  // C2b — ces limites n'étaient écrites que dans la Préparation, Expert.
+  // Recopiées dans les contre-indications, elles se lisent hors Expert.
+  it.each([
+    ['ginseng', 'Cure de 4-12 semaines max.'],
+    ['lavender', 'Huile essentielle uniquement après avis professionnel.'],
+  ])('free, %s : « %s » se lit en clair dans les contre-indications', (id, limit) => {
+    mockPlantId = id;
+    render(<PlantDetailScreen />);
+
+    // La Préparation reste fermée : seules les contre-indications portent la limite.
+    expect(screen.queryByText('Préparation')).toBeNull();
+    const { contraindications } = plantById(id);
+    expect(textsInReadingOrder().filter((t) => t.includes(limit))).toEqual([
+      contraindications,
+    ]);
+    const node = screen.getByText(contraindications, { includeHiddenElements: true });
+    expect(isObscured(node)).toBe(false);
+    expect(isHiddenFromAccessibility(node)).toBe(false);
+    expect(node.props.numberOfLines).toBeUndefined();
+  });
 });
