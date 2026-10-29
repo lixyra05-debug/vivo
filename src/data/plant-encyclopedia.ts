@@ -506,14 +506,14 @@ export const PLANT_ENCYCLOPEDIA: PlantEntry[] = [
     emoji: '💙',
     category: 'skin',
     properties:
-      "Propriétés documentées : huile riche en acide gamma-linolénique. Contribue au confort cutané dans le cadre d'une alimentation équilibrée.",
+      "Propriétés documentées : huile riche en acide gamma-linolénique.",
     traditionalUse:
       'Usage traditionnel de la fleur pour favoriser le confort cutané. Huile en complément alimentaire.',
-    partUsed: 'Graines (huile) — éviter les parties aériennes au long cours',
+    partUsed: 'Graines (huile) — éviter les parties aériennes',
     preparation:
       "Capsules d'huile de bourrache selon notice du fabricant.",
     contraindications:
-      "Parties aériennes (alcaloïdes pyrrolizidiniques) déconseillées au long cours, en grossesse, allaitement, chez l'enfant. Privilégier l'huile de graines purifiée.",
+      "Selon l'EFSA, la bourrache (feuilles, fleurs) contient des alcaloïdes pyrrolizidiniques hépatotoxiques et potentiellement cancérogènes. Consommation interne déconseillée. Contre-indications : grossesse, allaitement, enfants <18 ans, maladie hépatique. L'huile de pépins (sans PA) reste sans allégation santé validée.",
     interactions:
       'Prudence avec anticoagulants (effet potentiel sur l\'agrégation plaquettaire).',
     evidenceLevel: 'traditional',
