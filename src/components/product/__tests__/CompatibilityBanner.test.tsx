@@ -2,13 +2,16 @@ import { StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 import {
   CompatibilityBanner,
+  isUnverifiedCompatibility,
   UNVERIFIED_BODY,
   UNVERIFIED_TITLE,
 } from '../CompatibilityBanner';
 import {
+  ALLERGEN_TAG_TO_KEY,
   checkCompatibility,
   INSUFFICIENT_DATA_LABEL_FR,
 } from '@/src/lib/scoring/compatibility-engine';
+import { isProductCompatible } from '@/src/lib/scoring/profile-filters';
 import { normalizeOFFProduct } from '@/src/lib/api/openfoodfacts';
 import type { CompatibilityResult, Product, ScoringResult } from '@/src/lib/api/types';
 import { Palette } from '@/src/constants/theme';
@@ -378,6 +381,49 @@ describe('CompatibilityBanner — liste vide, profil allergique', () => {
         "La liste d'ingrédients de ce produit n'est pas disponible. Tes allergies et restrictions n'ont pas pu être vérifiées.",
       ),
     ).toBeTruthy();
+  });
+
+  // Lot S1b, (b2) — garde. Une déclaration ne vaut que pour ce qu'elle nomme :
+  // une fiche sans aucun texte qui déclare du lait ne dit rien du gluten. Le
+  // tag présent ne doit jamais rendre « compatible » l'allergène qu'il ne nomme
+  // pas — ni sur le bandeau, ni dans les listes « Compatibles ».
+  it('tags présents, aucun texte, allergène absent des tags : « Vérification impossible », jamais compatible', () => {
+    const sansTexte = (tag: string): Product =>
+      normalizeOFFProduct({ code: '0000000000002', ingredients_text: '', ingredients_text_fr: '', allergens_tags: [tag] });
+    const allergique = (allergie: string) => ({
+      allergies: [allergie],
+      dietary: [],
+      conditions: [],
+      avoid: [],
+      minScore: 0,
+    });
+
+    // Le cas type, de bout en bout : moteur réel, puis bandeau.
+    const result = checkCompatibility(sansTexte('en:milk'), scoring, allergique('gluten'));
+    expect([result.isCompatible, result.verificationStatus]).toEqual([true, 'insufficient_data']);
+    const { getByText, queryByText } = render(<CompatibilityBanner result={result} />);
+    expect(getByText(UNVERIFIED_TITLE)).toBeTruthy();
+    expect(
+      getByText(
+        "La liste d'ingrédients de ce produit n'est pas disponible. Tes allergies et restrictions n'ont pas pu être vérifiées.",
+      ),
+    ).toBeTruthy();
+    expect(queryByText(TITRE_ALLERGENES)).toBeNull();
+    expect(queryByText(TITRE_GENERIQUE)).toBeNull();
+
+    // Chacun des 14 tags canoniques, face à chacune des 13 autres allergies.
+    const ecarts: string[] = [];
+    for (const [tag, cle] of Object.entries(ALLERGEN_TAG_TO_KEY)) {
+      for (const allergie of Object.values(ALLERGEN_TAG_TO_KEY)) {
+        if (allergie === cle) continue;
+        const produit = sansTexte(tag);
+        const r = checkCompatibility(produit, scoring, allergique(allergie));
+        if (!isUnverifiedCompatibility(r) || isProductCompatible(produit, scoring, allergique(allergie))) {
+          ecarts.push(`${tag} × ${allergie}`);
+        }
+      }
+    }
+    expect(ecarts).toEqual([]);
   });
 });
 
