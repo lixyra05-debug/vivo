@@ -29,10 +29,12 @@ import type {
 // ─── Mocks paramétrables ────────────────────────────────────────────────────
 
 let mockParams: { id?: string } = { id: 'new' };
-let mockProfiles: FamilyProfile[] = [];
+// `undefined` : lecture encore en cours (isLoading).
+let mockProfiles: FamilyProfile[] | undefined = [];
 const mockUpdate = jest.fn<Promise<void>, [UpdateFamilyProfileInput]>(() =>
   Promise.resolve(),
 );
+const mockCreate = jest.fn<Promise<void>, [unknown]>(() => Promise.resolve());
 
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
@@ -70,9 +72,9 @@ jest.mock('@/src/lib/hooks/usePremium', () => ({
 
 jest.mock('@/src/lib/family/family-store', () => ({
   MAX_FAMILY_PROFILES: 4,
-  useFamilyProfiles: () => ({ data: mockProfiles, isLoading: false }),
+  useFamilyProfiles: () => ({ data: mockProfiles, isLoading: mockProfiles === undefined }),
   useCreateFamilyProfile: () => ({
-    mutateAsync: jest.fn(),
+    mutateAsync: mockCreate,
     mutate: jest.fn(),
     isPending: false,
   }),
@@ -226,5 +228,52 @@ describe('Mode Famille — garde : les champs restent, les données aussi', () =
         conditions: ['diabete'],
       }),
     );
+  });
+});
+
+/**
+ * C3b — `fetchFamilyProfiles` avale les erreurs et rend `[]` : après une
+ * lecture échouée (ou tant qu'elle court), l'écran d'édition reste un
+ * formulaire vide. Enregistrer y écrirait allergies et conditions vides,
+ * avatar et tranche d'âge par défaut — un effacement silencieux.
+ */
+describe('Mode Famille — « Enregistrer » attend le profil (C3b)', () => {
+  beforeEach(() => {
+    mockParams = { id: 'p-1' };
+    mockUpdate.mockClear();
+    mockCreate.mockClear();
+  });
+
+  it.each<[string, FamilyProfile[] | undefined]>([
+    ['lecture échouée (liste vide)', []],
+    ['lecture en cours', undefined],
+  ])('%s, nom saisi : aucun envoi', (_cas, profiles) => {
+    mockProfiles = profiles;
+    const view = render(
+      <Wrapper>
+        <FamilyEditScreen />
+      </Wrapper>,
+    );
+    expect(view.getByText('Modifier le profil')).toBeTruthy();
+
+    fireEvent.changeText(view.getByPlaceholderText('Ex : Léa'), 'Léa');
+    fireEvent.press(view.getByLabelText('Enregistrer'));
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('garde : en création, « Créer le profil » envoie toujours', () => {
+    mockParams = { id: 'new' };
+    mockProfiles = [];
+    const view = render(
+      <Wrapper>
+        <FamilyEditScreen />
+      </Wrapper>,
+    );
+
+    fireEvent.changeText(view.getByPlaceholderText('Ex : Léa'), 'Léa');
+    fireEvent.press(view.getByLabelText('Créer le profil'));
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 });

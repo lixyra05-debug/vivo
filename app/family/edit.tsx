@@ -369,7 +369,9 @@ export default function FamilyEditScreen() {
                   }
                   onPress={handleSubmit}
                   icon={<Check color="#FFFFFF" size={18} strokeWidth={2.4} />}
-                  disabled={isSubmitting}
+                  // Édition : tant que le profil n'est pas chargé (ou si la
+                  // lecture a échoué), enregistrer écraserait ses données.
+                  disabled={isSubmitting || !hydrated}
                 />
                 {isCreate ? (
                   <SecondaryButton
