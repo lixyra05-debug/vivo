@@ -77,6 +77,7 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Confiance & signalement** : `ConfidenceBadge` sous le header produit, `ReportButton` discret avec modal slide (5 raisons FR + description optionnelle), pas de photo MVP
 - **Adapter user→compat** : `userProfileToCompatibilityProfile` mappe `diabetic→diabete`, `pregnant→enceinte`, `child→bebe` ; renvoie `null` si standard sans allergie pour masquer le toggle
 - **Sources des allergènes (lot S1b)** : `normalizeOFFProduct` copie `ingredients_text_fr` (texte français, `null` si absent) et `allergens_tags` (déclaration de la fiche, saisie communautaire) dans `products` ; `ingredients_raw` reste la langue principale, et lui seul nourrit la note. **Migration `017_products_allergen_sources.sql` à appliquer AVANT tout déploiement** : `writeProductToCache` upsert l'objet entier.
+- **Lecture de la compatibilité (lot S1b)** : tous les lecteurs du texte — allergies, régimes, grossesse, cœliaque, FODMAP, huile de palme — lisent le texte français ET le texte principal (lecture cumulée : aucune alerte perdue). L'ordre, le français d'abord, ne décide que du mot affiché : `matchedText` d'une allergie, nom d'un déclencheur FODMAP (un aliment nommé dans les deux langues ne compte qu'une fois) ; les autres libellés citent le premier mot-clé de leur liste trouvé dans l'un ou l'autre texte. `allergens_tags` en union avec le texte : un tag présent est lu comme « contient », son absence ne prouve rien ; table un pour un `ALLERGEN_TAG_TO_KEY` (14 tags canoniques), tag hors table ignoré ; le cœliaque lit aussi `en:gluten`. Champs C5 : `matchedText` (mot lu dans un texte, absent pour un tag seul) et `checkedAllergenCount`. En production, seuls les allergies et la grossesse sont atteints (`userProfileToCompatibilityProfile`) ; régimes, cœliaque, FODMAP et huile de palme ne le sont par aucun écran.
 - **Migration** : `009_stores_confidence_reports.sql` (table `product_reports` RLS + table `stores` seedée idempotente)
 
 ## Sprint 1 — Corrections audit (avril 2026)
@@ -434,6 +435,31 @@ encore sur deux points :
 (`expect(getByText('Danger')).toBeTruthy()`) — le test doit être adapté dans le même commit. Corriger le
 dégradé sort le fichier de l'allowlist de `theme-guard.test.ts` (même règle que `ScoreCircle.tsx:88`) :
 retirer aussi la ligne de l'allowlist, sinon l'assertion « aucune entrée périmée » échoue.
+
+### LIMITE ASSUMÉE — un tag `allergens_tags` seul bloque, même sans appui sur la fiche (lot S1b)
+Depuis S1b, un tag canonique d'`allergens_tags` est lu comme « contient », en union avec le texte :
+une alerte de trop plutôt qu'une alerte manquée. Sur 170 fiches réelles (octobre 2026), les tags seuls
+font passer 36 verdicts d'allergie de compatible à incompatible, sans « Mot détecté » :
+- 9 ingrédients réels qu'aucun mot-clé ne lit (« maquereaux », « BROCHET », « emmental », « soya »,
+  « disulfite », « anhydride sulfureux », texte bulgare — D-C) ;
+- 15 traces recopiées dans la déclaration (tag aussi dans `traces_tags`), lues comme le texte lit déjà
+  « peut contenir » : « contient » ;
+- 2 châtaignes ou marrons déclarés `en:nuts`, hors de l'annexe II du règlement 1169/2011
+  (0022314010025, 3045320008920 — test de limite connue dans `compatibility-engine.test.ts`) ;
+- 1 tag porté par une autre recette de la fiche (3366321052386 : huile de noisette dans le seul
+  `ingredients_text_en`, que le moteur ne lit pas) ;
+- 9 sans aucun appui (ex. 50160884 « Vegan Bouillon » déclaré `en:milk`).
+
+Le libellé reste « Contient X (allergie déclarée) » : il ne dit pas que X vient de la déclaration. À
+revisiter avec la provenance du motif et le lot traces (`traces_tags`, hors S1b).
+
+### Locutions lues comme l'ingrédient, étendues par le texte français (lot S1b — D-C, D-E)
+La recherche par mot lit une locution comme l'ingrédient qu'elle nomme. Lire aussi le texte français
+étend ces faux positifs connus. Verdicts dus à la seule locution, 170 fiches, avant → après S1b :
+vinaigre (d'alcool, de vin) → grossesse et halal 19 → 21 chacun ; « arôme bacon » → halal, casher et
+sans porc 0 → 1 ; « Sans gluten » → allergie au gluten et cœliaque 3 → 4 ; « noix de coco » → fruits à
+coque 1 → 2 ; « pomme de terre » → déclencheur FODMAP « pomme » 9 → 11 fiches. Inchangés : « noix de
+muscade » et « beurre de cacao » (1 chacun). À traiter avec D-C (mots-clés, locutions) et D-E (négations).
 
 ## Conventions
 - TypeScript strict (`strict: true`)

@@ -1,4 +1,5 @@
 import {
+  ALLERGEN_TAG_TO_KEY,
   checkCompatibility,
   FODMAP_TRIGGERS,
   INSUFFICIENT_DATA_LABEL_FR,
@@ -757,5 +758,522 @@ describe('checkCompatibility — allergènes : pluriel, accent omis, ligature œ
       result.incompatibilities.filter((i) => i.labelFr.startsWith('Contient du gluten')),
     ).toHaveLength(1);
     expect(result.isCompatible).toBe(false);
+  });
+});
+
+// === Lot S1b — la source : texte français d'abord, allergènes déclarés en complément ===
+
+/**
+ * Fiches RÉELLES d'Open Food Facts (licence ODbL, relevées le 29 octobre 2026),
+ * champs recopiés tels quels. `ingredients_raw` est le texte de la langue
+ * principale de la fiche ; `ingredients_text_fr` et `allergens_tags` sont les
+ * deux sources que S1b donne à la compatibilité.
+ */
+const FICHES_S1B = {
+  // Nutella — langue principale : l'anglais, tronqué. Faux positif CONNU, hors
+  // lot (D-E, négations) : « Sans gluten. » se lit « gluten », pour une
+  // allergie au gluten comme pour le profil cœliaque.
+  nutella: {
+    ingredients_raw: 'sugar, palm oil',
+    ingredients_text_fr:
+      'Sucre, huile de palme, NOISETTES 13%, cacao maigre 7,4%, LAIT écrémé en poudre 6,6%, LACTOSERUM en poudre, émulsifiants: lécithines [SOJA), vanilline. Sans gluten.',
+    allergens_tags: ['en:milk', 'en:nuts', 'en:soybeans'],
+  },
+  // Nut & Fruit Mix Classic (20005726) — texte bulgare seulement ; OFF sert un
+  // texte français VIDE, que le moteur saute.
+  noixBulgare: {
+    ingredients_raw:
+      '40% светли стафиди (светли стафиди, слънчо - гледово масло), 20% бланширани бадеми, 15% орехи, 10% лешници, 10% бразилски орехи, 5% кашу, Може да съдържа следи от други ядки, фъстъци,',
+    ingredients_text_fr: '',
+    allergens_tags: ['en:nuts', 'en:peanuts'],
+  },
+  // Amora Sauce Crudités (8711200459926) — le sésame n'est que dans le texte
+  // anglais, et seulement en mention de traces (« may contain: sesame »).
+  // Faux positif CONNU, hors lot (D-C) : « vinaigre d'alcool » se lit
+  // « alcool » pour les profils grossesse et halal.
+  amora: {
+    ingredients_raw:
+      'water, rapeseed oil, apple cider vinegar² (apple cider vinegar, concentrated apple must), corn starch², egg yolk², salt², onion powder², stabilizer: guar gum², natural mustard flavour², may contain: sesame, ²ingredients of natural origin,',
+    ingredients_text_fr:
+      "Eau, huile de colza, vinaigre d'alcool, vinaigre de cidre adouci (vinaigre de cidre, moût de pomme concentré), amidon modifié, jaune d'ŒUF, sel, sucre, oignon en poudre, arôme naturel de MOUTARDE, stabilisant : gomme xanthane.",
+    allergens_tags: ['en:eggs', 'en:mustard'],
+  },
+  // Oatly Barista (7394376616228) — texte anglais seulement.
+  oatly: {
+    ingredients_raw:
+      'water,  oats  10%, rapeseed oil, acidity regulator (dipotassium phosphate), minerals (calcium carbonate, potassium iodide), salt, vitamins (d2, riboflavin and b12),',
+    ingredients_text_fr: '',
+    allergens_tags: ['en:gluten'],
+  },
+  // Oreo Double Crème (7622210137258) — langue principale : le néerlandais.
+  // Mention de traces lue « contient », hors lot : « PEUT CONTENIR LAIT. »
+  // bloque l'allergie au lait et le profil végan ; le tag en:milk est recopié
+  // des traces (traces_tags : en:milk).
+  oreo: {
+    ingredients_raw:
+      'suiker, _tarwebloem_, palmolie, koolzaadolie, _tarwezetmeel_, magere cacaopoeder 3.5%, glucose-fructosestroop, rijsmiddelen (kaliumcarbonaten, ammoniumcarbonaten, natriumcarbonaten), zout, emulgatoren (_sojalecithine_, zonnebloemlecithine), aroma',
+    ingredients_text_fr:
+      "Sucre, farine de BLÉ, huile de palme, amidon de BLÉ, huile de colza, cacao maigre en poudre 3,7 %, sirop de glucose-fructose, poudres à lever (carbonates d'ammonium, carbonates de potassium, carbonates de sodium), sel, émulsifiant (lécithines de SOJA), correcteur d'acidité (hydroxyde de sodium), arômes. PEUT CONTENIR LAIT.",
+    allergens_tags: ['en:gluten', 'en:milk', 'en:soybeans'],
+  },
+  // Cornichons (8711200460755) — la même recette en français et en anglais.
+  // Faux positif CONNU, hors lot (D-C) : le vinaigre se lit comme de l'alcool
+  // pour la grossesse et le halal — « alcool » (vinaigre d'alcool) en français,
+  // « wine » (white wine vinegar) en anglais.
+  cornichons: {
+    ingredients_raw:
+      'pickles (including sulphites), spirit vinegar, onion 8%, white wine vinegar, salt, spices to 1,9% (mustard seeds, red bell pepper, rehydrated, coriander seeds, allspice, black pepper), natural flavor of tarragon with other natural flavourings,',
+    ingredients_text_fr:
+      "cornichons (dont SULFITES), vinaigre d'alcool, oignon 8%, vinaigre de vin blanc, sel, épices 1,9% (graines de MOUTARDE, poivron rouge réhydraté, graines de coriandre, piment de la Jamaïque, poivre noir), arôme naturel d'estragon avec autres arômes naturels.",
+    allergens_tags: ['en:mustard', 'en:sulphur-dioxide-and-sulphites'],
+  },
+} as const;
+
+/** `as const` fige des tableaux en lecture seule : on les recopie pour `Product`. */
+function ficheS1b(fiche: (typeof FICHES_S1B)[keyof typeof FICHES_S1B]): Partial<Product> {
+  return { ...fiche, allergens_tags: [...fiche.allergens_tags] };
+}
+
+describe('checkCompatibility — texte français d’abord, allergènes déclarés en complément (lot S1b)', () => {
+  function motifsAllergie(result: ReturnType<typeof checkCompatibility>) {
+    return result.incompatibilities.filter((i) => i.type === 'allergy');
+  }
+
+  it.each([
+    ['fruits_a_coque', 'NOISETTES'],
+    ['lactose', 'LAIT'],
+    ['soja', 'SOJA'],
+  ])('Nutella, allergie %s : bloqué, mot détecté « %s » lu dans le texte français', (allergie, mot) => {
+    const result = checkCompatibility(
+      makeProduct(ficheS1b(FICHES_S1B.nutella)),
+      makeScoring(),
+      emptyProfile({ allergies: [allergie] }),
+    );
+    const motifs = motifsAllergie(result);
+    expect(motifs).toHaveLength(1);
+    expect(motifs[0].matchedText).toBe(mot);
+    expect(result.isCompatible).toBe(false);
+    expect(result.verificationStatus).toBe('verified');
+  });
+
+  it('le français d’abord : quand les deux textes nomment l’allergène, le mot vient du français', () => {
+    // Même recette dans les deux langues : « MOUTARDE » et « mustard ».
+    const result = checkCompatibility(
+      makeProduct(ficheS1b(FICHES_S1B.cornichons)),
+      makeScoring(),
+      emptyProfile({ allergies: ['moutarde'] }),
+    );
+    expect(motifsAllergie(result).map((m) => m.matchedText)).toEqual(['MOUTARDE']);
+  });
+
+  it('sans texte français, texte illisible pour les mots-clés : le tag déclaré est lu', () => {
+    // Texte bulgare : aucun mot-clé ne peut s'y lire. OFF déclare en:nuts.
+    const result = checkCompatibility(
+      makeProduct(ficheS1b(FICHES_S1B.noixBulgare)),
+      makeScoring(),
+      emptyProfile({ allergies: ['fruits_a_coque'] }),
+    );
+    const motifs = motifsAllergie(result);
+    expect(motifs).toHaveLength(1);
+    // Aucun mot n'a été LU : rien à afficher sous le motif.
+    expect(motifs[0].matchedText).toBeUndefined();
+    expect(result.isCompatible).toBe(false);
+  });
+
+  it('sans texte français : le texte principal reste lu', () => {
+    const result = checkCompatibility(
+      makeProduct({ ...ficheS1b(FICHES_S1B.oatly), allergens_tags: [] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['gluten'] }),
+    );
+    expect(motifsAllergie(result)).toHaveLength(1);
+    expect(result.isCompatible).toBe(false);
+  });
+
+  it('aucune alerte perdue : une mention de traces du seul texte principal reste lue, comme avant', () => {
+    // Le texte français d'Amora ne parle pas de sésame ; l'anglais dit « may
+    // contain: sesame ». Le moteur lit les traces comme « contient » (hors lot) ;
+    // lire le français D'ABORD ne doit pas faire taire ce qu'il voyait avant.
+    const result = checkCompatibility(
+      makeProduct(ficheS1b(FICHES_S1B.amora)),
+      makeScoring(),
+      emptyProfile({ allergies: ['sesame'] }),
+    );
+    expect(motifsAllergie(result)).toHaveLength(1);
+    expect(motifsAllergie(result)[0].matchedText).toBe('sesame');
+  });
+
+  it('tags sans texte : un tag présent est lu comme « contient »', () => {
+    // La déclaration de la fiche peut se tromper (traces recopiées, châtaigne
+    // déclarée « fruit à coque ») : une alerte de trop plutôt qu'une manquée.
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: null, ingredients_text_fr: null, allergens_tags: ['en:milk'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['lactose'] }),
+    );
+    expect(motifsAllergie(result)).toHaveLength(1);
+    expect(motifsAllergie(result)[0].matchedText).toBeUndefined();
+    expect(result.isCompatible).toBe(false);
+    // D11 : l'allergie a bien été vérifiée — par la déclaration, pas par le texte.
+    expect(result.verificationStatus).toBe('verified');
+  });
+
+  it('tags sans texte : l’absence d’un tag ne prouve rien', () => {
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: null, ingredients_text_fr: null, allergens_tags: ['en:milk'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['gluten'] }),
+    );
+    expect(result.isCompatible).toBe(true);
+    expect(result.verificationStatus).toBe('insufficient_data');
+  });
+
+  // Les deux formes d'une ligne de cache ancienne : écrite avant que la
+  // migration 017 n'existe (propriétés absentes), puis lue après (NULL et '{}').
+  it.each<[string, Partial<Product>, boolean]>([
+    ['propriétés absentes', {}, false],
+    ['colonnes NULL et vide', { ingredients_text_fr: null, allergens_tags: [] }, true],
+  ])('ligne de cache ancienne (%s) : seul le texte principal est lu', (_forme, colonnes, champsPresents) => {
+    // Le Nutella y reste « compatible » pour un allergique aux fruits à coque —
+    // limite connue de ces lignes, jusqu'à ce qu'un écran rafraîchisse le cache.
+    const ancienne = makeProduct({ ingredients_raw: FICHES_S1B.nutella.ingredients_raw, ...colonnes });
+    // Chaque forme est bien celle qu'elle dit être : la fabrique ne pose aucun champ S1b.
+    expect(['ingredients_text_fr' in ancienne, 'allergens_tags' in ancienne]).toEqual([
+      champsPresents,
+      champsPresents,
+    ]);
+    const result = checkCompatibility(
+      ancienne,
+      makeScoring(),
+      emptyProfile({ allergies: ['fruits_a_coque'] }),
+    );
+    expect(result.isCompatible).toBe(true);
+    expect(result.verificationStatus).toBe('verified');
+  });
+
+  it('tag inconnu : ignoré, même quand il nomme un allergène', () => {
+    // « nl:Milch », « en:Œufs » : tags saisis à la main, hors taxonomie OFF. Seuls
+    // les 14 tags canoniques comptent ; sans texte, rien n'est donc vérifié.
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: null, allergens_tags: ['nl:Milch', 'en:Œufs', 'en:kiwi'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['lactose', 'oeufs'] }),
+    );
+    expect(motifsAllergie(result)).toHaveLength(0);
+    expect(result.verificationStatus).toBe('insufficient_data');
+  });
+
+  it('la table tag → clé est un pour un avec les 14 clés du moteur', () => {
+    const CLES = [
+      'gluten', 'lactose', 'arachides', 'fruits_a_coque', 'soja', 'oeufs', 'poisson',
+      'crustaces', 'celeri', 'moutarde', 'sesame', 'sulfites', 'lupin', 'mollusques',
+    ];
+    const tags = Object.keys(ALLERGEN_TAG_TO_KEY);
+    const cles = Object.values(ALLERGEN_TAG_TO_KEY);
+    expect(tags).toHaveLength(14);
+    expect(new Set(cles).size).toBe(14);
+    expect([...cles].sort()).toEqual([...CLES].sort());
+    expect(tags.every((t) => /^en:[a-z-]+$/.test(t))).toBe(true);
+  });
+
+  // Chaque paire, une à une : une permutation des valeurs passerait le test de forme.
+  it.each([
+    ['en:gluten', 'gluten'],
+    ['en:milk', 'lactose'],
+    ['en:peanuts', 'arachides'],
+    ['en:nuts', 'fruits_a_coque'],
+    ['en:soybeans', 'soja'],
+    ['en:eggs', 'oeufs'],
+    ['en:fish', 'poisson'],
+    ['en:crustaceans', 'crustaces'],
+    ['en:celery', 'celeri'],
+    ['en:mustard', 'moutarde'],
+    ['en:sesame-seeds', 'sesame'],
+    ['en:sulphur-dioxide-and-sulphites', 'sulfites'],
+    ['en:lupin', 'lupin'],
+    ['en:molluscs', 'mollusques'],
+  ])('%s se lit comme l’allergie %s, et seulement elle', (tag, cle) => {
+    expect(ALLERGEN_TAG_TO_KEY[tag]).toBe(cle);
+    const sansTexte = makeProduct({ ingredients_raw: null, allergens_tags: [tag] });
+    expect(
+      checkCompatibility(sansTexte, makeScoring(), emptyProfile({ allergies: [cle] })).isCompatible,
+    ).toBe(false);
+    // Une autre allergie n'est pas concernée : sans texte, elle reste invérifiée.
+    const autre = cle === 'gluten' ? 'lupin' : 'gluten';
+    const r = checkCompatibility(sansTexte, makeScoring(), emptyProfile({ allergies: [autre] }));
+    expect([r.isCompatible, r.verificationStatus]).toEqual([true, 'insufficient_data']);
+  });
+
+  it('le mot vient du premier TEXTE qui nomme l’allergène, pas du premier mot-clé (Amandes)', () => {
+    // Amandes décortiquées (20724696), champs réels : « almond » précède
+    // « amande » dans les mots-clés, mais le texte français est lu d'abord.
+    const result = checkCompatibility(
+      makeProduct({
+        ingredients_raw: 'shelled almonds',
+        ingredients_text_fr: '_Amandes_.',
+        allergens_tags: ['en:nuts'],
+      }),
+      makeScoring(),
+      emptyProfile({ allergies: ['fruits_a_coque'] }),
+    );
+    expect(motifsAllergie(result).map((m) => m.matchedText)).toEqual(['Amandes']);
+  });
+
+  it('limite connue (D-B, union) : une châtaigne déclarée « fruits à coque » bloque, sans mot détecté', () => {
+    // Crème de marrons de l'Ardèche (0022314010025), champs réels. La fiche
+    // déclare en:nuts ; le texte ne nomme que châtaignes et marrons, hors de
+    // l'annexe II du règlement 1169/2011. Le tag est lu comme « contient » :
+    // l'alerte de trop est assumée. Ce test fige la limite (CLAUDE.md, dette).
+    const texte =
+      'Châtaignes (50%), sucre, marrons glacés (châtaignes (54,6%), sucre, sirop de glucose, extrait de vanille de Madagascar), extrait de vanille Madagascar.';
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: texte, ingredients_text_fr: texte, allergens_tags: ['en:nuts'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['fruits_a_coque'] }),
+    );
+    expect(motifsAllergie(result)).toStrictEqual([
+      { type: 'allergy', labelFr: 'Contient fruits à coque (allergie déclarée)', severity: 'blocker' },
+    ]);
+    expect(result.isCompatible).toBe(false);
+  });
+
+  it('textes blancs : rien n’est cherché, la vérification se dit impossible', () => {
+    // Le parseur rend null un français blanc mais recopie le texte principal tel
+    // quel : le moteur doit sauter lui-même une chaîne d'espaces.
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: '   ', ingredients_text_fr: '  ' }),
+      makeScoring(),
+      emptyProfile({ allergies: ['gluten'] }),
+    );
+    expect(result.verificationStatus).toBe('insufficient_data');
+    expect(result.checkedAllergenCount).toBe(0);
+  });
+
+  it('cœliaque : le tag en:gluten compte aussi quand le texte existe mais ne nomme rien', () => {
+    // Oreo, texte néerlandais seul : « _tarwebloem_ » n'est pas un mot-clé.
+    const result = checkCompatibility(
+      makeProduct({
+        ingredients_raw: FICHES_S1B.oreo.ingredients_raw,
+        ingredients_text_fr: null,
+        allergens_tags: ['en:gluten'],
+      }),
+      makeScoring(),
+      emptyProfile({ conditions: ['coeliaque'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual([
+      'Contient du gluten — interdit pour cœliaque',
+    ]);
+  });
+
+  it('cœliaque : le tag en:gluten suffit, comme pour l’allergie au gluten', () => {
+    const sansTexte = makeProduct({ ingredients_raw: null, allergens_tags: ['en:gluten'] });
+    const coeliaque = checkCompatibility(sansTexte, makeScoring(), emptyProfile({ conditions: ['coeliaque'] }));
+    const allergie = checkCompatibility(sansTexte, makeScoring(), emptyProfile({ allergies: ['gluten'] }));
+    expect(coeliaque.isCompatible).toBe(false);
+    expect(allergie.isCompatible).toBe(false);
+  });
+});
+
+// === Lot S1b — les autres lecteurs du texte : régimes et conditions ===
+
+describe('checkCompatibility — régimes et conditions lisent aussi le texte français (lot S1b)', () => {
+  // Aucun tag : seul le texte français peut fonder ces verdicts.
+  function sansTags(fiche: (typeof FICHES_S1B)[keyof typeof FICHES_S1B]): Product {
+    return makeProduct({ ...ficheS1b(fiche), allergens_tags: [] });
+  }
+
+  it('végan : le lait du Nutella se lit dans le texte français', () => {
+    const result = checkCompatibility(
+      sansTags(FICHES_S1B.nutella),
+      makeScoring(),
+      emptyProfile({ dietary: ['vegan'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toContain('Non végan (contient lait)');
+    expect(result.isCompatible).toBe(false);
+  });
+
+  it('cœliaque : la « farine de BLÉ » de l’Oreo se lit, son texte principal est néerlandais', () => {
+    const result = checkCompatibility(
+      sansTags(FICHES_S1B.oreo),
+      makeScoring(),
+      emptyProfile({ conditions: ['coeliaque'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual([
+      'Contient du gluten (blé) — interdit pour cœliaque',
+    ]);
+  });
+
+  it('huile de palme : « huile de palme » se lit là où le néerlandais dit « palmolie »', () => {
+    const result = checkCompatibility(
+      sansTags(FICHES_S1B.oreo),
+      makeScoring(),
+      emptyProfile({ avoid: ['huile_palme'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual(["Contient de l'huile de palme"]);
+  });
+
+  it('grossesse : le « lait cru » se lit dans le texte français (fiche construite)', () => {
+    // Fiche CONSTRUITE pour le test : un fromage au lait cru dont le texte
+    // principal, néerlandais, ne contient aucun mot-clé (« rauwe melk »).
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: 'rauwe melk, zout, stremsel', ingredients_text_fr: 'lait cru, sel, présure' }),
+      makeScoring(),
+      emptyProfile({ conditions: ['enceinte'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual([
+      'Interdit pendant la grossesse (contient lait cru)',
+    ]);
+  });
+
+  it('grossesse : le texte principal reste lu quand le français existe (fiche construite)', () => {
+    // Deux rédactions : seule l'anglaise nomme le lait cru.
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: 'raw milk cheese, salt', ingredients_text_fr: 'fromage, sel' }),
+      makeScoring(),
+      emptyProfile({ conditions: ['enceinte'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual([
+      'Interdit pendant la grossesse (contient raw milk)',
+    ]);
+  });
+
+  it('végan et végétarien : le texte principal reste lu quand le français existe (Sardines)', () => {
+    // Sardines (20703622), champs réels : « poissons » (pluriel) échappe aux
+    // mots-clés des régimes (D-D) ; seul « fish », dans le texte principal,
+    // porte l'alerte.
+    const sardines = makeProduct({
+      ingredients_raw: '72 % sardines (fish), 27 % extra virgin olive oil, 1 % salt.',
+      ingredients_text_fr: "72 % sardines (poissons), 27 % huile d'olive vierge extra, 1 % sel.",
+      allergens_tags: ['en:fish'],
+    });
+    expect(
+      ['vegan', 'vegetarien'].map(
+        (d) => checkCompatibility(sardines, makeScoring(), emptyProfile({ dietary: [d] })).isCompatible,
+      ),
+    ).toEqual([false, false]);
+  });
+
+  // Chaque paire FR/EN, une à une : une valeur fausse fusionnerait deux aliments.
+  it.each([
+    ['ail', 'garlic'],
+    ['oignon', 'onion'],
+    ['blé', 'wheat'],
+    ['lait', 'milk'],
+    ['pomme', 'apple'],
+    ['poire', 'pear'],
+    ['miel', 'honey'],
+    ['champignon', 'mushroom'],
+    ['artichaut', 'artichoke'],
+    ['chou-fleur', 'cauliflower'],
+  ])('FODMAP : « %s » et « %s » ne font qu’un déclencheur, nommé en français', (fr, en) => {
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: `sugar, ${en}`, ingredients_text_fr: `sucre, ${fr}` }),
+      makeScoring(),
+      emptyProfile({ conditions: ['ibs_fodmap'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual([`Déclencheur FODMAP détecté : ${fr}`]);
+  });
+
+  it('FODMAP : dix aliments différents restent dix déclencheurs', () => {
+    const result = checkCompatibility(
+      makeProduct({
+        ingredients_raw: 'garlic, onion, wheat, milk, apple, pear, honey, mushroom, artichoke, cauliflower',
+      }),
+      makeScoring(),
+      emptyProfile({ conditions: ['ibs_fodmap'] }),
+    );
+    expect(result.incompatibilities.filter((i) => i.labelFr.startsWith('Déclencheur FODMAP'))).toHaveLength(10);
+  });
+
+  it('FODMAP : dans un seul texte bilingue aussi, chaque aliment ne compte qu’une fois', () => {
+    // Une ligne de cache ancienne, ou une fiche sans texte français, peut porter
+    // les deux langues dans le seul texte principal.
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: 'Ingredients: wheat flour, milk, garlic. Ingrédients : farine de blé, lait, ail.' }),
+      makeScoring(),
+      emptyProfile({ conditions: ['ibs_fodmap'] }),
+    );
+    expect(result.incompatibilities.map((i) => i.labelFr)).toEqual([
+      'Déclencheur FODMAP détecté : ail',
+      'Déclencheur FODMAP détecté : blé',
+      'Déclencheur FODMAP détecté : lait',
+    ]);
+  });
+
+  it('FODMAP : un même aliment lu dans les deux langues ne compte qu’une fois', () => {
+    // « oignon 8% » et « onion 8% » : un seul déclencheur, nommé en français.
+    const result = checkCompatibility(
+      sansTags(FICHES_S1B.cornichons),
+      makeScoring(),
+      emptyProfile({ conditions: ['ibs_fodmap'] }),
+    );
+    expect(
+      result.incompatibilities.filter((i) => i.labelFr.startsWith('Déclencheur FODMAP')).map((i) => i.labelFr),
+    ).toEqual(['Déclencheur FODMAP détecté : oignon']);
+  });
+});
+
+// === Lot S1b (C5 côté moteur) — le mot lu, et les allergies cherchées ===
+
+describe('checkCompatibility — graphie lue et allergies cherchées (C5)', () => {
+  function motifsAllergie(result: ReturnType<typeof checkCompatibility>) {
+    return result.incompatibilities.filter((i) => i.type === 'allergy');
+  }
+
+  it('expose « NOISETTES » tel que la liste Nutella l’écrit, libellé inchangé', () => {
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: VRAIES_LISTES['3017620422003'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['fruits_a_coque'] }),
+    );
+    const motifs = motifsAllergie(result);
+    expect(motifs).toHaveLength(1);
+    expect(motifs[0].labelFr).toBe('Contient fruits à coque (allergie déclarée)');
+    expect(motifs[0].matchedText).toBe('NOISETTES');
+  });
+
+  it('« farine de BLE » donne « BLE », pas le mot-clé « blé »', () => {
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: VRAIES_LISTES['3021690201123'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['gluten'] }),
+    );
+    expect(motifsAllergie(result)[0]?.matchedText).toBe('BLE');
+  });
+
+  it('sulfites trouvés par tag additif seulement : aucune graphie inventée', () => {
+    const result = checkCompatibility(
+      makeProduct({ ingredients_raw: 'raisin, eau', additives_tags: ['en:e220'] }),
+      makeScoring(),
+      emptyProfile({ allergies: ['sulfites'] }),
+    );
+    const motifs = motifsAllergie(result);
+    expect(motifs).toHaveLength(1);
+    expect(motifs[0].matchedText).toBeUndefined();
+  });
+
+  it('compte les allergies réellement cherchées dans le texte', () => {
+    const avecListe = makeProduct({ ingredients_raw: 'eau, sel' });
+    // Clé inconnue du moteur : non cherchée (et la vérification se dit incomplète).
+    const result = checkCompatibility(
+      avecListe,
+      makeScoring(),
+      emptyProfile({ allergies: ['gluten', 'inconnu'] }),
+    );
+    expect(result.checkedAllergenCount).toBe(1);
+    expect(result.verificationStatus).toBe('insufficient_data');
+    // Pas de liste d'ingrédients : rien n'a été cherché dans un texte, même avec un tag.
+    expect(
+      checkCompatibility(
+        makeProduct({ allergens_tags: ['en:gluten'] }),
+        makeScoring(),
+        emptyProfile({ allergies: ['gluten'] }),
+      ).checkedAllergenCount,
+    ).toBe(0);
+    // Profil diabète seul : aucune allergie à chercher.
+    expect(
+      checkCompatibility(avecListe, makeScoring(), emptyProfile({ conditions: ['diabete'] }))
+        .checkedAllergenCount,
+    ).toBe(0);
   });
 });

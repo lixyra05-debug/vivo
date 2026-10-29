@@ -54,6 +54,25 @@ export const FODMAP_TRIGGERS: string[] = [
   'cauliflower',
 ];
 
+/**
+ * Les paires FR/EN de `FODMAP_TRIGGERS` : le mot anglais → l'aliment, nommé en
+ * français. Sert à ne compter qu'une fois un aliment nommé dans les deux
+ * langues — dans deux textes, ou dans un seul texte bilingue ; la liste des
+ * déclencheurs ne change pas.
+ */
+const FODMAP_SAME_FOOD = new Map<string, string>([
+  ['garlic', 'ail'],
+  ['onion', 'oignon'],
+  ['wheat', 'blé'],
+  ['milk', 'lait'],
+  ['apple', 'pomme'],
+  ['pear', 'poire'],
+  ['honey', 'miel'],
+  ['mushroom', 'champignon'],
+  ['artichoke', 'artichaut'],
+  ['cauliflower', 'chou-fleur'],
+]);
+
 // === Internal types & helpers ===
 
 /**
@@ -116,6 +135,32 @@ const ALLERGEN_KEYWORDS: Record<string, string[]> = {
   lupin: ['lupin'],
   mollusques: ['mollusque', 'escargot', 'snail', 'huître', 'huitre', 'oyster', 'moule', 'mussel', 'calmar', 'squid', 'pétoncle'],
 };
+
+/**
+ * Les 14 tags canoniques d'allergènes d'Open Food Facts (`allergens_tags`) ↔
+ * les 14 clés de `ALLERGEN_KEYWORDS`, un pour un. Un tag hors de cette table
+ * (« nl:Milch », « en:Œufs », « en:banana » : saisis à la main, jamais
+ * normalisés par la taxonomie OFF) est ignoré.
+ */
+export const ALLERGEN_TAG_TO_KEY: Readonly<Record<string, string>> = {
+  'en:gluten': 'gluten',
+  'en:milk': 'lactose',
+  'en:peanuts': 'arachides',
+  'en:nuts': 'fruits_a_coque',
+  'en:soybeans': 'soja',
+  'en:eggs': 'oeufs',
+  'en:fish': 'poisson',
+  'en:crustaceans': 'crustaces',
+  'en:celery': 'celeri',
+  'en:mustard': 'moutarde',
+  'en:sesame-seeds': 'sesame',
+  'en:sulphur-dioxide-and-sulphites': 'sulfites',
+  'en:lupin': 'lupin',
+  'en:molluscs': 'mollusques',
+};
+
+/** Recherche sans détour par le prototype (« constructor » n'est pas un tag). */
+const TAG_KEYS = new Map(Object.entries(ALLERGEN_TAG_TO_KEY));
 
 const ALLERGEN_LABELS_FR: Record<string, string> = {
   gluten: 'gluten',
@@ -334,12 +379,30 @@ function allergenPattern(keyword: string): RegExp {
   return new RegExp(`(?<!\\p{L})${body}${plural}(?!\\p{L})`, 'iu');
 }
 
-/** `textContainsAny` réservée aux mots-clés d'allergènes (motif tolérant). */
-function textContainsAllergen(text: string, keywords: string[]): string | null {
-  for (const kw of keywords) {
-    if (kw && allergenPattern(kw).test(text)) return kw;
+/**
+ * Premier mot-clé d'allergène présent dans les textes, AVEC la graphie sous
+ * laquelle il y figure : `matched` vaut « NOISETTES » quand le mot-clé est
+ * `noisette`. Les textes sont lus dans leur ordre — le français d'abord —, et
+ * dans chacun l'ordre de `keywords`. Le motif n'a ni `g` ni `y` : `exec`
+ * répond exactement comme `test`, sans état.
+ */
+function findAllergen(
+  texts: readonly string[],
+  keywords: string[],
+): { keyword: string; matched: string } | null {
+  for (const text of texts) {
+    for (const kw of keywords) {
+      if (!kw) continue;
+      const match = allergenPattern(kw).exec(text);
+      if (match) return { keyword: kw, matched: match[0] };
+    }
   }
   return null;
+}
+
+/** `textContainsAny` réservée aux mots-clés d'allergènes (motif tolérant). */
+function textContainsAllergen(text: string, keywords: string[]): string | null {
+  return findAllergen([text], keywords)?.keyword ?? null;
 }
 
 /** Extrait le numéro E d'un tag OFF (en:e150d → 150). Retourne null sinon. */
@@ -349,18 +412,57 @@ function parseEcode(tag: string): number | null {
   return parseInt(match[1], 10);
 }
 
-/** Récupère le texte d'ingrédients à inspecter (food vs cosmetic). */
-function getIngredientText(product: Product | CosmeticProduct): string | null {
-  if (isCosmetic(product)) {
-    return product.ingredients_inci ?? null;
+/**
+ * Textes d'ingrédients à inspecter, dans leur ordre de lecture.
+ *
+ * Alimentaire : le texte FRANÇAIS d'abord (`ingredients_text_fr`), puis celui
+ * de la langue principale de la fiche (`ingredients_raw`, qui seul nourrit la
+ * note). Les deux sont lus : le français est celui de l'étiquette vendue en
+ * France, mais une fiche OFF peut porter deux versions de recette, et le texte
+ * principal garde tout ce que la lecture d'avant voyait — aucune alerte n'est
+ * perdue. Un texte vide, ou identique au précédent, est sauté. Une ligne de
+ * cache antérieure à la migration 017 n'a que le texte principal.
+ */
+function getIngredientTexts(product: Product | CosmeticProduct): string[] {
+  const candidates = isCosmetic(product)
+    ? [product.ingredients_inci]
+    : [product.ingredients_text_fr, product.ingredients_raw];
+  const texts: string[] = [];
+  for (const text of candidates) {
+    if (typeof text === 'string' && text.trim().length > 0 && !texts.includes(text)) {
+      texts.push(text);
+    }
   }
-  return product.ingredients_raw ?? null;
+  return texts;
 }
 
-/** Indique si on dispose d'un texte d'ingrédients exploitable. */
-function hasIngredientData(product: Product | CosmeticProduct): boolean {
-  const txt = getIngredientText(product);
-  return typeof txt === 'string' && txt.trim().length > 0;
+/**
+ * Les textes, joints pour les lecteurs qui n'en cherchent qu'un : un retour à
+ * la ligne n'est pas une lettre, les frontières de mots tiennent, et aucun
+ * mot-clé ne peut se former à cheval sur deux textes.
+ */
+function getIngredientText(product: Product | CosmeticProduct): string | null {
+  const texts = getIngredientTexts(product);
+  return texts.length > 0 ? texts.join('\n') : null;
+}
+
+/**
+ * Clés des allergènes que la source DÉCLARE (`allergens_tags`, alimentaire
+ * seulement). Un allergène déclaré est lu comme « contient » — la déclaration,
+ * saisie par la communauté, peut se tromper (traces recopiées, châtaigne
+ * déclarée « fruit à coque », tag sans appui) : une alerte de trop plutôt
+ * qu'une manquée. Un allergène absent de
+ * la déclaration n'est pas pour autant absent du produit — d'où l'union avec
+ * le texte, jamais l'intersection.
+ */
+function declaredAllergenKeys(product: Product | CosmeticProduct): Set<string> {
+  const keys = new Set<string>();
+  if (isCosmetic(product)) return keys;
+  for (const tag of product.allergens_tags ?? []) {
+    const key = TAG_KEYS.get(tag);
+    if (key) keys.add(key);
+  }
+  return keys;
 }
 
 // === Core logic ===
@@ -371,8 +473,10 @@ export function checkCompatibility(
   profile: CompatibilityProfile
 ): CompatibilityResult {
   const incompatibilities: IncompatibilityReason[] = [];
+  const ingredientTexts = getIngredientTexts(product);
   const ingredientText = getIngredientText(product) ?? '';
-  const hasText = hasIngredientData(product);
+  const hasText = ingredientTexts.length > 0;
+  const declaredAllergens = declaredAllergenKeys(product);
 
   // Si on a besoin d'inspecter les ingrédients (allergies / certains conditions)
   // mais qu'ils sont absents → un seul warning "données insuffisantes" suffit.
@@ -387,7 +491,19 @@ export function checkCompatibility(
     });
   }
 
-  // === 1. Allergies (text-based, blockers) ===
+  // === 1. Allergies (texte + allergènes déclarés, blockers) ===
+  function pushAllergy(allergy: string, matchedText?: string): void {
+    const labelFr = `Contient ${ALLERGEN_LABELS_FR[allergy] ?? allergy} (allergie déclarée)`;
+    const reason: IncompatibilityReason = { type: 'allergy', labelFr, severity: 'blocker' };
+    // Une graphie n'existe que si le mot a été LU dans un texte : un tag —
+    // additif (`en:e220`) ou allergène déclaré (`en:milk`) — ne dit pas comment
+    // la liste l'écrit.
+    if (matchedText) reason.matchedText = matchedText;
+    incompatibilities.push(reason);
+  }
+  // Allergies réellement CHERCHÉES dans un texte (clé connue + liste présente).
+  // Le bandeau en a besoin pour ne parler d'« allergènes » qu'à qui en a déclaré.
+  let checkedAllergenCount = 0;
   for (const rawAllergy of profile.allergies) {
     // Les profils enregistrés avant l'alignement des écrans portent des
     // libellés (« Œufs ») et non des clés (`oeufs`) : on les ramène ici.
@@ -401,25 +517,28 @@ export function checkCompatibility(
       flagInsufficientData();
       continue;
     }
+    const declared = declaredAllergens.has(allergy);
     if (!hasText) {
-      flagInsufficientData();
+      // Sans liste, une déclaration est lue comme « contient » ; son absence
+      // ne conclut rien.
+      if (declared) pushAllergy(allergy);
+      else flagInsufficientData();
       continue;
     }
+    checkedAllergenCount += 1;
+    const inText = findAllergen(ingredientTexts, keywords);
+    let found = inText !== null || declared;
     // Cas spécial sulfites : on regarde aussi additives_tags pour les produits food
-    let found = textContainsAllergen(ingredientText, keywords);
     if (!found && !isCosmetic(product) && allergy === 'sulfites') {
       for (const tag of product.additives_tags ?? []) {
         const code = parseEcode(tag);
         if (code !== null && code >= 220 && code <= 228) {
-          found = `e${code}`;
+          found = true;
           break;
         }
       }
     }
-    if (found) {
-      const labelFr = `Contient ${ALLERGEN_LABELS_FR[allergy] ?? allergy} (allergie déclarée)`;
-      incompatibilities.push({ type: 'allergy', labelFr, severity: 'blocker' });
-    }
+    if (found) pushAllergy(allergy, inText?.matched);
   }
 
   // === 2. Dietary (blockers) ===
@@ -595,15 +714,19 @@ export function checkCompatibility(
         }
       }
     } else if (condition === 'coeliaque') {
-      if (!hasText) {
+      // Mêmes sources que l'allergie au gluten : les deux concluent pareil.
+      const declared = declaredAllergens.has('gluten');
+      if (!hasText && !declared) {
         flagInsufficientData();
         continue;
       }
-      const hit = textContainsAllergen(ingredientText, ALLERGEN_KEYWORDS.gluten);
-      if (hit) {
+      const hit = hasText ? textContainsAllergen(ingredientText, ALLERGEN_KEYWORDS.gluten) : null;
+      if (hit || declared) {
         incompatibilities.push({
           type: 'condition',
-          labelFr: `Contient du gluten (${hit}) — interdit pour cœliaque`,
+          labelFr: hit
+            ? `Contient du gluten (${hit}) — interdit pour cœliaque`
+            : 'Contient du gluten — interdit pour cœliaque',
           severity: 'blocker',
         });
       }
@@ -612,12 +735,15 @@ export function checkCompatibility(
         flagInsufficientData();
         continue;
       }
-      // Une incompatibilité par déclencheur trouvé (déduplication par token).
+      // Une incompatibilité par ALIMENT trouvé : le texte français et le texte
+      // principal sont lus tous les deux, et « oignon » puis « onion » ne font
+      // qu'un déclencheur, nommé en français (FR avant EN dans la liste).
       // Utilise frontières de mots pour éviter "ail" matchant "ailerons".
       const matched = new Set<string>();
       for (const trig of FODMAP_TRIGGERS) {
-        if (matchesWord(ingredientText, trig) && !matched.has(trig)) {
-          matched.add(trig);
+        const food = FODMAP_SAME_FOOD.get(trig) ?? trig;
+        if (!matched.has(food) && matchesWord(ingredientText, trig)) {
+          matched.add(food);
           incompatibilities.push({
             type: 'condition',
             labelFr: `Déclencheur FODMAP détecté : ${trig}`,
@@ -780,5 +906,6 @@ export function checkCompatibility(
     incompatibilities: sorted,
     compatibilityPercentage,
     verificationStatus: dataInsufficientFlagged ? 'insufficient_data' : 'verified',
+    checkedAllergenCount,
   };
 }

@@ -269,6 +269,18 @@ export interface IncompatibilityReason {
   type: 'allergy' | 'dietary' | 'condition' | 'avoid' | 'score';
   labelFr: string;
   severity: IncompatibilitySeverity;
+  /**
+   * Le mot tel qu'il figure dans le texte d'ingrédients lu (casse, accents et
+   * pluriel conservés : « NOISETTES », « BLE », « cacahuètes »), pris dans le
+   * premier texte qui le contient — le français d'abord : il peut donc manquer
+   * à la liste que la fiche affiche, qui est le texte principal. Renseigné
+   * pour les motifs `allergy` trouvés dans un TEXTE ; absent quand le motif ne
+   * vient que d'un tag — additif (sulfites via `additives_tags`) ou allergène
+   * déclaré (`allergens_tags`) — ou d'une règle qui ne lit pas le texte.
+   * OPTIONNEL et purement additif : `labelFr` ne change pas, `isCompatible` et
+   * `verificationStatus` non plus (D11).
+   */
+  matchedText?: string;
 }
 
 export interface CompatibilityResult {
@@ -280,13 +292,26 @@ export interface CompatibilityResult {
    * Distingue « vérifié et compatible » de « pas pu être vérifié ».
    *
    * `isCompatible` ne répond qu'à « existe-t-il un blocker ? ». Quand la liste
-   * d'ingrédients est absente, aucun blocker ne peut être levé : le résultat
-   * était donc `true`, indistinguable d'une vraie compatibilité. Un utilisateur
-   * allergique lisait « Compatible » alors que rien n'avait été contrôlé.
+   * d'ingrédients est absente, aucun mot ne peut y être cherché : seul un
+   * allergène que la fiche déclare (`allergens_tags`) peut encore lever un
+   * blocker. Sans lui, le résultat était `true`, indistinguable d'une vraie
+   * compatibilité — un utilisateur allergique lisait « Compatible » alors que
+   * rien n'avait été contrôlé. `insufficient_data` dit qu'au moins un critère
+   * demandé n'a pas pu être tranché.
    *
    * Champ OPTIONNEL et purement additif : `isCompatible` et
    * `compatibilityPercentage` gardent exactement leur sémantique, aucun
    * consommateur existant n'a besoin de changer.
    */
   verificationStatus?: 'verified' | 'insufficient_data';
+  /**
+   * Nombre d'allergies déclarées réellement CHERCHÉES dans un texte
+   * d'ingrédients (clé connue du moteur ET texte présent). Permet au bandeau
+   * de ne parler d'« allergènes » qu'à un profil qui en a déclaré : pour un
+   * profil diabète ou grossesse seul, la valeur est 0. Une allergie trouvée par
+   * un tag sans aucun texte n'est pas comptée : elle donne l'état
+   * incompatible, où ce compte ne sert pas. OPTIONNEL et additif, comme
+   * `verificationStatus` : la sémantique d'`isCompatible` est inchangée.
+   */
+  checkedAllergenCount?: number;
 }
