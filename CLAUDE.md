@@ -34,7 +34,7 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - `src/lib/gamification/streak-engine.ts` — Calcul streak en jours civils Europe/Paris (`calculateStreak`, `isStreakActive`)
 - `src/lib/gamification/badge-engine.ts` — Catalogue 12 badges + évaluation (`BADGES`, `getUserStats`, `checkBadges`)
 - `src/lib/gamification/weekly-summary.ts` — Synthèse hebdo ISO (lun→dim Paris, DST-safe)
-- `src/lib/education/content-database.ts` — 31 cartes éducatives (additifs/ingrédients/score/cosmétique/général + 9 cartes Beauvillard cross-référencées) + `findRelevantCards`
+- `src/lib/education/content-database.ts` — 65 cartes éducatives (22 d'origine : additifs/ingrédients/score/cosmétique/général ; 9 cartes Beauvillard cross-référencées ; 34 cartes phytothérapie cross-référencées EMA HMPC/EFSA/registre UE des allégations, garde-fou `content-database-clement.test.ts`) + `findRelevantCards`
 - `src/lib/education/transparency.ts` — `SCORING_METHODOLOGY` (poids food/cosmetic + 5 FAQ + sources EFSA/ANSES/OMS/CIRC)
 - `src/lib/stats/profile-stats-engine.ts` — `calculateProfileStats` (totaux, top 3 catégories, scansByDay 28j, week-over-week) — seuils <30/>80
 - `src/lib/stats/sparkline-data.ts` — Génération points + couleur trend (sage/orange/earth) pour `WeeklySparkline`
@@ -295,7 +295,7 @@ Bouclage du tier Premium avec 4 features pensées rétention et utilité famille
   - `app/family/edit.tsx` — Form create/edit. 8 emojis avatar (🧑/👨/👩/🧒/👶/🤰/👴/👵), nom maxLength=50, 4 chips age_group, 14 allergènes EU + 7 conditions multi-select. Boutons Créer/Annuler ou Enregistrer/Supprimer (Alert.alert confirm). Validation nom non vide. Échec mutation → Alert "max 4 profils ?".
   - `app/stats/index.tsx` — Dashboard 6 sections : KPI strip (totalScans / averageScore / streak), sparkline 28j Catmull-Rom (couleur trend selon slope), distribution 5 buckets colorés, top 5 catégories/marques en rows, exposition toxique (GlassCard tone="warning" si totalPenalties > 50). Empty state si 0 scans + paywall `advanced_stats`.
   - `src/components/home/FamilyProfilePills.tsx` — ScrollView horizontal de pills compactes (avatar 18px + nom Inter-SemiBold 12), pill active sage, dernière pill "+ Gérer" → `/family`. Render `null` si tier='free' OU profiles.length=0 (auto-gating).
-  - `src/lib/scoring/use-active-compat-profile.ts` — Hook qui ferait primer le profil familial actif sur `useProfileStore` (repli `userProfileToCompatibilityProfile(profile)`, `null` si rien à filtrer). **Aucun appelant, et non branché par décision (S3-2)** : les profils familiaux ne modifient ni l'analyse ni le score, et les écrans du Mode Famille le disent (« Pour mémoire »).
+  - `src/lib/scoring/use-active-compat-profile.ts` — Hook qui ferait primer le profil familial actif sur `useProfileStore` (repli `userProfileToCompatibilityProfile(profile)`, `null` si rien à filtrer). **Aucun appelant, et non branché par décision (S3-2)** : les profils familiaux ne modifient ni l'analyse ni le score, et l'écran d'édition du Mode Famille le dit (deux mentions « Pour mémoire », `app/family/edit.tsx:325` et `:345`).
   - `app/(tabs)/profile.tsx` : 3 SettingsRow ajoutés — Mode Famille (`Users` icon) → `/family`, Statistiques avancées (`BarChart3`) → `/stats`, Exporter mon rapport PDF (`FileText`) → `handleExportPdf` qui construit `HealthReportData` (userName, periodLabel FR, stats sur 30j, top 5 desc/asc par score, badges earned via `useUserBadges`). Free tier → push `/settings/subscription` ou Alert paywall.
   - `app/(tabs)/index.tsx` : `<FamilyProfilePills>` en `<FadeIn delay={60}>` au-dessus du Greeting. Composant gère lui-même le `null` (auto-gating).
 
@@ -396,24 +396,26 @@ groupée du conteneur PUIS chaque enfant, une fois de plus que nécessaire.
 `ScoreFactorsCard` double correctement avec `importantForAccessibility="no-hide-descendants"` — les
 deux autres restent à aligner. Correctif mécanique, sans risque, mais hors périmètre du lot score.
 
-### Le filtre « Ce que je peux manger » compte les produits non vérifiés comme compatibles
-`checkCompatibility` expose depuis mai 2026 un champ `verificationStatus: 'verified' | 'insufficient_data'`
-(`src/lib/api/types.ts`), qui distingue « vérifié et compatible » de « pas pu être vérifié faute de liste
-d'ingrédients ». La fiche produit l'exploite : `CompatibilityBanner` affiche un troisième état neutre
+### SOLDÉ — le filtre « Ce que je peux manger » ne compte plus les produits non vérifiés comme compatibles
+`checkCompatibility` expose un champ `verificationStatus: 'verified' | 'insufficient_data'`
+(`src/lib/api/types.ts`), qui distingue « vérifié et compatible » de « pas pu être vérifié » (liste
+d'ingrédients absente, allergène que le moteur ne sait pas chercher, donnée nutritionnelle ou groupe NOVA
+absent). La fiche produit l'exploite : `CompatibilityBanner` affiche un troisième état neutre
 « Vérification impossible » au lieu de « Compatible avec votre profil ».
 
-**Deux consommateurs ne le lisent pas encore** et se contentent de `isCompatible`, qui répond seulement à
-« existe-t-il un blocker ? » — donc `true` quand rien n'a pu être contrôlé :
-- `app/(tabs)/history.tsx:85` — `if (!compat.isCompatible) set.add(row.barcode)`
-- `src/lib/scoring/profile-filters.ts:19` — `checkCompatibility(...).isCompatible`
+**Soldé en août 2026 pour les deux consommateurs d'origine**, qui ne lisaient que `isCompatible` : ils
+lisent désormais aussi `verificationStatus`, et la sémantique de `isCompatible` n'a pas changé.
+- `src/lib/scoring/profile-filters.ts:43` — `isProductCompatible` exige en plus
+  `verificationStatus !== 'insufficient_data'` : l'invérifiable sort du mode « Mon profil » et du X de
+  « X / Y compatibles » des catégories et des enseignes.
+- `app/(tabs)/history.tsx:89` — l'invérifiable rejoint `incompatibleBarcodes`, donc le chip « Incompatibles ».
 
-**Conséquence** : un utilisateur allergique qui active le toggle « Compatibles » sur l'historique, une
-catégorie ou une enseigne voit apparaître des produits dont les allergènes n'ont jamais été vérifiés.
+Verrous : `src/lib/scoring/__tests__/profile-filters.test.ts` et
+`app/__tests__/history-unverified-compat.test.tsx`.
 
-**Pourquoi ce n'est pas corrigé** : `isCompatible` a été volontairement gelé pour ne pas modifier la
-sémantique d'un champ consommé ailleurs, et ces deux fichiers étaient hors du périmètre du lot.
-**Correction proposée** : faire lire `verificationStatus` aux deux call-sites et exclure — ou baliser —
-les produits `insufficient_data` dans les listes filtrées. Ne PAS changer `isCompatible`.
+**Soldé en octobre 2026 pour le cosmétique non évalué (lot S3)** : liste INCI présente, aucun ingrédient
+reconnu, le moteur répond `verified` ; `isProductCompatible` l'écarte quand même, du mode « Mon profil »
+comme du X.
 
 ### `ScoreComparison` tient une quatrième échelle de score
 Le lot « cohérence » de mai 2026 a unifié trois échelles : le verdict (`getScoreVerdict`), le libellé lu

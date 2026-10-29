@@ -129,7 +129,7 @@ Ils prouvent donc que le moteur fonctionne — ce qui est vrai — et ne touchen
 const ALLERGENS = [{ key: 'gluten', … }, { key: 'fruits_a_coque', … }, { key: 'oeufs', … }, …]
 ```
 
-**Le Mode Famille marche. Le profil principal — celui branché sur la fiche, l'historique, les catégories et les enseignes — ne marche pas.**
+**~~Le Mode Famille marche.~~ Le profil principal — celui branché sur la fiche, l'historique, les catégories et les enseignes — ne marche pas.** *Erratum du 29 octobre 2026 (lot S3) : « Le Mode Famille marche » était déjà faux à `45678fa` — son formulaire enregistre les bonnes clés, mais aucune analyse ne lit les profils familiaux (`useActiveCompatProfile` n'a aucun appelant). Le contraste, qui ne porte que sur les clés, tient.*
 
 **Surfaces impactées.** Fiche produit (`product/[barcode].tsx:316`), toggle « Compatibles » de l'historique (`history.tsx:84`), des catégories (`category/[slug].tsx:243,248`) et des enseignes (`store/[slug].tsx:142,149`), cas spécial sulfites (`:318-325`) inatteignable lui aussi.
 
