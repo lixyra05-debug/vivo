@@ -403,7 +403,7 @@ deux autres restent à aligner. Correctif mécanique, sans risque, mais hors pé
 (`src/lib/api/types.ts`), qui distingue « vérifié et compatible » de « pas pu être vérifié » (liste
 d'ingrédients absente, allergène que le moteur ne sait pas chercher, donnée nutritionnelle ou groupe NOVA
 absent). La fiche produit l'exploite : `CompatibilityBanner` affiche un troisième état neutre
-« Vérification impossible » au lieu de « Compatible avec votre profil ».
+« Vérification impossible » au lieu de l'état compatible.
 
 **Soldé en août 2026 pour les deux consommateurs d'origine**, qui ne lisaient que `isCompatible` : ils
 lisent désormais aussi `verificationStatus`, et la sémantique de `isCompatible` n'a pas changé.
@@ -460,6 +460,19 @@ vinaigre (d'alcool, de vin) → grossesse et halal 19 → 21 chacun ; « arôme 
 sans porc 0 → 1 ; « Sans gluten » → allergie au gluten et cœliaque 3 → 4 ; « noix de coco » → fruits à
 coque 1 → 2 ; « pomme de terre » → déclencheur FODMAP « pomme » 9 → 11 fiches. Inchangés : « noix de
 muscade » et « beurre de cacao » (1 chacun). À traiter avec D-C (mots-clés, locutions) et D-E (négations).
+
+### AVANT PUBLICATION — le « Mot détecté » du bandeau peut manquer à la liste affichée (lot S1b)
+Le moteur prend `matchedText` dans le premier texte qui le contient, le français d'abord ; la section
+« Ingrédients » de la fiche alimentaire affiche le texte principal (`ingredients_raw`), comme la carte
+des ingrédients, la note et ses explications. Sur 170 fiches réelles, 96 des 460 mots détectés (40
+fiches) ne figurent pas dans la liste affichée — Nutella 3017620422003 : bandeau « NOISETTES », liste
+« sugar, palm oil ». Le verdict est juste ; c'est l'explication qui ne se retrouve pas à l'écran.
+
+Afficher le texte français d'abord (option (d) du plan S1b, tenue hors du lot) en corrige 96 et en crée 4 —
+mots lus dans le seul texte principal (20466909 « egg », 8711200459926 « sesame », 8718114734484
+« E224 », 3250546610271 « sulfites ») —, et sépare la liste de la carte, de la note et de leurs
+explications sur 42 fiches. **À corriger avant publication**, dans un lot « liste affichée » (liste, carte,
+provenance du mot, soulignés d'OFF).
 
 ## Conventions
 - TypeScript strict (`strict: true`)

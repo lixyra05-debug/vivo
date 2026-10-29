@@ -104,7 +104,7 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
   const ENCEINTE: CompatibilityProfile = { ...DIABETE, conditions: ['enceinte'] };
   const BEBE: CompatibilityProfile = { ...DIABETE, conditions: ['bebe'] };
   /** Le message de sécurité de D11, mot pour mot : il ne doit jamais disparaître. */
-  const SECURITE = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
+  const SECURITE = "Tes allergies et restrictions n'ont pas pu être vérifiées.";
 
   /** Toute la chaîne de l'écran : OBF → note → compatibilité → cartes. */
   function rendre(
@@ -218,16 +218,16 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
       GLUTEN,
     );
     expect(queryAllByText(UNVERIFIED_TITLE)).toHaveLength(1);
-    expect(getByText('Incompatible avec votre profil')).toBeTruthy();
+    expect(getByText('Incompatible avec ton profil')).toBeTruthy();
   });
 
-  it('allergène lu dans le texte : « Incompatible avec votre profil » reste rendu', () => {
+  it('allergène lu dans le texte : « Incompatible avec ton profil » reste rendu', () => {
     const { compatibilityResult, getByText } = rendre(
       'AQUA (WATER), TRITICUM VULGARE (WHEAT) GERM OIL',
       GLUTEN,
     );
     expect(compatibilityResult.isCompatible).toBe(false);
-    expect(getByText('Incompatible avec votre profil')).toBeTruthy();
+    expect(getByText('Incompatible avec ton profil')).toBeTruthy();
   });
 
   it('« Excellent choix ! » ne commente plus un 100 qui ne mesure rien', () => {
@@ -266,7 +266,7 @@ describe('CosmeticProductView — S3-3, aucun ingrédient évalué', () => {
     // …et ici le bandeau est posé, ni « Vérification impossible » ni « Incompatible » : vert.
     expect(UNSAFE_getByType(CompatibilityBanner)).toBeTruthy();
     expect(queryByText(UNVERIFIED_TITLE)).toBeNull();
-    expect(queryByText('Incompatible avec votre profil')).toBeNull();
+    expect(queryByText(/^Incompatible avec/)).toBeNull();
     expect(getByText('Excellent choix !')).toBeTruthy();
   });
 

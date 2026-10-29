@@ -194,7 +194,7 @@ describe('S3-3 — aucun ingrédient évalué : « Vérification impossible »',
 describe('S3-3 — statut et bandeau « Vérification impossible » ne font qu’un', () => {
   const CORPS =
     "Aucun ingrédient de ce produit n'a pu être évalué : la liste INCI est absente ou n'est pas reconnue par Vivo. Vérifie la composition sur l'emballage.";
-  const SECURITE = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
+  const SECURITE = "Tes allergies et restrictions n'ont pas pu être vérifiées.";
   const ALLERGIQUE: CompatibilityProfile = {
     allergies: ['gluten'],
     dietary: [],
@@ -233,7 +233,7 @@ describe('S3-3 — statut et bandeau « Vérification impossible » ne font qu�
     expect(compatibilityResult.isCompatible).toBe(false);
     expect(getByText(CORPS)).toBeTruthy();
     // « Incompatible » n'est pas absorbé : la fiche le rend plus bas, à sa place.
-    expect(queryByText('Incompatible avec votre profil')).toBeNull();
+    expect(queryByText(/^Incompatible avec/)).toBeNull();
     expect(queryByText(SECURITE)).toBeNull();
   });
 });

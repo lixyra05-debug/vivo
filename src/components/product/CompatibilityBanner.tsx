@@ -5,17 +5,32 @@
  *
  *   compatible    → vert, aucun blocker levé ET vérification réellement faite
  *   incompatible  → rouge, au moins un blocker
- *   non vérifiée  → neutre, la liste d'ingrédients manquait
+ *   non vérifiée  → neutre, un critère demandé n'a pas pu être tranché (le plus
+ *                   souvent, la liste d'ingrédients manquait)
  *
  * Le troisième état corrige un mensonge par omission : `isCompatible` ne
- * répond qu'à « existe-t-il un blocker ? ». Sans ingrédients, aucun blocker ne
- * peut être levé — un utilisateur allergique lisait donc « Compatible avec
- * votre profil » alors que rien n'avait été contrôlé.
+ * répond qu'à « existe-t-il un blocker ? ». Sans ingrédients, seul un allergène
+ * que la fiche déclare peut encore lever un blocker ; sans lui, un utilisateur
+ * allergique lisait « Compatible avec votre profil » alors que rien n'avait été
+ * contrôlé.
  *
  * Les motifs de sévérité `warning` sont désormais rendus dans TOUS les états.
  * Ils n'apparaissaient que dans la branche incompatible, ce qui rendait
  * invisibles des constats pourtant établis — 45 g de sucres sur un profil
  * diabète, un NOVA 4 sur un profil bébé, un déclencheur FODMAP.
+ *
+ * L'état compatible ne dit plus « Compatible avec votre profil » : le moteur ne
+ * lit que la fiche transcrite — pour un aliment (Open Food Facts), la liste
+ * d'ingrédients, le texte français d'abord puis celui de la langue principale,
+ * et les allergènes que la fiche déclare ; pour un cosmétique (Open Beauty
+ * Facts), la liste INCI ; plus quelques données de la fiche (valeurs
+ * nutritionnelles, additifs, NOVA, huiles, note). Jamais l'étiquette elle-même,
+ * ni le champ des traces. Le titre dit donc ce qui a été cherché, renvoie à
+ * l'étiquette, et ne parle d'allergènes qu'à un profil qui en a déclaré
+ * (`checkedAllergenCount`). Dans l'état incompatible, un motif d'allergie
+ * montre le mot tel que le texte lu l'écrit (`matchedText`, le texte français
+ * d'abord : il peut manquer à la liste affichée, voir CLAUDE.md) ; un allergène
+ * trouvé par sa seule déclaration n'en montre aucun. Le bandeau tutoie.
  */
 
 import { useState } from 'react';
@@ -49,9 +64,20 @@ export const UNVERIFIED_TITLE = 'Vérification impossible';
  * disparaît jamais : un bloc qui porte cet état à la place du bandeau le
  * reprend mot pour mot.
  */
-export const UNVERIFIED_SAFETY = "Vos allergies et restrictions n'ont pas pu être vérifiées.";
+export const UNVERIFIED_SAFETY = "Tes allergies et restrictions n'ont pas pu être vérifiées.";
 export const UNVERIFIED_BODY = `La liste d'ingrédients de ce produit n'est pas disponible. ${UNVERIFIED_SAFETY}`;
+/** Titre compatible quand au moins une allergie déclarée a été cherchée. */
+const COMPATIBLE_ALLERGENS_TITLE =
+  "Aucun de tes allergènes détecté dans la liste d'ingrédients, vérifie l'étiquette";
+/** Titre compatible pour un profil sans allergie cherchée (diabète, grossesse, enfant seuls). */
+const COMPATIBLE_GENERIC_TITLE = "Rien de bloquant détecté pour ton profil, vérifie l'étiquette";
+const INCOMPATIBLE_TITLE = 'Incompatible avec ton profil';
 const WARNINGS_LABEL = "Points d'attention";
+
+/** Graphie lue dans la liste d'ingrédients, sous le motif qu'elle a déclenché. */
+function matchedTextLabel(matched: string): string {
+  return `Mot détecté : « ${matched} »`;
+}
 
 interface WarningsBlockProps {
   warnings: IncompatibilityReason[];
@@ -150,13 +176,20 @@ export function CompatibilityBanner({ result, unverifiedLead }: CompatibilityBan
   // ── Compatible ───────────────────────────────────────────────────────────
   if (result.isCompatible) {
     const showPercentage = result.compatibilityPercentage < 100;
+    // « Aucun de tes allergènes » serait faux pour un profil qui n'en a déclaré
+    // aucun (diabète, grossesse ou enfant seuls) : il faut qu'une allergie ait
+    // été CHERCHÉE. Champ absent (données anciennes) → titre générique.
+    const title =
+      (result.checkedAllergenCount ?? 0) > 0
+        ? COMPATIBLE_ALLERGENS_TITLE
+        : COMPATIBLE_GENERIC_TITLE;
     return (
       <FadeIn>
         <View style={styles.compatible}>
           <View style={styles.headerRow}>
             <CheckCircle2 color={Colors.sageVivid} size={22} strokeWidth={2.2} />
             <View style={styles.headerBody}>
-              <Text style={styles.compatibleTitle}>Compatible avec votre profil</Text>
+              <Text style={styles.compatibleTitle}>{title}</Text>
               {showPercentage ? (
                 <Text style={styles.compatibleSubtitle}>
                   {`✓ ${result.compatibilityPercentage}% des critères passent`}
@@ -175,6 +208,15 @@ export function CompatibilityBanner({ result, unverifiedLead }: CompatibilityBan
   const hasMore = reasons.length > VISIBLE_LIMIT;
   const visibleReasons = expanded ? reasons : reasons.slice(0, VISIBLE_LIMIT);
   const remaining = reasons.length - VISIBLE_LIMIT;
+  // Le Pressable est UN élément d'accessibilité : son libellé remplace la
+  // lecture des enfants. Sans les motifs, un lecteur d'écran n'annonçait que
+  // le verdict — ni l'allergène, ni le mot détecté.
+  const a11yLabel = [
+    INCOMPATIBLE_TITLE,
+    ...visibleReasons.map((r) =>
+      r.matchedText ? `${r.labelFr}, ${matchedTextLabel(r.matchedText)}` : r.labelFr,
+    ),
+  ].join('. ');
 
   function handleToggle() {
     if (!hasMore) return;
@@ -186,14 +228,14 @@ export function CompatibilityBanner({ result, unverifiedLead }: CompatibilityBan
       <Pressable
         onPress={handleToggle}
         accessibilityRole={hasMore ? 'button' : undefined}
-        accessibilityLabel="Incompatible avec votre profil"
+        accessibilityLabel={a11yLabel}
         accessibilityHint={hasMore ? 'Appuyer pour voir tous les motifs' : undefined}
         style={styles.incompatible}
       >
         <View style={styles.headerRow}>
           <AlertTriangle color={Colors.score.red} size={22} strokeWidth={2.2} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.incompatibleTitle}>Incompatible avec votre profil</Text>
+            <Text style={styles.incompatibleTitle}>{INCOMPATIBLE_TITLE}</Text>
           </View>
           {hasMore ? (
             expanded ? (
@@ -207,9 +249,16 @@ export function CompatibilityBanner({ result, unverifiedLead }: CompatibilityBan
           {visibleReasons.map((reason, idx) => (
             <View key={`${reason.type}-${idx}`} style={styles.reasonRow}>
               <View style={styles.dot} />
-              <Text style={styles.reasonText} numberOfLines={2}>
-                {reason.labelFr}
-              </Text>
+              <View style={styles.reasonBody}>
+                <Text style={styles.reasonLabel} numberOfLines={2}>
+                  {reason.labelFr}
+                </Text>
+                {reason.matchedText ? (
+                  <Text style={styles.matchedText} numberOfLines={1}>
+                    {matchedTextLabel(reason.matchedText)}
+                  </Text>
+                ) : null}
+              </View>
             </View>
           ))}
           {!expanded && hasMore ? (
@@ -319,6 +368,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text,
     lineHeight: 18,
+  },
+  /* Colonne libellé + mot détecté : c'est elle qui prend la largeur restante. */
+  reasonBody: {
+    flex: 1,
+    gap: 2,
+  },
+  reasonLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 18,
+  },
+  /* textSecondary, pas textMuted : sur le fond rouge pâle, textMuted tombe à
+     4,10:1, sous le seuil AA d'un texte de 12 px ; textSecondary tient 6,39:1. */
+  matchedText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: Palette.textSecondary,
+    lineHeight: 16,
   },
   moreText: {
     fontFamily: 'Inter-SemiBold',
