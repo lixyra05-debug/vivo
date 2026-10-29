@@ -85,7 +85,28 @@ export interface Product {
   name: string | null;
   brand: string | null;
   image_url: string | null;
+  /**
+   * Texte d'ingrédients de la langue PRINCIPALE de la fiche OFF
+   * (`ingredients_text`) — pas forcément le français. C'est lui que lit la note.
+   */
   ingredients_raw: string | null;
+  /**
+   * Texte d'ingrédients FRANÇAIS de la fiche OFF (`ingredients_text_fr`),
+   * `null` quand la fiche n'en a pas. Lu par la compatibilité seulement, jamais
+   * par la note. OPTIONNEL : les lignes en cache antérieures à la migration 017
+   * ne l'ont pas, ou l'ont à `null`.
+   */
+  ingredients_text_fr?: string | null;
+  /**
+   * Allergènes déclarés par la fiche OFF (`allergens_tags`, ex. `en:milk`),
+   * tels que la source les donne. La compatibilité les lit EN COMPLÉMENT du
+   * texte : un tag présent est lu comme « contient », son absence ne prouve
+   * rien. Saisie communautaire, la déclaration peut se tromper (traces
+   * recopiées, châtaigne déclarée « fruit à coque », tag sans appui sur la
+   * fiche). OPTIONNEL : une ligne en cache antérieure à la migration 017 n'a
+   * aucun tag.
+   */
+  allergens_tags?: string[];
   additives_tags: string[];
   nova_group: number | null;
   nutriscore_grade: string | null;

@@ -3,6 +3,8 @@ import {
   fetchProductCategoriesTags,
   fetchProductPackagings,
   normalizeOFFProduct,
+  productToScoringInput,
+  type OFFProduct,
 } from '../openfoodfacts';
 
 describe('fetchProductMultiSource', () => {
@@ -234,5 +236,72 @@ describe('normalizeOFFProduct — emballage', () => {
     });
     expect(product.packaging_components).toEqual([]);
     expect(product.packaging_material).toBe('Canette,Aluminium');
+  });
+});
+
+/**
+ * S1b — la compatibilité reçoit ses propres sources, la note garde la sienne.
+ *
+ * Charge utile RÉELLE du Nutella 3017620422003 (Open Food Facts, licence ODbL,
+ * relevée le 29 octobre 2026) : la langue principale de la fiche est
+ * l'anglais, et son texte, tronqué, se réduit à « sugar, palm oil ». Le texte
+ * français, complet, n'était jamais lu, et `allergens_tags` était jeté.
+ */
+describe('normalizeOFFProduct — sources des allergènes (S1b)', () => {
+  const NUTELLA = {
+    code: '3017620422003',
+    product_name: 'Nutella',
+    lang: 'en',
+    ingredients_text: 'sugar, palm oil',
+    ingredients_text_fr:
+      'Sucre, huile de palme, NOISETTES 13%, cacao maigre 7,4%, LAIT écrémé en poudre 6,6%, LACTOSERUM en poudre, émulsifiants: lécithines [SOJA), vanilline. Sans gluten.',
+    allergens_tags: ['en:milk', 'en:nuts', 'en:soybeans'],
+  };
+
+  it('garde le texte français à part : ingredients_raw reste le texte principal', () => {
+    const product = normalizeOFFProduct(NUTELLA);
+    expect(product.ingredients_raw).toBe('sugar, palm oil');
+    expect(product.ingredients_text_fr).toBe(NUTELLA.ingredients_text_fr);
+  });
+
+  it('conserve allergens_tags tels que la source les donne', () => {
+    expect(normalizeOFFProduct(NUTELLA).allergens_tags).toEqual([
+      'en:milk',
+      'en:nuts',
+      'en:soybeans',
+    ]);
+    // Un tag saisi hors taxonomie passe aussi : c'est le moteur, pas le
+    // parseur, qui l'ignore (table un pour un des 14 tags canoniques).
+    const saisieLibre = { ...NUTELLA, allergens_tags: ['en:milk', 'nl:Milch'] };
+    expect(normalizeOFFProduct(saisieLibre).allergens_tags).toEqual(['en:milk', 'nl:Milch']);
+  });
+
+  // Les deux formes réelles d'une fiche sans texte français : le champ absent, et
+  // le champ vide — c'est ainsi qu'OFF sert 20005726 (texte bulgare seulement).
+  it.each([
+    ['champ absent', { code: '1', ingredients_text: 'eau' }],
+    ['champ vide', { code: '20005726', ingredients_text: 'вода', ingredients_text_fr: '' }],
+    ['champ blanc', { code: '1', ingredients_text: 'eau', ingredients_text_fr: '  ' }],
+  ])('sans texte français (%s) : null, et sans tags : liste vide', (_cas, payload) => {
+    // Le cache Supabase déclare `allergens_tags` NOT NULL DEFAULT '{}' (migration 017).
+    const product = normalizeOFFProduct(payload);
+    expect(product.ingredients_text_fr).toBeNull();
+    expect(product.allergens_tags).toEqual([]);
+  });
+
+  it("écarte d'allergens_tags tout ce qui n'est pas une chaîne", () => {
+    // Charge utile JSON telle qu'un contributeur pourrait la produire : HORS
+    // contrat, d'où `unknown` puis une conversion explicite.
+    const brut: unknown = JSON.parse(
+      '{"code": "1", "allergens_tags": ["en:milk", 42, null, "en:eggs"]}',
+    );
+    expect(normalizeOFFProduct(brut as OFFProduct).allergens_tags).toEqual(['en:milk', 'en:eggs']);
+  });
+
+  it('la note ne change pas : productToScoringInput ignore les deux champs', () => {
+    const product = normalizeOFFProduct(NUTELLA);
+    const sansSources = { ...product, ingredients_text_fr: null, allergens_tags: [] };
+    expect(productToScoringInput(product)).toEqual(productToScoringInput(sansSources));
+    expect(productToScoringInput(product).ingredients_raw).toBe('sugar, palm oil');
   });
 });

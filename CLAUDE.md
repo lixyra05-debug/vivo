@@ -76,6 +76,7 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Mode "Ce que je peux manger"** : toggle 100g/Compatibles sur category + store screens (style `NutrientBreakdown`), banner sur fiche produit, compteur "X / Y compatibles"
 - **Confiance & signalement** : `ConfidenceBadge` sous le header produit, `ReportButton` discret avec modal slide (5 raisons FR + description optionnelle), pas de photo MVP
 - **Adapter user→compat** : `userProfileToCompatibilityProfile` mappe `diabetic→diabete`, `pregnant→enceinte`, `child→bebe` ; renvoie `null` si standard sans allergie pour masquer le toggle
+- **Sources des allergènes (lot S1b)** : `normalizeOFFProduct` copie `ingredients_text_fr` (texte français, `null` si absent) et `allergens_tags` (déclaration de la fiche, saisie communautaire) dans `products` ; `ingredients_raw` reste la langue principale, et lui seul nourrit la note. **Migration `017_products_allergen_sources.sql` à appliquer AVANT tout déploiement** : `writeProductToCache` upsert l'objet entier.
 - **Migration** : `009_stores_confidence_reports.sql` (table `product_reports` RLS + table `stores` seedée idempotente)
 
 ## Sprint 1 — Corrections audit (avril 2026)

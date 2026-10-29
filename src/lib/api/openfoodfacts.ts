@@ -24,7 +24,17 @@ export interface OFFProduct {
   product_name?: string;
   brands?: string;
   image_url?: string;
+  /** Langue PRINCIPALE de la fiche — pas forcément le français. */
   ingredients_text?: string;
+  /** Texte français, quand la fiche en a un. Déjà dans la charge utile. */
+  ingredients_text_fr?: string;
+  /**
+   * Allergènes déclarés par la fiche (`en:milk`…). Déjà dans la charge utile.
+   * Saisie communautaire : on y trouve aussi des traces recopiées, des
+   * châtaignes déclarées « fruits à coque » (hors annexe II du règlement
+   * 1169/2011) et des tags sans appui sur la fiche.
+   */
+  allergens_tags?: string[];
   additives_tags?: string[];
   nova_group?: number;
   nutriscore_grade?: string;
@@ -167,6 +177,17 @@ function extractOilTypes(off: OFFProduct): string[] {
   return [...oils];
 }
 
+/** Garde les tags tels quels ; écarte seulement ce qui n'est pas une chaîne. */
+function normalizeAllergenTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((t): t is string => typeof t === 'string');
+}
+
+/** Un texte vide ou blanc n'est pas un texte : OFF sert `""` aux fiches sans français. */
+function nonBlankOrNull(text: string | undefined): string | null {
+  return typeof text === 'string' && text.trim().length > 0 ? text : null;
+}
+
 export function normalizeOFFProduct(off: OFFProduct): Product {
   const n = off.nutriments ?? {};
   const labels = off.labels_tags ?? [];
@@ -176,7 +197,11 @@ export function normalizeOFFProduct(off: OFFProduct): Product {
     name: off.product_name ?? null,
     brand: off.brands ?? null,
     image_url: off.image_url ?? null,
+    // La note lit la langue principale, comme avant. La compatibilité reçoit
+    // ses propres sources : le texte français et les allergènes déclarés.
     ingredients_raw: off.ingredients_text ?? null,
+    ingredients_text_fr: nonBlankOrNull(off.ingredients_text_fr),
+    allergens_tags: normalizeAllergenTags(off.allergens_tags),
     additives_tags: off.additives_tags ?? [],
     nova_group: typeof off.nova_group === 'number' ? off.nova_group : null,
     nutriscore_grade: off.nutriscore_grade ?? null,
