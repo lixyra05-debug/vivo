@@ -39,6 +39,7 @@ import {
 import { calculateScore } from '@/src/lib/scoring/engine';
 import { composeScore } from '@/src/lib/scoring/composite-score';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
+import { getCosmeticVerificationStatus } from '@/src/lib/scoring/cosmetic-verification';
 import { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { findRelevantCards } from '@/src/lib/education/content-database';
@@ -479,7 +480,11 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
   }, [cosmeticQuery.data]);
 
   useEffect(() => {
-    if (!user || !barcode || !result || scanRecorded) return;
+    if (!user || !barcode || !cosmeticQuery.data || !result || scanRecorded) return;
+    // S3-3 — `score_at_scan` est NOT NULL : enregistrer un cosmétique dont aucun
+    // ingrédient n'a été évalué, c'est y écrire le 100 du moteur, que liraient
+    // ensuite historique, moyennes, « excellents », badges, récap et PDF.
+    if (getCosmeticVerificationStatus(cosmeticQuery.data) !== 'verified') return;
     setScanRecorded(true);
     recordScan.mutate({
       barcode,
@@ -488,7 +493,7 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
       penalties: result.penalties,
       productType: 'cosmetic',
     });
-  }, [user, barcode, result, scanRecorded, recordScan, profile]);
+  }, [user, barcode, cosmeticQuery.data, result, scanRecorded, recordScan, profile]);
 
   const compatibilityResult = useMemo(() => {
     if (!cosmeticQuery.data || !result) return null;

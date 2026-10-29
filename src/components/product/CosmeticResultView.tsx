@@ -2,14 +2,18 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AlertTriangle, Leaf } from 'lucide-react-native';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
+import { Icon } from '@/src/components/ui/Icon';
+import { UNVERIFIED_TITLE } from '@/src/components/product/CompatibilityBanner';
 import { ProductHeader } from '@/src/components/product/ProductHeader';
 import {
   ScoreCircle,
   SCORE_LABEL_FORMULATION,
 } from '@/src/components/product/ScoreCircle';
 import { Colors, scoreColor } from '@/src/constants/colors';
+import { Palette, Radius, Spacing } from '@/src/constants/theme';
 import { findCosmeticIngredient } from '@/src/lib/scoring/cosmetic-ingredients-db';
 import { getCosmeticProfileLabel } from '@/src/lib/scoring/cosmetic-profiles';
+import { getCosmeticVerificationStatus } from '@/src/lib/scoring/cosmetic-verification';
 import type {
   CosmeticIngredientRisk,
   CosmeticProduct,
@@ -79,7 +83,21 @@ export function verdictFromScore(score: number): { label: string; description: s
   };
 }
 
+/**
+ * S3-3 — corps du statut « Vérification impossible ». Il doit rester vrai pour
+ * chaque cas que `getCosmeticVerificationStatus` couvre : liste absente, vide,
+ * ou dont aucun nom n'est reconnu. Constat sur la donnée, jamais sur le
+ * produit : le 100 du moteur dit qu'aucune pénalité n'a été relevée, pas
+ * qu'il n'y avait rien à relever.
+ */
+export const COSMETIC_UNVERIFIED_BODY =
+  "Aucun ingrédient de ce produit n'a pu être évalué : la liste INCI est absente ou n'est pas reconnue par Vivo. Vérifie la composition sur l'emballage.";
+
 export function CosmeticResultView({ product, result, profile }: CosmeticResultViewProps) {
+  // S3-3 : sans ingrédient évalué, le 100 du moteur ne mesure rien — ni
+  // verdict, ni « Formule propre », ni cercle, ni couleur. Le moteur, lui,
+  // n'est pas modifié.
+  const evaluated = getCosmeticVerificationStatus(product) === 'verified';
   const scoreHex = scoreColor(result.score_final);
   const verdict = verdictFromScore(result.score_final);
   const topRisky = result.risky_ingredients.slice(0, 8);
@@ -91,59 +109,71 @@ export function CosmeticResultView({ product, result, profile }: CosmeticResultV
           name={product.name}
           brand={product.brand}
           imageUrl={product.image_url}
-          score={result.score_final}
+          score={evaluated ? result.score_final : null}
           isOrganic={false}
           category={product.category}
         />
       </FadeIn>
 
-      <FadeIn delay={140}>
-        <View style={{ alignItems: 'center', gap: 12 }}>
-          <View style={styles.scoreHaloWrap}>
-            <View style={[styles.scoreHalo, { backgroundColor: `${scoreHex}14` }]} />
-            {/*
-              Libellé explicite : le malus emballage ne s'applique qu'à
-              l'alimentaire (le barème est sourcé sur la migration au CONTACT
-              ALIMENTAIRE). Ce score reste la seule formulation, et le dit.
-            */}
-            <ScoreCircle
-              score={result.score_final}
-              size={200}
-              strokeWidth={14}
-              label={SCORE_LABEL_FORMULATION}
-            />
-          </View>
-          <Text
-            style={{
-              fontFamily: 'BricolageGrotesque-SemiBold',
-              fontSize: 20,
-              color: scoreHex,
-              letterSpacing: -0.3,
-            }}
-          >
-            {verdict.label}
-          </Text>
-          <Text
-            style={{
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color: Colors.textMuted,
-              textAlign: 'center',
-              paddingHorizontal: 24,
-              lineHeight: 19,
-            }}
-          >
-            {verdict.description}
-          </Text>
-          {profile !== 'standard' ? (
-            <View style={styles.profileChip}>
-              <Text style={styles.profileChipText}>
-                Profil : {getCosmeticProfileLabel(profile)}
-              </Text>
+      {evaluated ? (
+        <FadeIn delay={140}>
+          <View style={{ alignItems: 'center', gap: 12 }}>
+            <View style={styles.scoreHaloWrap}>
+              <View style={[styles.scoreHalo, { backgroundColor: `${scoreHex}14` }]} />
+              {/*
+                Libellé explicite : le malus emballage ne s'applique qu'à
+                l'alimentaire (le barème est sourcé sur la migration au CONTACT
+                ALIMENTAIRE). Ce score reste la seule formulation, et le dit.
+              */}
+              <ScoreCircle
+                score={result.score_final}
+                size={200}
+                strokeWidth={14}
+                label={SCORE_LABEL_FORMULATION}
+              />
             </View>
-          ) : null}
-        </View>
-      </FadeIn>
+            <Text
+              style={{
+                fontFamily: 'BricolageGrotesque-SemiBold',
+                fontSize: 20,
+                color: scoreHex,
+                letterSpacing: -0.3,
+              }}
+            >
+              {verdict.label}
+            </Text>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Colors.textMuted,
+                textAlign: 'center',
+                paddingHorizontal: 24,
+                lineHeight: 19,
+              }}
+            >
+              {verdict.description}
+            </Text>
+            {profile !== 'standard' ? (
+              <View style={styles.profileChip}>
+                <Text style={styles.profileChipText}>
+                  Profil : {getCosmeticProfileLabel(profile)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </FadeIn>
+      ) : (
+        <FadeIn delay={140}>
+          <View style={styles.unverified}>
+            <View style={styles.unverifiedHeader}>
+              <Icon name="AlertCircle" color="textMuted" />
+              <Text style={styles.unverifiedTitle}>{UNVERIFIED_TITLE}</Text>
+            </View>
+            <Text style={styles.unverifiedBody}>{COSMETIC_UNVERIFIED_BODY}</Text>
+          </View>
+        </FadeIn>
+      )}
 
       {result.blockers.length > 0 ? (
         <FadeIn delay={220}>
@@ -174,107 +204,111 @@ export function CosmeticResultView({ product, result, profile }: CosmeticResultV
         </FadeIn>
       ) : null}
 
-      <FadeIn delay={300}>
-        <View style={{ gap: 10 }}>
-          <View style={{ gap: 4 }}>
-            <Text
-              style={{
-                fontFamily: 'BricolageGrotesque-Bold',
-                fontSize: 20,
-                color: Colors.text,
-                letterSpacing: -0.3,
-              }}
-            >
-              Analyse INCI
-            </Text>
-            <Text
-              style={{
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: Colors.textMuted,
-              }}
-            >
-              Les ingrédients identifiés dans la formule.
-            </Text>
-          </View>
-          {topRisky.length === 0 ? (
-            <GlassCard style={{ padding: 16, gap: 10, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={styles.cleanIconBg}>
-                <Leaf color={Colors.sage} size={20} strokeWidth={2} />
-              </View>
+      {/* Sans évaluation, « Formule propre » ne se dit pas ; mais des ingrédients
+          à risque relevés par le moteur restent toujours affichés. */}
+      {evaluated || topRisky.length > 0 ? (
+        <FadeIn delay={300}>
+          <View style={{ gap: 10 }}>
+            <View style={{ gap: 4 }}>
               <Text
                 style={{
-                  fontFamily: 'Inter-Medium',
-                  fontSize: 13,
+                  fontFamily: 'BricolageGrotesque-Bold',
+                  fontSize: 20,
                   color: Colors.text,
-                  flex: 1,
-                  lineHeight: 19,
+                  letterSpacing: -0.3,
                 }}
               >
-                Formule propre, aucun ingrédient préoccupant détecté.
+                Analyse INCI
               </Text>
-            </GlassCard>
-          ) : (
-            <GlassCard style={{ padding: 14, gap: 12 }}>
-              {topRisky.map((item, idx) => {
-                const entry = findCosmeticIngredient(item.inci);
-                const dotColor = RISK_COLOR[item.risk];
-                return (
-                  <View
-                    key={item.inci}
-                    style={[
-                      styles.ingredientRow,
-                      idx < topRisky.length - 1 ? styles.ingredientRowBorder : null,
-                    ]}
-                  >
-                    <View style={[styles.riskDot, { backgroundColor: dotColor }]} />
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text
-                        style={{
-                          fontFamily: 'BricolageGrotesque-SemiBold',
-                          fontSize: 14,
-                          color: Colors.text,
-                        }}
-                        numberOfLines={2}
-                      >
-                        {entry?.nameFr ?? item.inci}
-                      </Text>
-                      <Text
-                        style={{
-                          fontFamily: 'Inter-Medium',
-                          fontSize: 11,
-                          color: Colors.textMuted,
-                          letterSpacing: 0.4,
-                        }}
-                      >
-                        {item.inci.toUpperCase()}
-                      </Text>
-                      {item.reason ? (
+              <Text
+                style={{
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                }}
+              >
+                Les ingrédients identifiés dans la formule.
+              </Text>
+            </View>
+            {topRisky.length === 0 ? (
+              <GlassCard style={{ padding: 16, gap: 10, flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.cleanIconBg}>
+                  <Leaf color={Colors.sage} size={20} strokeWidth={2} />
+                </View>
+                <Text
+                  style={{
+                    fontFamily: 'Inter-Medium',
+                    fontSize: 13,
+                    color: Colors.text,
+                    flex: 1,
+                    lineHeight: 19,
+                  }}
+                >
+                  Formule propre, aucun ingrédient préoccupant détecté.
+                </Text>
+              </GlassCard>
+            ) : (
+              <GlassCard style={{ padding: 14, gap: 12 }}>
+                {topRisky.map((item, idx) => {
+                  const entry = findCosmeticIngredient(item.inci);
+                  const dotColor = RISK_COLOR[item.risk];
+                  return (
+                    <View
+                      key={item.inci}
+                      style={[
+                        styles.ingredientRow,
+                        idx < topRisky.length - 1 ? styles.ingredientRowBorder : null,
+                      ]}
+                    >
+                      <View style={[styles.riskDot, { backgroundColor: dotColor }]} />
+                      <View style={{ flex: 1, gap: 3 }}>
                         <Text
                           style={{
-                            fontFamily: 'Inter',
-                            fontSize: 12,
+                            fontFamily: 'BricolageGrotesque-SemiBold',
+                            fontSize: 14,
+                            color: Colors.text,
+                          }}
+                          numberOfLines={2}
+                        >
+                          {entry?.nameFr ?? item.inci}
+                        </Text>
+                        <Text
+                          style={{
+                            fontFamily: 'Inter-Medium',
+                            fontSize: 11,
                             color: Colors.textMuted,
-                            lineHeight: 17,
-                            marginTop: 2,
+                            letterSpacing: 0.4,
                           }}
                         >
-                          {item.reason}
+                          {item.inci.toUpperCase()}
                         </Text>
-                      ) : null}
+                        {item.reason ? (
+                          <Text
+                            style={{
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              color: Colors.textMuted,
+                              lineHeight: 17,
+                              marginTop: 2,
+                            }}
+                          >
+                            {item.reason}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={[styles.riskPill, { backgroundColor: `${dotColor}22` }]}>
+                        <Text style={[styles.riskPillText, { color: dotColor }]}>
+                          {RISK_LABEL[item.risk]}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={[styles.riskPill, { backgroundColor: `${dotColor}22` }]}>
-                      <Text style={[styles.riskPillText, { color: dotColor }]}>
-                        {RISK_LABEL[item.risk]}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </GlassCard>
-          )}
-        </View>
-      </FadeIn>
+                  );
+                })}
+              </GlassCard>
+            )}
+          </View>
+        </FadeIn>
+      ) : null}
 
       {result.penalties.length > 0 ? (
         <FadeIn delay={400}>
@@ -417,6 +451,32 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  /* S3-3 — ni vert ni rouge : rien n'a été mesuré, et l'écran le montre.
+     Mêmes jetons que l'état « non vérifiée » de CompatibilityBanner. */
+  unverified: {
+    backgroundColor: Palette.surfaceInset,
+    borderColor: Palette.borderSoft,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: 14,
+    gap: Spacing.sm,
+  },
+  unverifiedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  unverifiedTitle: {
+    fontFamily: 'BricolageGrotesque-SemiBold',
+    fontSize: 16,
+    color: Colors.text,
+  },
+  unverifiedBody: {
+    fontFamily: 'Inter',
+    fontSize: 13,
+    color: Colors.textMuted,
+    lineHeight: 19,
   },
   cleanIconBg: {
     width: 40,

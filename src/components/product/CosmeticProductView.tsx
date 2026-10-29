@@ -15,6 +15,7 @@ import type { PackagingComponent } from '@/src/data/packaging-risks';
 import type { CosmeticProduct, CosmeticScoringResult } from '@/src/lib/api/types';
 import type { getCosmeticConfidence } from '@/src/lib/api/confidence';
 import type { checkCompatibility } from '@/src/lib/scoring/compatibility-engine';
+import { getCosmeticVerificationStatus } from '@/src/lib/scoring/cosmetic-verification';
 import type { EducationalCard as EducationalCardType } from '@/src/lib/gamification/types';
 
 export interface CosmeticProductViewProps {
@@ -37,6 +38,18 @@ export function CosmeticProductView({
   onPressMethodology,
 }: CosmeticProductViewProps) {
   const router = useRouter();
+  // S3-3 — sans ingrédient évalué, le 100 du moteur ne mesure rien : la fiche
+  // n'en tire ni le vert de compatibilité, ni une carte qui commente la note.
+  // `isCompatible` et `verificationStatus` (D11) gardent leur sens, et les
+  // états « Incompatible » et « Vérification impossible » restent rendus.
+  const evaluated = getCosmeticVerificationStatus(product) === 'verified';
+  // L'état vert du bandeau : compatible ET vérifié (cf. CompatibilityBanner).
+  const greenBanner =
+    compatibilityResult?.isCompatible === true &&
+    compatibilityResult.verificationStatus !== 'insufficient_data';
+  const cards = evaluated
+    ? educationalCards
+    : educationalCards.filter((card) => card.trigger.type !== 'score');
   return (
     <>
       <CosmeticResultView product={product} result={result} profile="standard" />
@@ -75,27 +88,27 @@ export function CosmeticProductView({
           </View>
         </FadeIn>
       ) : null}
-      {compatibilityResult ? (
+      {compatibilityResult && (evaluated || !greenBanner) ? (
         <FadeIn delay={160}>
           <CompatibilityBanner result={compatibilityResult} />
         </FadeIn>
       ) : null}
-      {educationalCards.map((card, i) => (
+      {cards.map((card, i) => (
         <FadeIn key={card.id} delay={260 + i * 120}>
           <EducationalCard card={card} />
         </FadeIn>
       ))}
-      <FadeIn delay={260 + educationalCards.length * 120}>
+      <FadeIn delay={260 + cards.length * 120}>
         <ReportButton barcode={product.barcode} />
       </FadeIn>
-      <FadeIn delay={300 + educationalCards.length * 120}>
+      <FadeIn delay={300 + cards.length * 120}>
         <SourceLink
           barcode={product.barcode}
           source="obf"
           lastUpdated={product.obf_last_updated ?? product.updated_at}
         />
       </FadeIn>
-      <FadeIn delay={340 + educationalCards.length * 120}>
+      <FadeIn delay={340 + cards.length * 120}>
         <Pressable
           onPress={() => Linking.openURL('https://world.openbeautyfacts.org')}
           accessibilityRole="link"

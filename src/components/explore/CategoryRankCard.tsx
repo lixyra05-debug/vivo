@@ -12,7 +12,8 @@ export type Medal = 'gold' | 'silver' | 'bronze';
 
 interface CategoryRankCardProps {
   result: SearchResult;
-  score: number;
+  /** `null` : produit non évalué (S3-3) — ni cercle ni chiffre. */
+  score: number | null;
   rank: number;
   medal?: Medal;
   confidence?: ProductConfidence;
@@ -46,7 +47,7 @@ export function CategoryRankCard({
     <Pressable
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`${medal ? `Médaille ${medal === 'gold' ? 'or' : medal === 'silver' ? 'argent' : 'bronze'}, ` : `Rang ${rank}, `}${displayName}, score ${score} sur 100`}
+      accessibilityLabel={`${medal ? `Médaille ${medal === 'gold' ? 'or' : medal === 'silver' ? 'argent' : 'bronze'}, ` : `Rang ${rank}, `}${displayName}, ${score === null ? 'non évalué' : `score ${score} sur 100`}`}
     >
       <GlassCard style={styles.card}>
         <View style={styles.rankBadge}>
@@ -92,7 +93,13 @@ export function CategoryRankCard({
           ) : null}
         </View>
 
-        <MiniScoreCircle score={score} size={52} strokeWidth={5} />
+        {score === null ? (
+          <View style={styles.unrated}>
+            <Text style={styles.unratedText}>Non évalué</Text>
+          </View>
+        ) : (
+          <MiniScoreCircle score={score} size={52} strokeWidth={5} />
+        )}
       </GlassCard>
     </Pressable>
   );
@@ -166,5 +173,17 @@ const styles = StyleSheet.create({
   confidenceRow: {
     marginTop: 4,
     flexDirection: 'row',
+  },
+  /* S3-3 — gabarit du cercle (52), ton neutre : rien n'a été mesuré. */
+  unrated: {
+    width: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unratedText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 10,
+    color: Colors.textMuted,
+    textAlign: 'center',
   },
 });

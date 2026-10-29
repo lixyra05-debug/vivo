@@ -31,6 +31,7 @@ import { getProductConfidence, getCosmeticConfidence } from '@/src/lib/api/confi
 import { calculateScore } from '@/src/lib/scoring/engine';
 import { composeScore } from '@/src/lib/scoring/composite-score';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
+import { getCosmeticVerificationStatus } from '@/src/lib/scoring/cosmetic-verification';
 import { isProductCompatible } from '@/src/lib/scoring/profile-filters';
 import { userProfileToCompatibilityProfile } from '@/src/lib/scoring/profile-adapter';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
@@ -52,6 +53,8 @@ const TEN_MIN_MS = 10 * 60 * 1000;
 interface RankedItem {
   result: SearchResult;
   score: number;
+  /** S3-3 — `false` : cosmétique dont aucun ingrédient n'a été évalué. Son 100 ne classe rien. */
+  evaluated: boolean;
   confidence: ProductConfidence;
   product: Product | CosmeticProduct;
   scoring: ScoringResult | CosmeticScoringResult;
@@ -71,6 +74,7 @@ async function computeFoodScore(
     return {
       result,
       score: scoring.score_final,
+      evaluated: true,
       confidence: getProductConfidence(product),
       product,
       scoring,
@@ -88,6 +92,7 @@ async function computeCosmeticScore(result: SearchResult): Promise<RankedItem | 
     return {
       result,
       score: scoring.score_final,
+      evaluated: getCosmeticVerificationStatus(product) === 'verified',
       confidence: getCosmeticConfidence(product),
       product,
       scoring,
@@ -109,7 +114,9 @@ async function rankResults(
   );
   const settled = await Promise.all(tasks);
   const ranked = settled.filter((x): x is RankedItem => x !== null);
-  ranked.sort((a, b) => b.score - a.score);
+  // S3-3 — un produit non évalué ferme la marche : le 100 que le moteur lui rend
+  // faute d'ingrédient reconnu le hissait en tête du classement.
+  ranked.sort((a, b) => Number(b.evaluated) - Number(a.evaluated) || b.score - a.score);
   return ranked;
 }
 
@@ -343,7 +350,7 @@ export default function CategoryScreen() {
           ) : (
             <View style={{ gap: 10 }}>
               {visibleLive.map((item, index) => {
-                const medal = hasFeatured ? undefined : medalForIndex(index);
+                const medal = hasFeatured || !item.evaluated ? undefined : medalForIndex(index);
                 return (
                   <FadeIn
                     key={item.result.barcode}
@@ -351,7 +358,7 @@ export default function CategoryScreen() {
                   >
                     <CategoryRankCard
                       result={item.result}
-                      score={item.score}
+                      score={item.evaluated ? item.score : null}
                       rank={index + 1}
                       medal={medal}
                       confidence={item.confidence}

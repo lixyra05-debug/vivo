@@ -67,4 +67,14 @@ describe('CategoryRankCard', () => {
     fireEvent.press(getByRole('button'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  // S3-3 (option catégorie) — un produit dont aucun ingrédient n'a été évalué.
+  it('score null : « Non évalué » au lieu du cercle, et aucune note à l’oral', () => {
+    const { getByText, getByRole, queryByLabelText } = render(
+      <CategoryRankCard result={result} score={null} rank={7} onPress={() => {}} />,
+    );
+    expect(getByText('Non évalué')).toBeTruthy();
+    expect(queryByLabelText(/sur 100/)).toBeNull();
+    expect(getByRole('button', { name: 'Rang 7, Pomme bio, non évalué' })).toBeTruthy();
+  });
 });

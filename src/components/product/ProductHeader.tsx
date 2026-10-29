@@ -2,12 +2,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Leaf } from 'lucide-react-native';
 import { Colors, scoreColor } from '@/src/constants/colors';
+import { Palette } from '@/src/constants/theme';
 
 interface ProductHeaderProps {
   name?: string | null;
   brand?: string | null;
   imageUrl?: string | null;
-  score: number;
+  /** `null` : produit non évalué (S3-3) → halo neutre, jamais la couleur d'un verdict. */
+  score: number | null;
   isOrganic: boolean;
   category?: string | null;
 }
@@ -21,7 +23,7 @@ export function ProductHeader({
   category,
 }: ProductHeaderProps) {
   const displayName = name && name.trim().length > 0 ? name : 'Produit';
-  const color = scoreColor(score);
+  const color = score === null ? Palette.textMuted : scoreColor(score);
   const haloColor = `${color}14`;
 
   const a11yLabel = `${displayName}${brand ? `, ${brand}` : ''}${isOrganic ? ', produit bio' : ''}`;

@@ -362,8 +362,9 @@ Le packaging cesse d'être informatif : il devient un **modificateur appliqué A
 ## Dette identifiée (non corrigée, à arbitrer)
 
 ### LIMITE CONNUE ET ASSUMÉE — les listes trient sur `score_final`, donc l'absence de donnée avantage
-`category/[slug].tsx:112`, `store/[slug].tsx:84` et `top-by-category.ts:86` trient tous sur
-`scoring.score_final`, c'est-à-dire la note **avec** malus emballage.
+`category/[slug].tsx:119`, `store/[slug].tsx:84` et `top-by-category.ts:86` trient tous sur
+`scoring.score_final`, c'est-à-dire la note **avec** malus emballage (dans la liste catégorie, un
+cosmétique non évalué — S3-3 — passe après tous les autres, sans médaille ni cercle de note).
 
 Conséquence : un produit dont OFF ne renseigne pas `packagings[]` ne prend **aucun malus — par absence
 de donnée, pas par propreté réelle**. Il devance donc, dans une liste, un produit par ailleurs
