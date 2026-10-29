@@ -115,6 +115,8 @@ export default function PlantDetailScreen() {
           </View>
         </PlantSection>
 
+        <PrecautionSections plant={plant} />
+
         <PlantSection delay={200} title="Propriétés documentées">
           <Text style={styles.bodyText}>
             {isExpert
@@ -258,8 +260,23 @@ function ExpertSections({ plant }: ExpertSectionsProps) {
       <PlantSection delay={500} title="Préparation">
         <Text style={styles.bodyText}>{plant.preparation}</Text>
       </PlantSection>
+    </>
+  );
+}
 
-      <FadeIn delay={600}>
+interface PrecautionSectionsProps {
+  plant: PlantEntry;
+}
+
+/**
+ * Contre-indications et interactions : contenu de sécurité, rendu à tous les
+ * paliers, en clair et avant le paywall. Ne lit pas le palier — ni son
+ * chargement ni son erreur ne peuvent le masquer.
+ */
+function PrecautionSections({ plant }: PrecautionSectionsProps) {
+  return (
+    <>
+      <FadeIn delay={140}>
         <GlassCard style={styles.contraindicationCard}>
           <Text style={styles.sectionTitle}>Contre-indications</Text>
           <Text style={[styles.bodyText, { color: '#7B1F1F' }]}>
@@ -268,9 +285,9 @@ function ExpertSections({ plant }: ExpertSectionsProps) {
         </GlassCard>
       </FadeIn>
 
-      <PlantSection delay={700} title="Interactions médicamenteuses">
+      <PlantSection delay={170} title="Interactions médicamenteuses">
         <Text style={styles.bodyText}>
-          {plant.interactions ?? 'Aucune interaction notable documentée.'}
+          {plant.interactions ?? 'Aucune interaction renseignée sur cette fiche.'}
         </Text>
       </PlantSection>
     </>

@@ -170,7 +170,7 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
   plant_database: {
     labelFr: 'Base de données plantes médicinales',
     descriptionFr:
-      '40 fiches plantes documentées, enrichies régulièrement — usages, préparations et précautions.',
+      '40 fiches plantes documentées, enrichies régulièrement — usages et préparations.',
     freeLimit: 0,
   },
   herbal_remedies: {

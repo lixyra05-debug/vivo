@@ -222,6 +222,12 @@ describe('premium-gate', () => {
       expect(def.labelFr).not.toMatch(/médicament|alternative/i);
       expect(def.descriptionFr).not.toMatch(/médicament|alternative/i);
     });
+
+    it('plant_database ne vend pas les précautions, visibles à tous les paliers', () => {
+      const def = PREMIUM_FEATURES.plant_database;
+      expect(def.labelFr).not.toMatch(/précaution|contre-indication|interaction/i);
+      expect(def.descriptionFr).not.toMatch(/précaution|contre-indication|interaction/i);
+    });
   });
 
   describe('canAccessFeature', () => {
