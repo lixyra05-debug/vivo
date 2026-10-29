@@ -10,6 +10,11 @@
  * Conditions : 7 valeurs reconnues par le moteur (diabete, enceinte, bebe,
  * coeliaque, ibs_fodmap, hypertension, cholesterol).
  *
+ * Allergies et conditions sont enregistrées pour mémoire : hors de ce
+ * formulaire, aucun écran ne s'en sert (`useActiveCompatProfile` n'a aucun
+ * consommateur). Les deux mentions « Pour mémoire » le disent ; elles
+ * deviendront fausses le jour où une analyse s'en servira (S3-2).
+ *
  * Free / Premium-non-éligible : `<PremiumPaywall featureKey="family_mode" />`.
  */
 
@@ -243,7 +248,7 @@ export default function FamilyEditScreen() {
               {isCreate ? 'Nouveau profil' : 'Modifier le profil'}
             </Text>
             <Text style={styles.subtitle}>
-              Personnalise les scans pour ce membre de la famille
+              Les informations de ce membre de la famille
             </Text>
           </View>
         </FadeIn>
@@ -317,7 +322,8 @@ export default function FamilyEditScreen() {
               <GlassCard style={styles.card}>
                 <Text style={styles.sectionLabel}>Allergies & intolérances</Text>
                 <Text style={styles.sectionHint}>
-                  Vivo bloquera les produits qui contiennent ces allergènes.
+                  Pour mémoire : ces informations ne modifient pas
+                  l&apos;analyse des produits.
                 </Text>
                 <View style={styles.chipsRow}>
                   {ALLERGENS.map((allergen) => (
@@ -336,7 +342,7 @@ export default function FamilyEditScreen() {
               <GlassCard style={styles.card}>
                 <Text style={styles.sectionLabel}>Conditions de santé</Text>
                 <Text style={styles.sectionHint}>
-                  Le score sera adapté pour ce profil (informatif, pas médical).
+                  Pour mémoire : ces informations ne modifient ni l&apos;analyse ni le score.
                 </Text>
                 <View style={styles.chipsRow}>
                   {CONDITIONS.map((condition) => (

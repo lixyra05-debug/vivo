@@ -2,8 +2,8 @@
  * Mode Famille — liste des profils familiaux (Premium tier).
  *
  * Crée jusqu'à 4 profils familiaux et bascule entre eux. Chaque profil porte
- * ses propres allergies et conditions, qui pilotent le filtre "Ce que je peux manger"
- * via `useActiveCompatProfile` (côté futur consumer).
+ * ses propres allergies et conditions, enregistrées pour mémoire : aucune
+ * analyse ne s'en sert (`useActiveCompatProfile` n'a aucun consommateur).
  *
  * Free / Premium-non-éligible : `<PremiumPaywall featureKey="family_mode" />`
  * — la liste reste cachée, seuls le titre et la garantie restent visibles.
@@ -145,8 +145,7 @@ function FamilyContent({
           </View>
           <Text style={styles.emptyTitle}>Aucun profil familial</Text>
           <Text style={styles.emptyBody}>
-            Ajoute ton premier profil pour commencer à personnaliser tes scans
-            par membre de la famille.
+            Ajoute un profil pour chaque membre de la famille.
           </Text>
           <Pressable
             accessibilityRole="button"

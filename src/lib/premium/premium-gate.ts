@@ -133,7 +133,7 @@ export const PREMIUM_FEATURES: Record<PremiumFeatureKey, PremiumFeatureDef> = {
   family_mode: {
     labelFr: 'Mode Famille',
     descriptionFr:
-      "Crée jusqu'à 4 profils familiaux avec leurs allergies et restrictions, et bascule entre eux d'un tap.",
+      "Crée jusqu'à 4 profils familiaux.",
     freeLimit: 0,
   },
   advanced_stats: {

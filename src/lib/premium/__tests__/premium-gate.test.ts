@@ -228,6 +228,17 @@ describe('premium-gate', () => {
       expect(def.labelFr).not.toMatch(/précaution|contre-indication|interaction/i);
       expect(def.descriptionFr).not.toMatch(/précaution|contre-indication|interaction/i);
     });
+
+    // S3-2 — aucune analyse ne lit un profil familial : la description ne
+    // vend ni bascule, ni blocage, ni score adapté, ni scans personnalisés,
+    // et ne met pas en avant des données de santé qu'aucun calcul n'utilise.
+    it('family_mode ne promet aucun effet des profils familiaux (S3-2)', () => {
+      const def = PREMIUM_FEATURES.family_mode;
+      expect(def.descriptionFr).toBe("Crée jusqu'à 4 profils familiaux.");
+      expect(def.descriptionFr).not.toMatch(
+        /bascul|d'un tap|bloqu|adapt|personnalis|allergi|condition|restriction/i,
+      );
+    });
   });
 
   describe('canAccessFeature', () => {

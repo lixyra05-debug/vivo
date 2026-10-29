@@ -273,7 +273,7 @@ Bouclage du tier Expert avec 5 features pensées rétention quotidienne et engag
 Bouclage du tier Premium avec 4 features pensées rétention et utilité famille. 660 → **681 tests verts** (+21). Aucune régression. Migration 014, +1 install autorisée (`expo-print` ~15.0.8). 25 features inchangées en taille (rename `food_journal` → `family_mode`, `export_data` → `export_pdf`).
 
 - **Premium gate** : `src/lib/premium/premium-gate.ts` — rename des 2 placeholders côté `PremiumFeatureKey`, `FEATURE_TIER`, `PREMIUM_FEATURES`. Total reste 25 features (10 Premium + 15 Expert). Catalog plus propre, plus de placeholders fantômes.
-  - `family_mode` : "Mode Famille" — *Crée jusqu'à 4 profils familiaux avec leurs allergies et restrictions, et bascule entre eux d'un tap.*
+  - `family_mode` : "Mode Famille" — *Crée jusqu'à 4 profils familiaux.* (S3-2 : la description ne promet ni bascule ni effet sur les scans ; allergies et conditions des membres sont gardées pour mémoire, aucune analyse ne les lit.)
   - `export_pdf` : "Export PDF" — *Génère un rapport santé PDF de tes 30 derniers jours, prêt à partager avec ton médecin.*
 
 - **Migration `014_family_profiles.sql`** (idempotente, à appliquer manuellement dans Supabase SQL Editor) :
@@ -291,11 +291,11 @@ Bouclage du tier Premium avec 4 features pensées rétention et utilité famille
   - `src/lib/stores/__tests__/useScanHistory.test.tsx` — 1 test garde-fou : `useScanHistory({limit: 30})` applique `.limit(30)` server-side, `useScanHistory({limit: undefined})` omet `.limit`. Confirme la gate Premium-vs-free déjà câblée dans `app/(tabs)/history.tsx` (lignes 44, 49-52, 442-486).
 
 - **Frontend** (Agent 2 — 6 livrables UI + 2 tests, livré 675 → 681 = +6) :
-  - `app/family/index.tsx` — Liste max 4 profils + tap pour activer + edit pin → `/family/edit?id={id}` + bouton "+ Nouveau profil" (caché si ≥4). Skeleton loading, empty state, paywall `family_mode` pour free.
+  - `app/family/index.tsx` — Liste max 4 profils + tap pour marquer un profil actif (écrit seulement `is_active` : aucune analyse ne lit le profil actif) + edit pin → `/family/edit?id={id}` + bouton "+ Nouveau profil" (caché si ≥4). Skeleton loading, empty state (« Ajoute un profil pour chaque membre de la famille. »), paywall `family_mode` pour free.
   - `app/family/edit.tsx` — Form create/edit. 8 emojis avatar (🧑/👨/👩/🧒/👶/🤰/👴/👵), nom maxLength=50, 4 chips age_group, 14 allergènes EU + 7 conditions multi-select. Boutons Créer/Annuler ou Enregistrer/Supprimer (Alert.alert confirm). Validation nom non vide. Échec mutation → Alert "max 4 profils ?".
   - `app/stats/index.tsx` — Dashboard 6 sections : KPI strip (totalScans / averageScore / streak), sparkline 28j Catmull-Rom (couleur trend selon slope), distribution 5 buckets colorés, top 5 catégories/marques en rows, exposition toxique (GlassCard tone="warning" si totalPenalties > 50). Empty state si 0 scans + paywall `advanced_stats`.
   - `src/components/home/FamilyProfilePills.tsx` — ScrollView horizontal de pills compactes (avatar 18px + nom Inter-SemiBold 12), pill active sage, dernière pill "+ Gérer" → `/family`. Render `null` si tier='free' OU profiles.length=0 (auto-gating).
-  - `src/lib/scoring/use-active-compat-profile.ts` — Hook unifié : profil familial actif prime sur `useProfileStore`, fallback `userProfileToCompatibilityProfile(profile)` sinon. Renvoie `null` si rien à filtrer. **Pas encore branché** côté call-sites existants (history/category/store) — c'est un AJOUT pour les futures intégrations.
+  - `src/lib/scoring/use-active-compat-profile.ts` — Hook qui ferait primer le profil familial actif sur `useProfileStore` (repli `userProfileToCompatibilityProfile(profile)`, `null` si rien à filtrer). **Aucun appelant, et non branché par décision (S3-2)** : les profils familiaux ne modifient ni l'analyse ni le score, et les écrans du Mode Famille le disent (« Pour mémoire »).
   - `app/(tabs)/profile.tsx` : 3 SettingsRow ajoutés — Mode Famille (`Users` icon) → `/family`, Statistiques avancées (`BarChart3`) → `/stats`, Exporter mon rapport PDF (`FileText`) → `handleExportPdf` qui construit `HealthReportData` (userName, periodLabel FR, stats sur 30j, top 5 desc/asc par score, badges earned via `useUserBadges`). Free tier → push `/settings/subscription` ou Alert paywall.
   - `app/(tabs)/index.tsx` : `<FamilyProfilePills>` en `<FadeIn delay={60}>` au-dessus du Greeting. Composant gère lui-même le `null` (auto-gating).
 
