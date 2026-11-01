@@ -66,24 +66,30 @@ import type { BadgeDef, ScanRecord } from '@/src/lib/gamification/types';
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function ProductScreen() {
-  const { barcode, type } = useLocalSearchParams<{
+  const { barcode, type, from } = useLocalSearchParams<{
     barcode: string;
     type?: 'food' | 'cosmetic';
+    from?: string;
   }>();
   const isCosmetic = type === 'cosmetic';
+  // Rouverte depuis l'historique ou les favoris (`scanProductRoute`) : la fiche
+  // n'est pas un nouveau scan, elle n'en enregistre pas (lot H).
+  const shouldRecord = from !== 'history';
 
   if (isCosmetic) {
-    return <CosmeticProductScreen barcode={barcode} />;
+    return <CosmeticProductScreen barcode={barcode} shouldRecord={shouldRecord} />;
   }
 
-  return <FoodProductScreen barcode={barcode} />;
+  return <FoodProductScreen barcode={barcode} shouldRecord={shouldRecord} />;
 }
 
 interface FoodProductScreenProps {
   barcode: string;
+  /** `false` quand la fiche est rouverte depuis l'historique ou les favoris. */
+  shouldRecord: boolean;
 }
 
-function FoodProductScreen({ barcode }: FoodProductScreenProps) {
+function FoodProductScreen({ barcode, shouldRecord }: FoodProductScreenProps) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
@@ -145,7 +151,7 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
   }, [productQuery.data, userProfile, packagings]);
 
   useEffect(() => {
-    if (!user || !barcode || !result || scanRecorded) return;
+    if (!shouldRecord || !user || !barcode || !result || scanRecorded) return;
     setScanRecorded(true);
     recordScan.mutate(
       {
@@ -162,7 +168,16 @@ function FoodProductScreen({ barcode }: FoodProductScreenProps) {
         },
       },
     );
-  }, [user, barcode, result, scanRecorded, recordScan, userProfile.type, scanHistoryQuery]);
+  }, [
+    shouldRecord,
+    user,
+    barcode,
+    result,
+    scanRecorded,
+    recordScan,
+    userProfile.type,
+    scanHistoryQuery,
+  ]);
 
   // Check badges après l'enregistrement du scan
   useEffect(() => {
@@ -447,9 +462,11 @@ const styles = StyleSheet.create({
 
 interface CosmeticProductScreenProps {
   barcode: string;
+  /** `false` quand la fiche est rouverte depuis l'historique ou les favoris. */
+  shouldRecord: boolean;
 }
 
-function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
+function CosmeticProductScreen({ barcode, shouldRecord }: CosmeticProductScreenProps) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const profile = useProfileStore((s) => s.profile);
@@ -480,7 +497,9 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
   }, [cosmeticQuery.data]);
 
   useEffect(() => {
-    if (!user || !barcode || !cosmeticQuery.data || !result || scanRecorded) return;
+    if (!shouldRecord || !user || !barcode || !cosmeticQuery.data || !result || scanRecorded) {
+      return;
+    }
     // S3-3 — `score_at_scan` est NOT NULL : enregistrer un cosmétique dont aucun
     // ingrédient n'a été évalué, c'est y écrire le 100 du moteur, que liraient
     // ensuite historique, moyennes, « excellents », badges, récap et PDF.
@@ -493,7 +512,7 @@ function CosmeticProductScreen({ barcode }: CosmeticProductScreenProps) {
       penalties: result.penalties,
       productType: 'cosmetic',
     });
-  }, [user, barcode, cosmeticQuery.data, result, scanRecorded, recordScan, profile]);
+  }, [shouldRecord, user, barcode, cosmeticQuery.data, result, scanRecorded, recordScan, profile]);
 
   const compatibilityResult = useMemo(() => {
     if (!cosmeticQuery.data || !result) return null;

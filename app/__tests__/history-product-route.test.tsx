@@ -3,7 +3,8 @@
  *
  * Tant que l'historique était illisible, l'erreur ne se voyait pas : une ligne
  * ouvrait `/product/{code}` sans type, donc la fiche ALIMENTAIRE, même pour un
- * cosmétique. L'historique et les favoris passent désormais `?type=`.
+ * cosmétique. L'historique et les favoris passent désormais `?type=`, et
+ * `from=history` : la fiche rouverte n'enregistre pas un nouveau scan.
  */
 import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -84,8 +85,8 @@ describe('Lot H — une ligne ouvre la fiche de son type', () => {
   beforeEach(() => mockPush.mockClear());
 
   it.each([
-    ['72', '/product/3401520107313?type=cosmetic'],
-    ['64', '/product/3017620422003?type=food'],
+    ['72', '/product/3401520107313?type=cosmetic&from=history'],
+    ['64', '/product/3017620422003?type=food&from=history'],
   ])('historique : la ligne notée %s ouvre %s', (score, route) => {
     const { getByLabelText } = renderWithClient(<HistoryScreen />);
     // Le libellé de la CARTE (le cercle de note porte aussi « Score … sur 100 »).
@@ -96,6 +97,6 @@ describe('Lot H — une ligne ouvre la fiche de son type', () => {
   it('favoris : un cosmétique ouvre la fiche cosmétique', () => {
     const { getByLabelText } = renderWithClient(<FavoritesScreen />);
     fireEvent.press(getByLabelText(/^Produit inconnu\. Score 72 sur 100/));
-    expect(mockPush).toHaveBeenCalledWith('/product/3401520107313?type=cosmetic');
+    expect(mockPush).toHaveBeenCalledWith('/product/3401520107313?type=cosmetic&from=history');
   });
 });

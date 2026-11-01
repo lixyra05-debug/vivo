@@ -234,13 +234,16 @@ export function useUserStats(userId: string | undefined) {
 }
 
 /**
- * Route de la fiche d'une ligne d'historique : un cosmétique ouvre la fiche
- * cosmétique. Sans `type`, la route ouvrait la fiche alimentaire.
+ * Route de la fiche d'une ligne d'historique (ou de favori). Un cosmétique ouvre
+ * la fiche cosmétique — sans `type`, la route ouvrait la fiche alimentaire —, et
+ * `from=history` dit à la fiche qu'elle est rouverte, pas scannée : elle
+ * n'enregistre pas de nouveau scan.
  */
 export function scanProductRoute(
   row: Pick<ScanHistoryRow, 'barcode' | 'product_type'>,
-): `/product/${string}?type=${ScanProductType}` {
-  return `/product/${row.barcode}?type=${row.product_type === 'cosmetic' ? 'cosmetic' : 'food'}`;
+): `/product/${string}?type=${ScanProductType}&from=history` {
+  const type = row.product_type === 'cosmetic' ? 'cosmetic' : 'food';
+  return `/product/${row.barcode}?type=${type}&from=history`;
 }
 
 export function dedupeByBarcode(rows: ScanHistoryRow[]): ScanHistoryRow[] {

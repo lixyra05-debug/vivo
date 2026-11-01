@@ -405,6 +405,9 @@ compteurs de l'accueil (`useUserStats`, sans jointure) restaient justes.
   produit). Jamais le code-barres ni le message de la base, dont le détail peut citer la valeur : le filtre R8
   de `beforeSend` ne lit que `message` et l'URL, pas une exception. Aucun nouvel essai (`retry: false`) :
   l'insertion n'est pas idempotente, un second essai après une réponse perdue doublerait le scan.
+- **Rouvrir n'est pas scanner** : `scanProductRoute` ajoute `from=history`, et la fiche rouverte depuis
+  l'Historique ou les Favoris n'enregistre pas de nouveau scan — chaque réouverture ajoutait une ligne, comptée
+  par les compteurs, la série, les badges, le récap et le PDF.
 
 ## Dette avant publication
 
@@ -451,6 +454,12 @@ requête d'emballage répond après elle, `score_at_scan` vaut la formulation sa
 affiche ensuite la note composée. Et une requête d'emballage en échec rend `[]`, qui prime sur le cache
 comme « aucun emballage ». La garde `product-food-scan-history.test.tsx` ne voit ni l'un ni l'autre : ses
 réponses arrivent ensemble.
+
+### Scans en double hors (d) : ouvrir une fiche depuis une liste enregistre un scan (lot H)
+Seuls l'Historique et les Favoris disent à la fiche qu'elle est rouverte (`from=history`). La recherche, les
+catégories, les enseignes, les alternatives et l'accueil (`router.push('/product/…')`) ouvrent la fiche comme
+la caméra : chaque consultation y devient un scan, compté par les compteurs, la série, les badges, le récap et
+le PDF. À trancher : quelles entrées sont un scan.
 
 ## Dette identifiée (non corrigée, à arbitrer)
 

@@ -18,6 +18,7 @@ import ProductScreen from '@/app/product/[barcode]';
 import { normalizeOFFProduct, productToScoringInput, type OFFProduct } from '@/src/lib/api/openfoodfacts';
 import { calculateScore } from '@/src/lib/scoring/engine';
 import { composeScore } from '@/src/lib/scoring/composite-score';
+import { scanProductRoute } from '@/src/lib/stores/useProductStore';
 
 jest.mock('expo-image', () => {
   const { View } = require('react-native');
@@ -53,10 +54,24 @@ jest.mock('@/src/lib/api/use-alternatives', () => ({
   useAlternatives: () => ({ alternatives: [], isLoading: false }),
 }));
 
+/** Un scan : la caméra ouvre la fiche avec le seul type. */
+const SCANNED = { barcode: '3274080005003', type: 'food' };
+let mockParams: Record<string, string> = SCANNED;
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ barcode: '3274080005003', type: 'food' }),
+  useLocalSearchParams: () => mockParams,
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
 }));
+
+/** Les paramètres que la fiche reçoit d'une route `/product/{code}?…`. */
+function paramsFrom(route: string): Record<string, string> {
+  const [path, query = ''] = route.split('?');
+  const params: Record<string, string> = { barcode: path.slice('/product/'.length) };
+  for (const pair of query.split('&')) {
+    const [key, value = ''] = pair.split('=');
+    if (key) params[key] = value;
+  }
+  return params;
+}
 
 jest.mock('@/src/lib/stores/useAuthStore', () => ({
   useAuthStore: (selector: (s: { user: { id: string } | null }) => unknown) =>
@@ -151,6 +166,7 @@ describe('Lot H — fiche alimentaire : le scan entre dans l’historique', () =
     await cleanupAsync();
     client.clear();
     mockMutate.mockClear();
+    mockParams = SCANNED;
   });
 
   it('un seul enregistrement, de type food, à la note composée (formulation et emballage)', async () => {
@@ -175,5 +191,13 @@ describe('Lot H — fiche alimentaire : le scan entre dans l’historique', () =
       }),
       expect.anything(),
     );
+  });
+
+  it('rouverte depuis l’historique (scanProductRoute) : la fiche s’affiche, aucun nouveau scan', async () => {
+    mockParams = paramsFrom(scanProductRoute({ barcode: '3274080005003', product_type: 'food' }));
+    const { findByText } = rendreFiche();
+    expect(await findByText('Eau de source')).toBeTruthy();
+    await act(async () => {});
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 });

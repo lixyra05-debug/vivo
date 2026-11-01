@@ -18,6 +18,7 @@ import type { ReactNode } from 'react';
 import ProductScreen from '@/app/product/[barcode]';
 import { cosmeticToScoringInput, normalizeOBFProduct } from '@/src/lib/api/openbeautyfacts';
 import { calculateCosmeticScore } from '@/src/lib/scoring/cosmetic-engine';
+import { scanProductRoute } from '@/src/lib/stores/useProductStore';
 
 jest.mock('expo-image', () => {
   const { View } = require('react-native');
@@ -39,10 +40,23 @@ jest.mock('@/src/components/ui/FadeIn', () => ({
 }));
 jest.mock('@/src/components/ui/Skeleton', () => ({ Skeleton: () => null }));
 
+const SCANNED = { barcode: '3401520107313', type: 'cosmetic' };
+let mockParams: Record<string, string> = SCANNED;
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ barcode: '3401520107313', type: 'cosmetic' }),
+  useLocalSearchParams: () => mockParams,
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
 }));
+
+/** Les paramètres que la fiche reçoit d'une route `/product/{code}?…`. */
+function paramsFrom(route: string): Record<string, string> {
+  const [path, query = ''] = route.split('?');
+  const params: Record<string, string> = { barcode: path.slice('/product/'.length) };
+  for (const pair of query.split('&')) {
+    const [key, value = ''] = pair.split('=');
+    if (key) params[key] = value;
+  }
+  return params;
+}
 
 jest.mock('@/src/lib/stores/useAuthStore', () => ({
   useAuthStore: (selector: (s: { user: { id: string } | null }) => unknown) =>
@@ -108,6 +122,7 @@ describe('S3-3 — fiche cosmétique : seul ce qui a été évalué entre dans l
   afterEach(async () => {
     await cleanupAsync();
     client.clear();
+    mockParams = SCANNED;
   });
 
   it.each([
@@ -135,5 +150,14 @@ describe('S3-3 — fiche cosmétique : seul ce qui a été évalué entre dans l
         productType: 'cosmetic',
       }),
     );
+  });
+
+  it('lot H — rouverte depuis l’historique (scanProductRoute) : liste évaluée, aucun nouveau scan', async () => {
+    mockInci = 'Aqua, Glycerin, Sodium Laureth Sulfate';
+    mockParams = paramsFrom(scanProductRoute({ barcode: '3401520107313', product_type: 'cosmetic' }));
+    const { findByText } = rendreFiche();
+    expect(await findByText('Crème hydratante')).toBeTruthy();
+    await act(async () => {});
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 });
