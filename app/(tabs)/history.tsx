@@ -25,6 +25,7 @@ import {
   type ScanHistoryRow,
 } from '@/src/lib/stores/useProductStore';
 import type { PenaltyDetail, ScoringResult } from '@/src/lib/api/types';
+import { ReadErrorState } from '@/src/components/common/ReadErrorState';
 import { ScanLine } from 'lucide-react-native';
 
 const FREE_LIMIT = 30;
@@ -52,6 +53,8 @@ export default function HistoryScreen() {
     limit: isPremium ? undefined : FREE_LIMIT,
   });
   const toggleFavorite = useToggleFavorite(user?.id);
+  // Lecture en erreur, rien en cache : ce n'est PAS un historique vide (lot H).
+  const readFailed = query.isError && !query.data;
 
   const compatProfile = useMemo(
     () => userProfileToCompatibilityProfile(profile),
@@ -213,9 +216,15 @@ export default function HistoryScreen() {
                 color: Colors.textMuted,
               }}
             >
-              {isPremium
-                ? `Tous tes scans (${rows.length})`
-                : `Tes ${Math.min(rows.length, FREE_LIMIT)} derniers scans`}
+              {/* Sans données (chargement, lecture en erreur), aucun compte :
+                  « Tes 0 derniers scans » se lirait comme un historique vide. */}
+              {!query.data
+                ? isPremium
+                  ? 'Tous tes scans'
+                  : 'Tes derniers scans'
+                : isPremium
+                  ? `Tous tes scans (${rows.length})`
+                  : `Tes ${Math.min(rows.length, FREE_LIMIT)} derniers scans`}
             </Text>
           </View>
         </FadeIn>
@@ -343,6 +352,10 @@ export default function HistoryScreen() {
               </FadeIn>
             ))}
           </View>
+        ) : readFailed ? (
+          <FadeIn delay={120}>
+            <ReadErrorState onRetry={() => void query.refetch()} />
+          </FadeIn>
         ) : rows.length === 0 ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 }}>
             <FadeIn delay={120}>

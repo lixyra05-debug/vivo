@@ -28,6 +28,7 @@ import { Colors } from '@/src/constants/colors';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { usePremium } from '@/src/lib/premium/premium-gate';
 import { useMonthlyRecap } from '@/src/lib/stats/use-monthly-recap';
+import { ReadErrorState } from '@/src/components/common/ReadErrorState';
 import type { MonthlyRecap } from '@/src/lib/stats/monthly-recap';
 
 const GRADIENT_TOP = '#2D4A2D';
@@ -79,7 +80,12 @@ export default function MonthlyRecapScreen() {
 
   const userId = useAuthStore((s) => s.session?.user?.id ?? null);
   const { tier, isLoading: tierLoading } = usePremium();
-  const { recap, isLoading: recapLoading } = useMonthlyRecap(userId, year, month);
+  const {
+    recap,
+    isLoading: recapLoading,
+    isError: recapReadFailed,
+    refetch: refetchRecap,
+  } = useMonthlyRecap(userId, year, month);
 
   const viewShotRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
@@ -148,7 +154,7 @@ export default function MonthlyRecapScreen() {
                 {recap?.monthLabel ?? 'Ton mois en chiffres'}
               </Text>
               <Text style={styles.previewBigNumber}>
-                {recap?.totalScans ?? 0}
+                {recapReadFailed ? '—' : (recap?.totalScans ?? 0)}
               </Text>
               <Text style={styles.previewLabel}>scans ce mois-ci</Text>
             </View>
@@ -177,6 +183,13 @@ export default function MonthlyRecapScreen() {
 
         {recapLoading ? (
           <LoadingState />
+        ) : recapReadFailed ? (
+          // Lecture en erreur : ce n'est PAS un mois sans scan (lot H).
+          <View style={styles.centerFill}>
+            <View style={styles.emptyCard}>
+              <ReadErrorState onRetry={refetchRecap} />
+            </View>
+          </View>
         ) : recap === null || recap.totalScans === 0 ? (
           <EmptyState
             monthLabel={recap?.monthLabel ?? ''}

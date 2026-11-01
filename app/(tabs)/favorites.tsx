@@ -8,6 +8,7 @@ import { Skeleton } from '@/src/components/ui/Skeleton';
 import { PrimaryCTA } from '@/src/components/home/PrimaryCTA';
 import { FavoriteGridCard } from '@/src/components/product/FavoriteGridCard';
 import { EmptyHeart } from '@/src/components/illustrations/EmptyHeart';
+import { ReadErrorState } from '@/src/components/common/ReadErrorState';
 import { Colors } from '@/src/constants/colors';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import {
@@ -27,6 +28,8 @@ export default function FavoritesScreen() {
   const toggle = useToggleFavorite(user?.id);
 
   const favorites = useMemo(() => dedupeByBarcode(query.data ?? []), [query.data]);
+  // Lecture en erreur, rien en cache : ce n'est PAS une liste vide (lot H).
+  const readFailed = query.isError && !query.data;
 
   function confirmRemove(item: ScanHistoryRow) {
     Alert.alert(
@@ -100,6 +103,10 @@ export default function FavoritesScreen() {
               <Skeleton height={220} radius={22} />
             </View>
           </View>
+        ) : readFailed ? (
+          <FadeIn delay={120}>
+            <ReadErrorState onRetry={() => void query.refetch()} />
+          </FadeIn>
         ) : favorites.length === 0 ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 }}>
             <FadeIn delay={120}>

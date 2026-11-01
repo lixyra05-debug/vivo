@@ -12,7 +12,11 @@ import { Palette, Spacing, Type } from '@/src/constants/theme';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import { useUserStats } from '@/src/lib/stores/useProductStore';
-import { formatFirstName, formatGreetingSubtitle } from '@/src/lib/home/formatters';
+import {
+  GREETING_SUBTITLE_UNREAD,
+  formatFirstName,
+  formatGreetingSubtitle,
+} from '@/src/lib/home/formatters';
 
 export function Greeting() {
   const user = useAuthStore((s) => s.user);
@@ -20,7 +24,10 @@ export function Greeting() {
   const { data: stats } = useUserStats(user?.id);
 
   const firstName = formatFirstName(profile?.display_name, user?.email);
-  const subtitle = formatGreetingSubtitle(stats?.total ?? 0);
+  // Connecté, compteurs pas encore lus ou en erreur : pas « Scanne ton premier
+  // produit », qui dirait l'historique vide (lot H).
+  const subtitle =
+    user && !stats ? GREETING_SUBTITLE_UNREAD : formatGreetingSubtitle(stats?.total ?? 0);
 
   return (
     <View style={styles.wrap} accessible accessibilityRole="header">

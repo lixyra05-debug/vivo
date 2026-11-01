@@ -36,6 +36,9 @@ interface ProductNameRow {
 export interface UseMonthlyRecapResult {
   recap: MonthlyRecap | null;
   isLoading: boolean;
+  /** Lecture en échec, rien en cache : à ne pas confondre avec un mois sans scan (lot H). */
+  isError: boolean;
+  refetch: () => void;
 }
 
 /**
@@ -94,17 +97,21 @@ export function useMonthlyRecap(
     staleTime: FIVE_MINUTES_MS,
   });
 
+  const refetch = (): void => {
+    void query.refetch();
+  };
+
   if (!userId) {
-    return { recap: null, isLoading: false };
+    return { recap: null, isLoading: false, isError: false, refetch };
   }
 
   if (!query.data) {
-    return { recap: null, isLoading: query.isLoading };
+    return { recap: null, isLoading: query.isLoading, isError: query.isError, refetch };
   }
 
   const recap = calculateMonthlyRecap(query.data.scans, year, month, {
     productLookup: query.data.lookup,
   });
 
-  return { recap, isLoading: query.isLoading };
+  return { recap, isLoading: query.isLoading, isError: false, refetch };
 }

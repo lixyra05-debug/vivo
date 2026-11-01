@@ -12,7 +12,7 @@ import { GlassCard } from '@/src/components/ui/GlassCard';
 import { Palette, Spacing, Type } from '@/src/constants/theme';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import { useUserStats } from '@/src/lib/stores/useProductStore';
-import { formatStats } from '@/src/lib/home/formatters';
+import { STATS_UNREAD, formatStats } from '@/src/lib/home/formatters';
 
 interface StatCellProps {
   value: string;
@@ -35,7 +35,8 @@ function Divider() {
 export function StatsRow() {
   const user = useAuthStore((s) => s.user);
   const { data: stats } = useUserStats(user?.id);
-  const display = formatStats(stats);
+  // Connecté, compteurs pas encore lus ou en erreur : « — », pas « 0 » (lot H).
+  const display = user && !stats ? STATS_UNREAD : formatStats(stats);
 
   return (
     <GlassCard

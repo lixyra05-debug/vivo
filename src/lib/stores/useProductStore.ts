@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/supabase';
 import { fetchCachedProducts, getOrFetchProduct } from '../api/openfoodfacts';
 import type { Product } from '../api/types';
+import { error as logError } from '../utils/logger';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const ONE_MINUTE_MS = 60 * 1000;
@@ -166,6 +167,18 @@ export function buildScanInsertPayload(
   };
 }
 
+/**
+ * Code d'erreur de la base (PostgreSQL ou PostgREST : `23503`, `42501`,
+ * `PGRST204`…). `null` quand postgrest-js n'en rend pas — panne réseau, requête
+ * abandonnée, réponse illisible : il les rend en erreur à `code: ''` au lieu de
+ * les lever.
+ */
+function databaseErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const { code } = error as { code?: unknown };
+  return typeof code === 'string' && code.length > 0 ? code : null;
+}
+
 export function useRecordScan(userId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -176,6 +189,19 @@ export function useRecordScan(userId: string | undefined) {
         .insert(buildScanInsertPayload(userId, input));
       if (error) throw error;
       return true;
+    },
+    // Aucun nouvel essai : l'insertion n'est pas idempotente — si la réponse se
+    // perd après l'écriture, un second essai doublerait le scan.
+    retry: false,
+    // Un enregistrement refusé ne passe plus inaperçu (lot H) : il est journalisé
+    // (Sentry hors dev), sans le code-barres ni le message de la base — son détail
+    // peut citer la valeur (« Key (barcode)=(…) »), et le filtre R8 de
+    // `beforeSend` ne lit que `message` et l'URL, pas une exception.
+    onError: (error, input) => {
+      logError(new Error('Enregistrement du scan refusé'), {
+        code: databaseErrorCode(error) ?? 'sans_code',
+        productType: input.productType ?? 'food',
+      });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['scan_history'] });

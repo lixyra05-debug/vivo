@@ -392,6 +392,19 @@ compteurs de l'accueil (`useUserStats`, sans jointure) restaient justes.
 - **Garde** : `app/__tests__/product-food-scan-history.test.tsx` — un scan alimentaire donne un seul
   enregistrement, de type `food`, à la note composée (le pendant de `product-cosmetic-scan-history.test.tsx`,
   S3-3).
+- **Lecture en erreur ≠ liste vide** : `ReadErrorState` (« Impossible de charger tes scans », bouton
+  « Réessayer » → `refetch`) remplace l'état vide de l'Historique, des Favoris, des Stats, du Récap (son aperçu
+  gratuit affiche « — », pas « 0 ») et de la section statistiques du Profil — quand la lecture a échoué sans
+  rien en cache : une relecture en erreur garde la liste affichée. Sans données (chargement, erreur), le
+  sous-titre de l'Historique ne compte rien (plus de « Tes 0 derniers scans ») et l'accueil affiche « — » et
+  « Que scannes-tu aujourd'hui ? » au lieu de « 0 » et « Scanne ton premier produit » (hors connexion, le « 0 »
+  reste vrai). L'export PDF refuse un historique non lu au lieu de produire « Aucune activité enregistrée ».
+  `useMonthlyRecap` expose `isError` et `refetch`.
+- **Un enregistrement refusé laisse une trace** : `useRecordScan` journalise l'échec (`logger.error` : code de
+  la base, ou `sans_code` quand postgrest-js n'en rend pas — panne réseau, requête abandonnée —, et type de
+  produit). Jamais le code-barres ni le message de la base, dont le détail peut citer la valeur : le filtre R8
+  de `beforeSend` ne lit que `message` et l'URL, pas une exception. Aucun nouvel essai (`retry: false`) :
+  l'insertion n'est pas idempotente, un second essai après une réponse perdue doublerait le scan.
 
 ## Dette avant publication
 

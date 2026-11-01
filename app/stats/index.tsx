@@ -44,6 +44,7 @@ import {
   type BrandAggregate,
 } from '@/src/lib/stats/advanced-stats';
 import type { ScanRecord } from '@/src/lib/gamification/types';
+import { ReadErrorState } from '@/src/components/common/ReadErrorState';
 
 /**
  * Un scan tel que le lit `calculateAdvancedStats` : la marque nourrit le top 5
@@ -182,6 +183,13 @@ export default function AdvancedStatsScreen() {
               <Skeleton key={i} height={120} radius={20} />
             ))}
           </View>
+        ) : scanHistoryQuery.isError && !scanHistoryQuery.data ? (
+          // Lecture en erreur : ce n'est PAS « aucune donnée » (lot H).
+          <FadeIn delay={120}>
+            <GlassCard style={styles.emptyCard}>
+              <ReadErrorState onRetry={() => void scanHistoryQuery.refetch()} />
+            </GlassCard>
+          </FadeIn>
         ) : scans.length === 0 ? (
           <FadeIn delay={120}>
             <GlassCard style={styles.emptyCard}>

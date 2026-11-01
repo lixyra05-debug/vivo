@@ -33,6 +33,7 @@ import { FadeIn } from '@/src/components/ui/FadeIn';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { SettingsRow } from '@/src/components/profile/SettingsRow';
 import { ProfileStatsSection } from '@/src/components/stats/ProfileStatsSection';
+import { ReadErrorState } from '@/src/components/common/ReadErrorState';
 import { Colors } from '@/src/constants/colors';
 import { useReduceMotion } from '@/src/hooks/useReduceMotion';
 import { signOut } from '@/src/lib/api/auth';
@@ -172,8 +173,14 @@ export default function ProfileScreen() {
       );
       return;
     }
+    // Historique pas encore lu, ou illisible : un rapport « Aucune activité
+    // enregistrée » serait faux. On refuse plutôt que de l'exporter (lot H).
+    if (!scanHistoryQuery.data) {
+      Alert.alert('Export impossible', 'Tes scans ne sont pas disponibles pour le moment. Réessaie dans un instant.');
+      return;
+    }
     try {
-      const allRows = scanHistoryQuery.data ?? [];
+      const allRows = scanHistoryQuery.data;
       const totalScans = allRows.length;
       const averageScore =
         totalScans === 0
@@ -395,13 +402,18 @@ export default function ProfileScreen() {
         </FadeIn>
 
         <FadeIn delay={200}>
-          <ProfileStatsSection
-            userId={user?.id ?? ''}
-            scans={scans}
-            reportCount={reportCountQuery.data ?? 0}
-            badges={{ earned: badges.earned, newlyEarned: [] }}
-            onSeeMethodology={() => router.push('/methodology')}
-          />
+          {scanHistoryQuery.isError && !scanHistoryQuery.data ? (
+            // Lecture en erreur : pas des statistiques à zéro (lot H).
+            <ReadErrorState onRetry={() => void scanHistoryQuery.refetch()} />
+          ) : (
+            <ProfileStatsSection
+              userId={user?.id ?? ''}
+              scans={scans}
+              reportCount={reportCountQuery.data ?? 0}
+              badges={{ earned: badges.earned, newlyEarned: [] }}
+              onSeeMethodology={() => router.push('/methodology')}
+            />
+          )}
         </FadeIn>
 
         {tier === 'expert' ? (

@@ -22,6 +22,12 @@ export interface HomeStatsDisplay {
   bad: string;
 }
 
+/**
+ * Compteurs pas encore lus, ou lecture en erreur (lot H) : « — », jamais
+ * « 0 », qui se lirait comme « aucun scan ».
+ */
+export const STATS_UNREAD: HomeStatsDisplay = { scans: '—', average: '—', bad: '—' };
+
 export function formatStats(stats?: UserStats | null): HomeStatsDisplay {
   const total = stats?.total ?? 0;
   const avg = stats?.avg ?? 0;
@@ -32,6 +38,9 @@ export function formatStats(stats?: UserStats | null): HomeStatsDisplay {
     bad: bad.toString(),
   };
 }
+
+/** Sous-titre tant que les compteurs ne sont pas lus : rien sur le nombre de scans. */
+export const GREETING_SUBTITLE_UNREAD = 'Que scannes-tu aujourd’hui ?';
 
 export function formatGreetingSubtitle(total: number): string {
   if (total === 0) return 'Scanne ton premier produit pour démarrer.';

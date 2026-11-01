@@ -2,7 +2,7 @@
  * Écran Stats avancées : free → paywall, premium → contenu rendu.
  */
 
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import AdvancedStatsScreen from '../stats/index';
@@ -57,11 +57,15 @@ jest.mock('@/src/lib/hooks/usePremium', () => ({
   }),
 }));
 
+let mockReadFailed = false;
+const mockRefetch = jest.fn();
 jest.mock('@/src/lib/stores/useProductStore', () => ({
   useScanHistory: () => ({
-    data: mockScans,
+    data: mockReadFailed ? undefined : mockScans,
     isLoading: false,
-    error: null,
+    isError: mockReadFailed,
+    error: mockReadFailed ? new Error('PGRST200') : null,
+    refetch: mockRefetch,
   }),
 }));
 
@@ -76,6 +80,8 @@ describe('AdvancedStatsScreen', () => {
   beforeEach(() => {
     mockTier = 'premium';
     mockScans = [];
+    mockReadFailed = false;
+    mockRefetch.mockClear();
   });
 
   it("Free : rend le PremiumPaywall", () => {
@@ -102,6 +108,19 @@ describe('AdvancedStatsScreen', () => {
     );
     expect(getByText('Aucune donnée à analyser')).toBeTruthy();
     expect(queryByText('Tendance 28 jours')).toBeNull();
+  });
+
+  it('lecture en erreur (lot H) : « Impossible de charger tes scans », jamais « Aucune donnée à analyser »', () => {
+    mockReadFailed = true;
+    const { getByText, queryByText, getByLabelText } = render(
+      <Wrapper>
+        <AdvancedStatsScreen />
+      </Wrapper>,
+    );
+    expect(getByText('Impossible de charger tes scans')).toBeTruthy();
+    expect(queryByText('Aucune donnée à analyser')).toBeNull();
+    fireEvent.press(getByLabelText('Réessayer'));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 
   it('Premium avec scans : rend les sections principales', () => {

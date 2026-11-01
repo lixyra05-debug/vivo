@@ -55,3 +55,32 @@ describe('useMonthlyRecap — lecture en deux temps (lot H)', () => {
     expect(result.current.recap?.bestProduct?.name).toBe('Pain complet');
   });
 });
+
+/** Les deux lectures, chacune réussie ou en erreur. */
+function mockReads(history: 'ok' | 'error', products: 'ok' | 'error') {
+  const chain: Record<string, unknown> = {};
+  chain.eq = jest.fn(() => chain);
+  chain.gte = jest.fn(() => chain);
+  chain.lt = jest.fn(() =>
+    Promise.resolve(history === 'ok' ? { data: ROWS, error: null } : { data: null, error: { message: 'boom' } }),
+  );
+  const productsIn = jest.fn(() =>
+    Promise.resolve(products === 'ok' ? { data: [], error: null } : { data: null, error: { message: 'boom' } }),
+  );
+  (supabase.from as jest.Mock).mockImplementation((table: string) =>
+    table === 'scan_history' ? { select: () => chain } : { select: () => ({ in: productsIn }) },
+  );
+}
+
+describe('useMonthlyRecap — une lecture en erreur n’est pas un mois sans scan (lot H)', () => {
+  it.each([
+    ['scan_history', 'error', 'ok'],
+    ['products', 'ok', 'error'],
+  ] as const)('lecture de %s en erreur : isError, aucun récap', async (_table, history, products) => {
+    mockReads(history, products);
+    const { result } = renderHook(() => useMonthlyRecap('uid-1', 2026, 8), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.recap).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+  });
+});
