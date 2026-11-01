@@ -361,6 +361,84 @@ Le packaging cesse d'être informatif : il devient un **modificateur appliqué A
 - **D14 — les alternatives se comparent sur `formulationScore`** : les candidats de `findAlternatives` sont notés par `nutriScoreToProxy`, aveugle à l'emballage. Garde-fou source-level `alternatives-axis.test.ts` (modèle `theme-guard`) sur les DEUX appelants — la régression initiale venait précisément d'un second call site oublié dans `scan-choc`.
 - **`scan_history` : discontinuité assumée.** Pas de backfill — le packaging des scans passés n'a jamais été stocké. `score_at_scan` est par définition le score montré ce jour-là ; le réécrire falsifierait l'historique. Les seuils de badges étant cumulatifs, aucun badge accordé ne peut être révoqué.
 
+## Historique lisible — lot H (octobre 2026)
+La migration 012 (C-002) a supprimé la clé étrangère `scan_history.barcode → products` : les cosmétiques
+n'ont pas de ligne dans `products`, elle ne peut pas revenir. Or l'historique se lisait par une jointure
+PostgREST, `product:products(*)`, que PostgREST ne sait faire qu'à travers une clé étrangère (erreur
+PGRST200). Sur une base où la 012 est appliquée, toute lecture de l'historique échouait — historique,
+favoris, série, stats, récap, export PDF, badges —, et l'écran disait « Aucun scan pour le moment ». Les
+compteurs de l'accueil (`useUserStats`, sans jointure) restaient justes.
+
+- **Lecture en deux temps** : `useScanHistory` et `useMonthlyRecap` lisent `scan_history` seul, puis la fiche
+  des aliments par `fetchCachedProducts` (`openfoodfacts.ts`, `.in('barcode', …)` par lots de
+  `PRODUCT_LOOKUP_CHUNK = 100`). Aucune clé, aucune vue, RLS intacte. Un lot en erreur fait échouer toute la
+  lecture : un résultat partiel passerait pour des produits absents du cache.
+- **Cosmétiques** : pas de fiche dans `products`, donc `product: null` ; la carte dit « Produit inconnu », avec
+  sa note et sa date. Une ligne ouvre la fiche de son type (`scanProductRoute`, `?type=`) : sans type, un
+  cosmétique ouvrait la fiche alimentaire.
+- **Filtre « Incompatibles »** (`history.tsx`) : une ligne sans fiche — cosmétique, ou aliment absent du cache —
+  n'a rien de vérifiable ; elle rejoint les incompatibles, comme un produit `insufficient_data` (règle « au
+  doute » de S3). **Provisoire** pour les cosmétiques : tant que leur cache ne se remplit pas, chacun y figure.
+- **Stats avancées** : `app/stats/index.tsx` ne transmettait à `calculateAdvancedStats` ni la marque ni le
+  relevé des pénalités — historique lisible, l'écran aurait affiché « Aucune marque détectée » et « Aucun additif
+  détecté ✅ » quoi qu'on scanne. Les deux sont transmis, et l'exposition ne compte que les codes d'additifs
+  (`e250`…) : le relevé contient aussi `nova4`, les macros et leurs bonus (points négatifs), les pénalités de
+  profil et, pour un cosmétique, des noms INCI.
+- **Garde-fou** : `src/lib/api/__tests__/schema-contract.test.ts` rejoue les migrations (colonnes, clés
+  étrangères), relève chaque jointure `alias:table(…)` du code et exige sa clé ; il vérifie aussi que chaque
+  champ écrit dans `products`, `cosmetic_products` et `scan_history` en est une colonne, et que chaque appel de
+  `fetchCachedProducts` passe une liste de colonnes littérale, sans jointure, avec `barcode`. Les tests
+  simulent Supabase : sans ce contrat, aucun ne voit une requête que la base refuse.
+- **Garde** : `app/__tests__/product-food-scan-history.test.tsx` — un scan alimentaire donne un seul
+  enregistrement, de type `food`, à la note composée (le pendant de `product-cosmetic-scan-history.test.tsx`,
+  S3-3).
+
+## Dette avant publication
+
+### BLOQUANT avant publication — tout compte connecté peut empoisonner le cache `products` (lot H)
+012 ouvre `products` en INSERT et en UPDATE à tout compte connecté (`WITH CHECK (true)`), sans trigger ni
+contrôle des valeurs : n'importe quel compte peut écrire n'importe quelle fiche, sur toutes ses colonnes.
+`updated_at` est fixé par le client (`normalizeOFFProduct`), et `getOrFetchProduct` sert une fiche fraîche à
+tous sans relire OFF : une fiche réécrite est servie à tous pendant 7 jours, et sans fin si sa date est mise
+dans le futur. La note en dépend (ingrédients, additifs, NOVA, macros, emballage), le verdict allergène aussi
+(`ingredients_raw`, `ingredients_text_fr`, `allergens_tags`), comme le nom, la marque et l'image affichés.
+
+Piste à étudier, pas à appliquer : écriture par une Edge Function serveur qui reçoit le seul code-barres,
+relit OFF elle-même et fixe `updated_at` côté serveur ; le client ne garde que la lecture. Elle vaut aussi
+pour `cosmetic_products`. Aucune migration n'est écrite à ce stade.
+
+### D1 — le « Mot détecté » du bandeau peut manquer à la liste affichée (lot S1b)
+Le moteur prend `matchedText` dans le premier texte qui le contient, le français d'abord ; la section
+« Ingrédients » de la fiche alimentaire affiche le texte principal (`ingredients_raw`), comme la carte
+des ingrédients, la note et ses explications. Sur 170 fiches réelles, 96 des 460 mots détectés (40
+fiches) ne figurent pas dans la liste affichée — Nutella 3017620422003 : bandeau « NOISETTES », liste
+« sugar, palm oil ». Le verdict est juste ; c'est l'explication qui ne se retrouve pas à l'écran.
+
+Afficher le texte français d'abord (option (d) du plan S1b, tenue hors du lot) en corrige 96 et en crée 4 —
+mots lus dans le seul texte principal (20466909 « egg », 8711200459926 « sesame », 8718114734484
+« E224 », 3250546610271 « sulfites ») —, et sépare la liste de la carte, de la note et de leurs
+explications sur 42 fiches. **À corriger avant publication**, dans un lot « liste affichée » (liste, carte,
+provenance du mot, soulignés d'OFF).
+
+### Le cache cosmétique ne se remplit pas : `cosmetic_products` n'a aucune politique d'écriture (lot H)
+008 n'ouvre que la lecture (`FOR SELECT`), et aucune migration n'ajoute INSERT ni UPDATE.
+`writeCosmeticToCache` est donc refusé par la RLS, et l'erreur avalée (`openbeautyfacts.ts:126`). Chaque
+fiche cosmétique se relit sur OBF ; l'historique ne peut pas nommer un cosmétique (« Produit inconnu »), et le
+filtre « Incompatibles » les y range tous, provisoirement.
+
+À traiter par une migration dédiée, **jamais un INSERT ouvert** sur le modèle de 012 : l'entrée « BLOQUANT »
+ci-dessus en décrit le risque, et la piste d'écriture serveur qu'elle propose vaut ici aussi. Puis une
+lecture de `cosmetic_products` dans `useScanHistory`.
+
+### Course sur la note d'emballage : un scan peut s'enregistrer sans le malus (lot H)
+La fiche alimentaire enregistre le scan dès que la note existe, avec l'emballage connu à cet instant : la
+réponse de `fetchProductPackagings` ou, en attendant, le `packaging_components` de la fiche en cache. Si la
+fiche en cache n'en porte pas (`'[]'` : ligne écrite avant la 016, ou par une version antérieure) et que la
+requête d'emballage répond après elle, `score_at_scan` vaut la formulation sans malus, alors que l'écran
+affiche ensuite la note composée. Et une requête d'emballage en échec rend `[]`, qui prime sur le cache
+comme « aucun emballage ». La garde `product-food-scan-history.test.tsx` ne voit ni l'un ni l'autre : ses
+réponses arrivent ensemble.
+
 ## Dette identifiée (non corrigée, à arbitrer)
 
 ### LIMITE CONNUE ET ASSUMÉE — les listes trient sur `score_final`, donc l'absence de donnée avantage
@@ -461,18 +539,11 @@ sans porc 0 → 1 ; « Sans gluten » → allergie au gluten et cœliaque 3 → 
 coque 1 → 2 ; « pomme de terre » → déclencheur FODMAP « pomme » 9 → 11 fiches. Inchangés : « noix de
 muscade » et « beurre de cacao » (1 chacun). À traiter avec D-C (mots-clés, locutions) et D-E (négations).
 
-### AVANT PUBLICATION — le « Mot détecté » du bandeau peut manquer à la liste affichée (lot S1b)
-Le moteur prend `matchedText` dans le premier texte qui le contient, le français d'abord ; la section
-« Ingrédients » de la fiche alimentaire affiche le texte principal (`ingredients_raw`), comme la carte
-des ingrédients, la note et ses explications. Sur 170 fiches réelles, 96 des 460 mots détectés (40
-fiches) ne figurent pas dans la liste affichée — Nutella 3017620422003 : bandeau « NOISETTES », liste
-« sugar, palm oil ». Le verdict est juste ; c'est l'explication qui ne se retrouve pas à l'écran.
-
-Afficher le texte français d'abord (option (d) du plan S1b, tenue hors du lot) en corrige 96 et en crée 4 —
-mots lus dans le seul texte principal (20466909 « egg », 8711200459926 « sesame », 8718114734484
-« E224 », 3250546610271 « sulfites ») —, et sépare la liste de la carte, de la note et de leurs
-explications sur 42 fiches. **À corriger avant publication**, dans un lot « liste affichée » (liste, carte,
-provenance du mot, soulignés d'OFF).
+### Une ligne d'historique sans fiche en cache s'affiche « Produit inconnu » (lot H)
+Le nom, la marque et la photo viennent du cache `products`. Si une migration de ce cache manque en base
+(016 `packaging_components`, 017 `ingredients_text_fr` et `allergens_tags`), `writeProductToCache` échoue
+(colonne absente, erreur avalée) : les produits scannés depuis ne sont pas mis en cache, et leur ligne n'a pas
+de fiche. Appliquer 016 et 017 avant de déployer.
 
 ## Conventions
 - TypeScript strict (`strict: true`)

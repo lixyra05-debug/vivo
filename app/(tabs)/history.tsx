@@ -19,6 +19,7 @@ import { useProfileStore } from '@/src/lib/stores/useProfileStore';
 import { usePremium } from '@/src/lib/premium/premium-gate';
 import {
   dedupeByBarcode,
+  scanProductRoute,
   useScanHistory,
   useToggleFavorite,
   type ScanHistoryRow,
@@ -61,7 +62,14 @@ export default function HistoryScreen() {
     if (!compatProfile) return new Set<string>();
     const set = new Set<string>();
     for (const row of query.data ?? []) {
-      if (!row.product) continue;
+      // Sans fiche — un cosmétique, ou un aliment absent du cache `products` —,
+      // rien n'a pu être vérifié : au doute, la ligne rejoint les incompatibles.
+      // Provisoire pour les cosmétiques, que leur cache ne nomme pas encore
+      // (CLAUDE.md, « Dette avant publication »).
+      if (!row.product) {
+        set.add(row.barcode);
+        continue;
+      }
       const fakeResult: ScoringResult = {
         score_final: row.score_at_scan,
         score_color:
@@ -171,7 +179,7 @@ export default function HistoryScreen() {
           score={item.score_at_scan}
           scannedAt={item.scanned_at}
           isFavorite={item.is_favorite}
-          onPress={() => router.push(`/product/${item.barcode}`)}
+          onPress={() => router.push(scanProductRoute(item))}
           onToggleFavorite={() =>
             toggleFavorite.mutate({ barcode: item.barcode, next: !item.is_favorite })
           }

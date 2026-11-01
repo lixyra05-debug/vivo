@@ -17,6 +17,7 @@ let mockScans: Array<{
   product_type: 'food' | 'cosmetic';
   is_favorite: boolean;
   product: unknown;
+  penalties_snapshot?: unknown;
 }> = [];
 
 jest.mock('expo-haptics', () => ({
@@ -133,5 +134,34 @@ describe('AdvancedStatsScreen', () => {
     expect(getByText('Top 5 catégories')).toBeTruthy();
     expect(getByText('Top 5 marques')).toBeTruthy();
     expect(getByText('Régularité')).toBeTruthy();
+  });
+
+  it('Premium : la marque et les additifs relevés au scan nourrissent leurs sections (lot H)', () => {
+    mockTier = 'premium';
+    mockScans = [
+      {
+        barcode: '123',
+        score_at_scan: 40,
+        scanned_at: new Date().toISOString(),
+        product_type: 'food',
+        is_favorite: false,
+        product: { brand: 'Marque A' },
+        penalties_snapshot: [
+          { code: 'nova4', points: 15, category: 'nova' },
+          { code: 'e250', points: 20, category: 'additive' },
+          { code: 'protein_bonus', points: -3, category: 'macro' },
+        ],
+      },
+    ];
+    const { getByText, queryByText } = render(
+      <Wrapper>
+        <AdvancedStatsScreen />
+      </Wrapper>,
+    );
+    expect(getByText('Marque A')).toBeTruthy();
+    expect(queryByText('Aucune marque détectée sur tes scans récents.')).toBeNull();
+    expect(getByText('e250')).toBeTruthy();
+    expect(queryByText('nova4')).toBeNull();
+    expect(queryByText('Aucun additif détecté sur les 30 derniers jours ✅')).toBeNull();
   });
 });

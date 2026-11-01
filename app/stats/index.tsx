@@ -45,6 +45,14 @@ import {
 } from '@/src/lib/stats/advanced-stats';
 import type { ScanRecord } from '@/src/lib/gamification/types';
 
+/**
+ * Un scan tel que le lit `calculateAdvancedStats` : la marque nourrit le top 5
+ * des marques, le relevé des pénalités l'exposition aux additifs. Les omettre,
+ * c'est afficher « Aucune marque détectée » et « Aucun additif détecté ✅ »
+ * quoi qu'on ait scanné.
+ */
+type StatsScan = ScanRecord & { brand: string | null; penalties_snapshot: unknown };
+
 const SPARKLINE_PADDING = 6;
 const SPARKLINE_HEIGHT = 100;
 
@@ -111,7 +119,7 @@ export default function AdvancedStatsScreen() {
 
   const isFree = tier === 'free';
 
-  const scans: ScanRecord[] = useMemo(
+  const scans: StatsScan[] = useMemo(
     () =>
       (scanHistoryQuery.data ?? []).map((row) => ({
         barcode: row.barcode,
@@ -122,6 +130,8 @@ export default function AdvancedStatsScreen() {
         category_slug:
           (row.product as { categories_tags?: string[] | null } | null)
             ?.categories_tags?.[0] ?? null,
+        brand: row.product?.brand ?? null,
+        penalties_snapshot: row.penalties_snapshot,
       })),
     [scanHistoryQuery.data],
   );

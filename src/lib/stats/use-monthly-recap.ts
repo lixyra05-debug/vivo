@@ -1,12 +1,15 @@
 /**
  * Hook React Query pour le récap mensuel.
  *
- * Charge les scans du mois cible depuis `scan_history` (jointure produits pour
- * récupérer name/brand) puis calcule le récap via `calculateMonthlyRecap`.
+ * Charge les scans du mois cible depuis `scan_history`, puis le nom et la
+ * marque des aliments par une seconde lecture de `products` (la jointure
+ * PostgREST n'a plus de clé étrangère depuis la migration 012), et calcule le
+ * récap via `calculateMonthlyRecap`.
  */
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/src/lib/api/supabase';
+import { fetchCachedProducts } from '@/src/lib/api/openfoodfacts';
 import {
   calculateMonthlyRecap,
   type MonthlyRecap,
@@ -22,10 +25,12 @@ interface ScanHistoryRowMin {
   scanned_at: string;
   product_type?: 'food' | 'cosmetic' | null;
   is_favorite?: boolean | null;
-  product?: {
-    name?: string | null;
-    brand?: string | null;
-  } | null;
+}
+
+interface ProductNameRow {
+  barcode: string;
+  name: string | null;
+  brand: string | null;
 }
 
 export interface UseMonthlyRecapResult {
@@ -57,7 +62,7 @@ export function useMonthlyRecap(
 
       const { data, error } = await supabase
         .from('scan_history')
-        .select('barcode, score_at_scan, scanned_at, product_type, is_favorite, product:products(name, brand)')
+        .select('barcode, score_at_scan, scanned_at, product_type, is_favorite')
         .eq('user_id', userId)
         .gte('scanned_at', startUtc.toISOString())
         .lt('scanned_at', endUtc.toISOString());
@@ -74,14 +79,13 @@ export function useMonthlyRecap(
         category_slug: null,
       }));
 
+      const products = await fetchCachedProducts<ProductNameRow>(
+        rows.filter((row) => row.product_type !== 'cosmetic').map((row) => row.barcode),
+        'barcode, name, brand',
+      );
       const lookup: Record<string, ProductLookupEntry> = {};
-      for (const row of rows) {
-        if (row.product) {
-          lookup[row.barcode] = {
-            name: row.product.name ?? null,
-            brand: row.product.brand ?? null,
-          };
-        }
+      for (const [barcode, product] of products) {
+        lookup[barcode] = { name: product.name ?? null, brand: product.brand ?? null };
       }
 
       return { scans, lookup };

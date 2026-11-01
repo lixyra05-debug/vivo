@@ -137,4 +137,33 @@ describe('calculateAdvancedStats', () => {
     expect(stats.toxicExposure.totalPenalties).toBe(13);
     expect(stats.toxicExposure.worstAdditive).toEqual({ code: 'E951', count: 2 });
   });
+
+  it('l’exposition ne compte que les additifs : ni NOVA, ni macros et bonus, ni profil, ni INCI (lot H)', () => {
+    const now = new Date('2026-05-07T10:00:00Z');
+    const scans: ScanRecordWithPenalties[] = [
+      makeScan({
+        barcode: 'aliment',
+        scanned_at: '2026-05-06T10:00:00.000Z',
+        // Relevé tel que l'enregistre le moteur alimentaire.
+        penalties_snapshot: [
+          { code: 'nova4', points: 15, category: 'nova' },
+          { code: 'e250', points: 20, category: 'additive' },
+          { code: 'sugars', points: 10, category: 'macro' },
+          { code: 'protein_bonus', points: -3, category: 'macro' },
+          { code: 'profile_gluten', points: 30, category: 'profile' },
+        ],
+      }),
+      makeScan({
+        barcode: 'cosmetique',
+        product_type: 'cosmetic',
+        scanned_at: '2026-05-06T11:00:00.000Z',
+        penalties_snapshot: [{ code: 'methylparaben', points: 8, category: 'preservative' }],
+      }),
+    ];
+    const stats = calculateAdvancedStats(scans as ScanRecord[], now);
+
+    expect(stats.toxicExposure.uniqueAdditives).toBe(1);
+    expect(stats.toxicExposure.totalPenalties).toBe(20);
+    expect(stats.toxicExposure.worstAdditive).toEqual({ code: 'e250', count: 1 });
+  });
 });

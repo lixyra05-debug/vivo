@@ -108,7 +108,16 @@ interface PenaltyEntry {
   points?: number;
 }
 
-/** Coerce le snapshot non typé en tableau d'entrées exploitables. */
+/**
+ * Code d'additif alimentaire (« e250 », « E951 »). Le relevé enregistré avec
+ * le scan contient aussi le plafond NOVA (« nova4 »), les macros et leurs
+ * bonus (points négatifs), les huiles, le clean labeling, les pénalités de
+ * profil hors additifs (« profile_gluten ») et, pour un cosmétique, des noms
+ * INCI : rien de cela n'est un additif.
+ */
+const ADDITIVE_CODE = /^e\d{3,4}/i;
+
+/** Coerce le snapshot non typé en tableau d'entrées d'additifs exploitables. */
 function coercePenalties(snapshot: unknown): PenaltyEntry[] {
   if (!Array.isArray(snapshot)) return [];
   const out: PenaltyEntry[] = [];
@@ -116,6 +125,7 @@ function coercePenalties(snapshot: unknown): PenaltyEntry[] {
     if (entry && typeof entry === 'object') {
       const e = entry as Record<string, unknown>;
       const code = typeof e.code === 'string' ? e.code : undefined;
+      if (code === undefined || !ADDITIVE_CODE.test(code)) continue;
       const points = typeof e.points === 'number' ? e.points : undefined;
       out.push({ code, points });
     }

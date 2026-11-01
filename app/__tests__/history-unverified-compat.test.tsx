@@ -123,11 +123,21 @@ function makeRow(opts: {
   };
 }
 
-const mockRows: ScanHistoryRow[] = [
+const BASE_ROWS: ScanHistoryRow[] = [
   makeRow({ id: 'r1', barcode: '111', name: 'Vérifié sain', ingredients: 'eau, sel' }),
   makeRow({ id: 'r2', barcode: '222', name: 'Avec gluten', ingredients: 'farine de blé' }),
   makeRow({ id: 'r3', barcode: '333', name: 'Sans étiquette', ingredients: null }),
 ];
+let mockRows: ScanHistoryRow[] = BASE_ROWS;
+
+/** Telle que la rend la lecture en deux temps quand `products` n'a pas la fiche. */
+function rowWithoutSheet(barcode: string, productType: 'food' | 'cosmetic'): ScanHistoryRow {
+  return {
+    ...makeRow({ id: barcode, barcode, name: '', ingredients: null }),
+    product_type: productType,
+    product: null,
+  };
+}
 
 jest.mock('@/src/lib/stores/useProductStore', () => {
   const actual = jest.requireActual('@/src/lib/stores/useProductStore');
@@ -173,5 +183,22 @@ describe('HistoryScreen — produits invérifiables et filtre Incompatibles', ()
     expect(queryByLabelText(/Avec gluten/)).toBeTruthy();
     expect(queryByLabelText(/Sans étiquette/)).toBeTruthy();
     expect(queryByLabelText(/Vérifié sain/)).toBeNull();
+  });
+});
+
+describe('HistoryScreen — ligne sans fiche et filtre Incompatibles (lot H)', () => {
+  afterEach(() => {
+    mockRows = BASE_ROWS;
+  });
+
+  it('un aliment absent du cache et un cosmétique, sans fiche, rejoignent « Incompatibles »', () => {
+    mockRows = [...BASE_ROWS, rowWithoutSheet('444', 'food'), rowWithoutSheet('555', 'cosmetic')];
+    const { getByText } = render(
+      <Wrapper>
+        <HistoryScreen />
+      </Wrapper>,
+    );
+    // Blocker + invérifiable + les 2 lignes sans fiche = 4.
+    expect(getByText('Incompatibles (4)')).toBeTruthy();
   });
 });

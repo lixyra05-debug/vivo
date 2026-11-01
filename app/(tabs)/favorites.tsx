@@ -12,6 +12,7 @@ import { Colors } from '@/src/constants/colors';
 import { useAuthStore } from '@/src/lib/stores/useAuthStore';
 import {
   dedupeByBarcode,
+  scanProductRoute,
   useScanHistory,
   useToggleFavorite,
   type ScanHistoryRow,
@@ -52,7 +53,7 @@ export default function FavoritesScreen() {
           brand={item.product?.brand ?? null}
           imageUrl={item.product?.image_url ?? null}
           score={item.score_at_scan}
-          onPress={() => router.push(`/product/${item.barcode}`)}
+          onPress={() => router.push(scanProductRoute(item))}
           onLongPress={() => confirmRemove(item)}
         />
       </FadeIn>

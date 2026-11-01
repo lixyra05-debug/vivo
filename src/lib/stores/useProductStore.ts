@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/supabase';
-import { getOrFetchProduct } from '../api/openfoodfacts';
+import { fetchCachedProducts, getOrFetchProduct } from '../api/openfoodfacts';
 import type { Product } from '../api/types';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -58,16 +58,29 @@ export function useScanHistory({ userId, limit, onlyFavorites = false }: UseScan
     queryKey: ['scan_history', userId, limit ?? null, onlyFavorites] as const,
     queryFn: async (): Promise<ScanHistoryRow[]> => {
       if (!userId) return [];
+      // Lecture en deux temps (lot H) : la jointure `product:products(*)`
+      // exigeait une clé étrangère que la migration 012 a supprimée — PostgREST
+      // la refusait, et l'historique s'affichait vide.
       let query = supabase
         .from('scan_history')
-        .select('*, product:products(*)')
+        .select('*')
         .eq('user_id', userId)
         .order('scanned_at', { ascending: false });
       if (onlyFavorites) query = query.eq('is_favorite', true);
       if (limit) query = query.limit(limit);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as unknown as ScanHistoryRow[];
+      const rows = (data ?? []) as unknown as Array<Omit<ScanHistoryRow, 'product'>>;
+      // Seuls les aliments ont une fiche dans `products` : un cosmétique garde
+      // `product: null`, comme un aliment absent du cache.
+      const products = await fetchCachedProducts<Product>(
+        rows.filter((r) => r.product_type !== 'cosmetic').map((r) => r.barcode),
+        '*',
+      );
+      return rows.map((r) => ({
+        ...r,
+        product: r.product_type === 'cosmetic' ? null : (products.get(r.barcode) ?? null),
+      }));
     },
     enabled: Boolean(userId),
     staleTime: ONE_MINUTE_MS,
@@ -192,6 +205,16 @@ export function useUserStats(userId: string | undefined) {
     enabled: Boolean(userId),
     staleTime: ONE_MINUTE_MS,
   });
+}
+
+/**
+ * Route de la fiche d'une ligne d'historique : un cosmétique ouvre la fiche
+ * cosmétique. Sans `type`, la route ouvrait la fiche alimentaire.
+ */
+export function scanProductRoute(
+  row: Pick<ScanHistoryRow, 'barcode' | 'product_type'>,
+): `/product/${string}?type=${ScanProductType}` {
+  return `/product/${row.barcode}?type=${row.product_type === 'cosmetic' ? 'cosmetic' : 'food'}`;
 }
 
 export function dedupeByBarcode(rows: ScanHistoryRow[]): ScanHistoryRow[] {

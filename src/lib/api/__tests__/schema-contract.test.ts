@@ -24,14 +24,11 @@ const MIGRATIONS_DIR = path.join(ROOT, 'supabase/migrations');
 const SOURCE_DIRS = ['app', 'src'];
 
 /**
- * Jointures connues sans clé étrangère : la dette que le commit (b) du lot H
- * solde par une lecture en deux temps. Liste décroissante — une entrée qui ne
- * correspond plus à une jointure sans clé fait échouer la suite.
+ * Jointures connues sans clé étrangère. Soldée par le lot H (lecture en deux
+ * temps) : la liste est vide et doit le rester — une jointure nouvelle passe
+ * par une clé étrangère, ou par une lecture en deux temps.
  */
-const KNOWN_BROKEN_EMBEDS: ReadonlyArray<string> = [
-  'src/lib/stats/use-monthly-recap.ts · scan_history → products',
-  'src/lib/stores/useProductStore.ts · scan_history → products',
-];
+const KNOWN_BROKEN_EMBEDS: ReadonlyArray<string> = [];
 
 // === Rejeu des migrations ===
 
@@ -275,7 +272,69 @@ const keyOf = (e: Embed): string => `${e.file} · ${e.from} → ${e.table}`;
  * leurs colonnes. Toute nouvelle sélection non littérale doit y être ajoutée,
  * avec la raison pour laquelle elle ne joint rien.
  */
-const REVIEWED_DYNAMIC_SELECTS: ReadonlyArray<string> = [];
+const REVIEWED_DYNAMIC_SELECTS: ReadonlyArray<string> = [
+  // fetchCachedProducts : les colonnes viennent de ses appelants, relus un par
+  // un par le test « chaque appel de fetchCachedProducts… ».
+  'src/lib/api/openfoodfacts.ts · columns',
+];
+
+// === Appels de fetchCachedProducts ===
+
+interface CachedProductsCall {
+  file: string;
+  line: number;
+  /** La liste de colonnes, quand elle est passée en chaîne littérale. */
+  columns: string | null;
+}
+
+/** Arguments de premier niveau d'un appel, depuis sa parenthèse ouvrante. */
+function callArguments(source: string, openAt: number): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (let i = openAt + 1; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "'" || ch === '"' || ch === '`') {
+      const end = source.indexOf(ch, i + 1);
+      if (end === -1) break;
+      current += source.slice(i, end + 1);
+      i = end;
+      continue;
+    }
+    if ('([{'.includes(ch)) depth += 1;
+    if (')]}'.includes(ch)) {
+      if (depth === 0) break;
+      depth -= 1;
+    }
+    if (ch === ',' && depth === 0) {
+      args.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) args.push(current.trim());
+  return args;
+}
+
+/** Un appel (pas la définition), avec ou sans paramètre de type. */
+const CACHED_PRODUCTS_CALL = /(?<!function )\bfetchCachedProducts(?:<[^<>()]*>)?\(/g;
+
+function scanCachedProductsCalls(source: string, file: string): CachedProductsCall[] {
+  return [...source.matchAll(CACHED_PRODUCTS_CALL)].map((m) => {
+    const at = m.index ?? 0;
+    const columns = callArguments(source, at + m[0].length - 1)[1] ?? '';
+    const literal = /^(['"`])([^'"`]*)\1$/.exec(columns);
+    return { file, line: source.slice(0, at).split('\n').length, columns: literal ? literal[2] : null };
+  });
+}
+
+/** Littérale, sans jointure, et avec `barcode` : la clé de la table rendue. */
+function isSafeColumnList(columns: string | null): boolean {
+  if (columns === null || columns.includes('(')) return false;
+  const list = columns.split(',').map((c) => c.trim());
+  return list.includes('*') || list.includes('barcode');
+}
 
 // === Tests ===
 
@@ -326,13 +385,34 @@ describe('contrat schéma ↔ requêtes (lot H)', () => {
     expect(violations).toEqual([]);
   });
 
-  it('la dette connue ne contient aucune entrée périmée', () => {
-    const broken = new Set(
-      scanCode()
-        .embeds.filter((e) => !hasForeignKeyBetween(schema, e.from, e.table))
-        .map(keyOf),
+  it('la liste des jointures connues est vide', () => {
+    // Regarnir la liste pour faire passer une jointure nouvelle fait tomber ce
+    // test : une jointure passe par une clé étrangère, ou par une lecture en
+    // deux temps (`fetchCachedProducts`).
+    expect(KNOWN_BROKEN_EMBEDS).toEqual([]);
+  });
+
+  it('chaque appel de fetchCachedProducts passe ses colonnes en littéral, sans jointure, avec barcode', () => {
+    const fixture = [
+      "await fetchCachedProducts<Product>(rows.filter((r) => r.product_type !== 'cosmetic').map((r) => r.barcode), '*');",
+      'await fetchCachedProducts(codes, columns);',
+      "await fetchCachedProducts(codes, 'barcode, brand:brands(name)');",
+      'export async function fetchCachedProducts<T extends { barcode: string }>(barcodes: string[], columns: string) {}',
+    ].join('\n');
+    expect(scanCachedProductsCalls(fixture, 'fixture.ts').map((c) => [c.line, c.columns])).toEqual([
+      [1, '*'],
+      [2, null],
+      [3, 'barcode, brand:brands(name)'],
+    ]);
+
+    const calls = SOURCE_DIRS.flatMap((dir) => sourceFiles(path.join(ROOT, dir))).flatMap((full) =>
+      scanCachedProductsCalls(fs.readFileSync(full, 'utf8'), path.relative(ROOT, full)),
     );
-    expect(KNOWN_BROKEN_EMBEDS.filter((entry) => !broken.has(entry))).toEqual([]);
+    expect(calls.length).toBeGreaterThan(0);
+    const unsafe = calls
+      .filter((c) => !isSafeColumnList(c.columns))
+      .map((c) => `${c.file}:${c.line} · ${c.columns ?? 'colonnes non littérales'}`);
+    expect(unsafe).toEqual([]);
   });
 
   it('chaque champ du cache produits (upsert de l’objet entier) est une colonne de products', () => {

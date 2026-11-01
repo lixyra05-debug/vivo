@@ -237,6 +237,45 @@ async function readProductFromCache(barcode: string): Promise<Product | null> {
   return data as Product;
 }
 
+/**
+ * Taille d'un lot de codes-barres pour `fetchCachedProducts`. Les codes
+ * voyagent dans l'URL (`barcode=in.(…)`) : 100 codes de 14 chiffres tiennent
+ * sous 2 Ko, loin des limites des passerelles.
+ */
+export const PRODUCT_LOOKUP_CHUNK = 100;
+
+/**
+ * Fiches du cache alimentaire (`products`), lues par code-barres — `columns`
+ * doit inclure `barcode`, clé de la table rendue.
+ *
+ * Remplace la jointure PostgREST `product:products(…)` depuis `scan_history` :
+ * elle exigeait une clé étrangère que la migration 012 a supprimée (les
+ * cosmétiques n'ont pas de ligne dans `products`, elle ne peut pas revenir),
+ * et PostgREST la refusait (PGRST200). Lire en deux temps n'a besoin d'aucune
+ * clé ; la RLS de `products` (lecture publique, migration 012) s'applique
+ * telle quelle. Un lot en erreur fait échouer toute la lecture : un résultat
+ * partiel passerait pour des produits absents du cache.
+ */
+export async function fetchCachedProducts<T extends { barcode: string }>(
+  barcodes: readonly string[],
+  columns: string,
+): Promise<Map<string, T>> {
+  const unique = [...new Set(barcodes)];
+  const lots: string[][] = [];
+  for (let i = 0; i < unique.length; i += PRODUCT_LOOKUP_CHUNK) {
+    lots.push(unique.slice(i, i + PRODUCT_LOOKUP_CHUNK));
+  }
+  const responses = await Promise.all(
+    lots.map((lot) => supabase.from('products').select(columns).in('barcode', lot)),
+  );
+  const byBarcode = new Map<string, T>();
+  for (const { data, error } of responses) {
+    if (error) throw error;
+    for (const row of (data ?? []) as unknown as T[]) byBarcode.set(row.barcode, row);
+  }
+  return byBarcode;
+}
+
 function isCacheStale(product: Product): boolean {
   const updated = product.updated_at ? new Date(product.updated_at).getTime() : 0;
   return Date.now() - updated > CACHE_TTL_MS;
