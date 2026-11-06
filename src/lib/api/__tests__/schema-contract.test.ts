@@ -42,6 +42,25 @@ interface ForeignKey {
 interface Schema {
   columns: Map<string, Set<string>>;
   foreignKeys: Map<string, ForeignKey>;
+  /** Politiques RLS par table : nom → commande (`all`, `select`, `insert`, `update`, `delete`). */
+  policies: Map<string, Map<string, string>>;
+  /** Triggers par table : nom → moment (`before`…) et fonction exécutée. */
+  triggers: Map<string, Map<string, { timing: string; fn: string }>>;
+  /** Tables où la RLS est activée. */
+  rls: Set<string>;
+  /** Corps des fonctions SQL (entre `$$`), en minuscules, espaces réduits. */
+  functions: Map<string, string>;
+  /** Droits retirés par table et par rôle (`revoke`), rendus par un `grant`. */
+  revoked: Map<string, Map<string, Set<string>>>;
+}
+
+function entryOf<V>(maps: Map<string, Map<string, V>>, key: string): Map<string, V> {
+  let map = maps.get(key);
+  if (!map) {
+    map = new Map();
+    maps.set(key, map);
+  }
+  return map;
 }
 
 /** Retire ce qui n'est pas du DDL de tables : corps `$$`, commentaires, chaînes. */
@@ -80,8 +99,25 @@ function refTableOf(raw: string): string {
   return raw.startsWith('public.') ? raw.slice('public.'.length) : raw;
 }
 
+function emptySchema(): Schema {
+  return {
+    columns: new Map(),
+    foreignKeys: new Map(),
+    policies: new Map(),
+    triggers: new Map(),
+    rls: new Set(),
+    functions: new Map(),
+    revoked: new Map(),
+  };
+}
+
 function replayMigrations(files: readonly string[]): Schema {
-  const schema: Schema = { columns: new Map(), foreignKeys: new Map() };
+  const schema = emptySchema();
+  for (const file of files) replaySql(schema, fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8'));
+  return schema;
+}
+
+function replaySql(schema: Schema, source: string): void {
   const columnsOf = (table: string): Set<string> => {
     let set = schema.columns.get(table);
     if (!set) {
@@ -94,86 +130,150 @@ function replayMigrations(files: readonly string[]): Schema {
     schema.foreignKeys.set(fk.name, fk);
   };
 
-  for (const file of files) {
-    const sql = stripSql(fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8'));
-    for (const rawStatement of sql.split(';')) {
-      const statement = rawStatement.replace(/\s+/g, ' ').trim().toLowerCase();
-      if (!statement) continue;
+  // Les corps `$$` disparaissent avec stripSql : on garde d'abord ceux des fonctions.
+  const functionBody = new RegExp(
+    String.raw`create (?:or replace )?function (?:public\.)?(${ID})\s*\([^)]*\)[\s\S]*?\bas \$\$([\s\S]*?)\$\$`,
+    'g',
+  );
+  for (const m of source.toLowerCase().matchAll(functionBody)) {
+    schema.functions.set(m[1], m[2].replace(/\s+/g, ' ').trim());
+  }
 
-      const create = new RegExp(String.raw`^create table (?:if not exists )?(?:public\.)?(${ID}) \((.*)\)$`).exec(statement);
-      if (create) {
-        const [, table, body] = create;
-        const columns = columnsOf(table);
-        for (const item of splitTopLevel(body)) {
-          const tableFk = new RegExp(
-            String.raw`^(?:constraint (${ID}) )?foreign key \((${ID})\) ${REF}`,
-          ).exec(item);
-          if (tableFk) {
-            const [, name, column, ref] = tableFk;
-            addForeignKey({ name: name ?? `${table}_${column}_fkey`, table, column, refTable: refTableOf(ref) });
-            continue;
+  const sql = stripSql(source);
+  for (const rawStatement of sql.split(';')) {
+    const statement = rawStatement.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!statement) continue;
+
+    // Nom entre guillemets ou nu : une politique sans guillemets compte aussi.
+    const createPolicy = new RegExp(
+      String.raw`^create policy (?:"([^"]+)"|(${ID})) on (?:public\.)?(${ID})(?: as (?:permissive|restrictive))?(?: for (all|select|insert|update|delete))?`,
+    ).exec(statement);
+    if (createPolicy) {
+      const [, quoted, bare, table, command] = createPolicy;
+      entryOf(schema.policies, table).set(quoted ?? bare, command ?? 'all');
+      continue;
+    }
+    const dropPolicy = new RegExp(String.raw`^drop policy (?:if exists )?(?:"([^"]+)"|(${ID})) on (?:public\.)?(${ID})`).exec(statement);
+    if (dropPolicy) {
+      schema.policies.get(dropPolicy[3])?.delete(dropPolicy[1] ?? dropPolicy[2]);
+      continue;
+    }
+    const createTrigger = new RegExp(
+      String.raw`^create (?:or replace )?trigger (${ID}) (before|after|instead of) .*? on (?:public\.)?(${ID}) .*?execute (?:function|procedure) (?:public\.)?(${ID}) ?\(`,
+    ).exec(statement);
+    if (createTrigger) {
+      const [, name, timing, table, fn] = createTrigger;
+      entryOf(schema.triggers, table).set(name, { timing, fn });
+      continue;
+    }
+    const privilege = new RegExp(String.raw`^(grant|revoke) (.+?) on (?:table )?(.+?) (?:to|from) (.+)$`).exec(statement);
+    if (privilege) {
+      const [, verb, privileges, objects, roles] = privilege;
+      if (/^(sequence|function|schema|all) /.test(objects)) continue;
+      for (const object of objects.split(',').map((o) => refTableOf(o.trim()))) {
+        for (const role of roles.split(',').map((r) => r.trim())) {
+          const byRole = entryOf(schema.revoked, object);
+          const set = byRole.get(role) ?? new Set<string>();
+          for (const priv of privileges.split(',').map((x) => x.trim())) {
+            if (verb === 'revoke') set.add(priv);
+            else if (priv === 'all') set.clear();
+            else set.delete(priv);
           }
-          if (/^(constraint|primary key|unique|check|exclude)\b/.test(item)) continue;
-          const column = new RegExp(String.raw`^"?(${ID})"?\s`).exec(item)?.[1];
-          if (!column) continue;
-          columns.add(column);
-          const inline = new RegExp(REF).exec(item);
+          byRole.set(role, set);
+        }
+      }
+      continue;
+    }
+    const dropTrigger = new RegExp(String.raw`^drop trigger (?:if exists )?(${ID}) on (?:public\.)?(${ID})`).exec(statement);
+    if (dropTrigger) {
+      schema.triggers.get(dropTrigger[2])?.delete(dropTrigger[1]);
+      continue;
+    }
+
+    const create = new RegExp(String.raw`^create table (?:if not exists )?(?:public\.)?(${ID}) \((.*)\)$`).exec(statement);
+    if (create) {
+      const [, table, body] = create;
+      const columns = columnsOf(table);
+      for (const item of splitTopLevel(body)) {
+        const tableFk = new RegExp(
+          String.raw`^(?:constraint (${ID}) )?foreign key \((${ID})\) ${REF}`,
+        ).exec(item);
+        if (tableFk) {
+          const [, name, column, ref] = tableFk;
+          addForeignKey({ name: name ?? `${table}_${column}_fkey`, table, column, refTable: refTableOf(ref) });
+          continue;
+        }
+        if (/^(constraint|primary key|unique|check|exclude)\b/.test(item)) continue;
+        const column = new RegExp(String.raw`^"?(${ID})"?\s`).exec(item)?.[1];
+        if (!column) continue;
+        columns.add(column);
+        const inline = new RegExp(REF).exec(item);
+        if (inline) {
+          addForeignKey({ name: `${table}_${column}_fkey`, table, column, refTable: refTableOf(inline[1]) });
+        }
+      }
+      continue;
+    }
+
+    const alter = new RegExp(String.raw`^alter table (?:if exists )?(?:only )?(?:public\.)?(${ID}) (.*)$`).exec(statement);
+    if (alter) {
+      const [, table, actions] = alter;
+      for (const action of splitTopLevel(actions)) {
+        if (action === 'enable row level security') {
+          schema.rls.add(table);
+          continue;
+        }
+        if (action === 'disable row level security') {
+          schema.rls.delete(table);
+          continue;
+        }
+        const addFk = new RegExp(
+          String.raw`^add constraint (${ID}) foreign key \((${ID})\) ${REF}`,
+        ).exec(action);
+        if (addFk) {
+          const [, name, column, ref] = addFk;
+          addForeignKey({ name, table, column, refTable: refTableOf(ref) });
+          continue;
+        }
+        if (/^add constraint /.test(action)) continue;
+        const addColumn = new RegExp(String.raw`^add (?:column )?(?:if not exists )?"?(${ID})"?\s`).exec(action);
+        if (addColumn) {
+          const column = addColumn[1];
+          columnsOf(table).add(column);
+          const inline = new RegExp(REF).exec(action);
           if (inline) {
             addForeignKey({ name: `${table}_${column}_fkey`, table, column, refTable: refTableOf(inline[1]) });
           }
+          continue;
         }
-        continue;
+        const dropConstraint = new RegExp(String.raw`^drop constraint (?:if exists )?(${ID})`).exec(action);
+        if (dropConstraint) {
+          schema.foreignKeys.delete(dropConstraint[1]);
+          continue;
+        }
+        const dropColumn = new RegExp(String.raw`^drop (?:column )?(?:if exists )?(${ID})`).exec(action);
+        if (dropColumn && !/^drop (constraint|not null|default)\b/.test(action)) {
+          columnsOf(table).delete(dropColumn[1]);
+          for (const [name, fk] of schema.foreignKeys) {
+            if (fk.table === table && fk.column === dropColumn[1]) schema.foreignKeys.delete(name);
+          }
+        }
       }
+      continue;
+    }
 
-      const alter = new RegExp(String.raw`^alter table (?:if exists )?(?:only )?(?:public\.)?(${ID}) (.*)$`).exec(statement);
-      if (alter) {
-        const [, table, actions] = alter;
-        for (const action of splitTopLevel(actions)) {
-          const addFk = new RegExp(
-            String.raw`^add constraint (${ID}) foreign key \((${ID})\) ${REF}`,
-          ).exec(action);
-          if (addFk) {
-            const [, name, column, ref] = addFk;
-            addForeignKey({ name, table, column, refTable: refTableOf(ref) });
-            continue;
-          }
-          if (/^add constraint /.test(action)) continue;
-          const addColumn = new RegExp(String.raw`^add (?:column )?(?:if not exists )?"?(${ID})"?\s`).exec(action);
-          if (addColumn) {
-            const column = addColumn[1];
-            columnsOf(table).add(column);
-            const inline = new RegExp(REF).exec(action);
-            if (inline) {
-              addForeignKey({ name: `${table}_${column}_fkey`, table, column, refTable: refTableOf(inline[1]) });
-            }
-            continue;
-          }
-          const dropConstraint = new RegExp(String.raw`^drop constraint (?:if exists )?(${ID})`).exec(action);
-          if (dropConstraint) {
-            schema.foreignKeys.delete(dropConstraint[1]);
-            continue;
-          }
-          const dropColumn = new RegExp(String.raw`^drop (?:column )?(?:if exists )?(${ID})`).exec(action);
-          if (dropColumn && !/^drop (constraint|not null|default)\b/.test(action)) {
-            columnsOf(table).delete(dropColumn[1]);
-            for (const [name, fk] of schema.foreignKeys) {
-              if (fk.table === table && fk.column === dropColumn[1]) schema.foreignKeys.delete(name);
-            }
-          }
-        }
-        continue;
-      }
-
-      const drop = new RegExp(String.raw`^drop table (?:if exists )?(?:public\.)?(${ID})`).exec(statement);
-      if (drop) {
-        schema.columns.delete(drop[1]);
-        for (const [name, fk] of schema.foreignKeys) {
-          if (fk.table === drop[1] || fk.refTable === drop[1]) schema.foreignKeys.delete(name);
-        }
+    const drop = new RegExp(String.raw`^drop table (?:if exists )?(?:public\.)?(${ID})`).exec(statement);
+    if (drop) {
+      schema.columns.delete(drop[1]);
+      schema.policies.delete(drop[1]);
+      schema.triggers.delete(drop[1]);
+      schema.rls.delete(drop[1]);
+      schema.revoked.delete(drop[1]);
+      for (const [name, fk] of schema.foreignKeys) {
+        if (fk.table === drop[1] || fk.refTable === drop[1]) schema.foreignKeys.delete(name);
       }
     }
   }
-  return schema;
 }
 
 function migrationFiles(): string[] {
@@ -433,5 +533,82 @@ describe('contrat schéma ↔ requêtes (lot H)', () => {
       buildScanInsertPayload('u', { barcode: '1', score: 50, profile: 'standard', penalties: [] }),
     );
     expect(fields.filter((f) => !columns.has(f))).toEqual([]);
+  });
+
+  it('le rejeu lit les politiques, les triggers et la RLS (lot C)', () => {
+    const fixture = emptySchema();
+    replaySql(
+      fixture,
+      [
+        'create table t (id int, updated_at timestamptz);',
+        'alter table public.t enable row level security;',
+        'create policy "Lecture" on public.t for select using (true);',
+        'create policy "Écriture" on public.t for insert to authenticated with check (true);',
+        'create policy "Tout" on t using (true);',
+        'drop policy if exists "Écriture" on public.t;',
+        'create policy t_write on public.t for update using (true);',
+        'create trigger t_dates before insert or update on public.t for each row execute function public.f();',
+        'create or replace function public.f() returns trigger language plpgsql as $$ begin new.d := now(); return new; end; $$;',
+        'revoke insert, update on public.t from anon, authenticated;',
+        'grant update on t to authenticated;',
+        'revoke all on sequence public.t_id_seq from anon;',
+      ].join('\n'),
+    );
+    expect(Object.fromEntries(fixture.policies.get('t') ?? [])).toEqual({ lecture: 'select', tout: 'all', t_write: 'update' });
+    expect(Object.fromEntries(fixture.triggers.get('t') ?? [])).toEqual({ t_dates: { timing: 'before', fn: 'f' } });
+    expect(fixture.functions.get('f')).toBe('begin new.d := now(); return new; end;');
+    expect([...(fixture.revoked.get('t')?.get('anon') ?? [])]).toEqual(['insert', 'update']);
+    expect([...(fixture.revoked.get('t')?.get('authenticated') ?? [])]).toEqual(['insert']);
+    expect(fixture.revoked.has('t_id_seq')).toBe(false);
+    expect(fixture.rls.has('t')).toBe(true);
+  });
+
+  it('les caches products et cosmetic_products ne sont plus ouverts qu’en lecture (lot C)', () => {
+    const writable = ['products', 'cosmetic_products'].flatMap((table) =>
+      [...(schema.policies.get(table) ?? new Map<string, string>())]
+        .filter(([, command]) => command !== 'select')
+        .map(([name, command]) => `${table} · ${name} · ${command}`),
+    );
+    expect(writable).toEqual([]);
+    for (const table of ['products', 'cosmetic_products']) {
+      expect(schema.rls.has(table)).toBe(true);
+      expect([...(schema.policies.get(table)?.values() ?? [])]).toContain('select');
+    }
+  });
+
+  it('les dates des deux caches sont fixées par le serveur : trigger BEFORE, now() du serveur, création conservée (lot C)', () => {
+    for (const table of ['products', 'cosmetic_products']) {
+      expect([...(schema.triggers.get(table)?.values() ?? [])]).toContainEqual({ timing: 'before', fn: 'set_cache_timestamps' });
+    }
+    const body = schema.functions.get('set_cache_timestamps') ?? '';
+    expect(body).toContain('new.updated_at := pg_catalog.now()');
+    expect(body).toContain('new.created_at := old.created_at');
+  });
+
+  it('les rôles client ne peuvent plus écrire dans les deux caches, même par une politique oubliée (REVOKE, lot C)', () => {
+    for (const table of ['products', 'cosmetic_products']) {
+      for (const role of ['anon', 'authenticated']) {
+        expect([...(schema.revoked.get(table)?.get(role) ?? [])]).toEqual(
+          expect.arrayContaining(['insert', 'update', 'delete', 'truncate']),
+        );
+      }
+    }
+  });
+
+  it('les dates dans le futur sont rendues périmées AVANT la création des triggers, qui redateraient la mise à jour (018)', () => {
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, '018_cache_server_timestamps.sql'), 'utf8').toLowerCase();
+    const neutralize = sql.indexOf("update public.products\n  set updated_at = now() - interval '8 days'");
+    const trigger = sql.indexOf('create trigger products_set_cache_timestamps');
+    expect(neutralize).toBeGreaterThan(-1);
+    expect(neutralize).toBeLessThan(trigger);
+  });
+
+  it('le journal des relectures n’est ouvert à aucun client : RLS active, aucune politique (lot C)', () => {
+    expect([...(schema.columns.get('cache_refresh_log') ?? [])].sort()).toEqual(['id', 'requested_at', 'source', 'user_id']);
+    expect(schema.rls.has('cache_refresh_log')).toBe(true);
+    expect(schema.policies.get('cache_refresh_log')?.size ?? 0).toBe(0);
+    for (const role of ['anon', 'authenticated']) {
+      expect([...(schema.revoked.get('cache_refresh_log')?.get(role) ?? [])]).toContain('all');
+    }
   });
 });
