@@ -76,7 +76,7 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Mode "Ce que je peux manger"** : toggle 100g/Compatibles sur category + store screens (style `NutrientBreakdown`), banner sur fiche produit, compteur "X / Y compatibles"
 - **Confiance & signalement** : `ConfidenceBadge` sous le header produit, `ReportButton` discret avec modal slide (5 raisons FR + description optionnelle), pas de photo MVP
 - **Adapter user→compat** : `userProfileToCompatibilityProfile` mappe `diabetic→diabete`, `pregnant→enceinte`, `child→bebe` ; renvoie `null` si standard sans allergie pour masquer le toggle
-- **Sources des allergènes (lot S1b)** : `normalizeOFFProduct` copie `ingredients_text_fr` (texte français, `null` si absent) et `allergens_tags` (déclaration de la fiche, saisie communautaire) dans `products` ; `ingredients_raw` reste la langue principale, et lui seul nourrit la note. **Migration `017_products_allergen_sources.sql` à appliquer AVANT tout déploiement** : `writeProductToCache` upsert l'objet entier.
+- **Sources des allergènes (lot S1b)** : `normalizeOFFProduct` copie `ingredients_text_fr` (texte français, `null` si absent) et `allergens_tags` (déclaration de la fiche, saisie communautaire) dans `products` ; `ingredients_raw` reste la langue principale, et lui seul nourrit la note. **Migration `017_products_allergen_sources.sql`** : en base (vérifié le 06/11/2026) ; elle devait précéder tout déploiement, car la fiche normalisée s'écrit entière — par `writeProductToCache` jusqu'au lot C, par `cache-product` depuis.
 - **Lecture de la compatibilité (lot S1b)** : tous les lecteurs du texte — allergies, régimes, grossesse, cœliaque, FODMAP, huile de palme — lisent le texte français ET le texte principal (lecture cumulée : aucune alerte perdue). L'ordre, le français d'abord, ne décide que du mot affiché : `matchedText` d'une allergie, nom d'un déclencheur FODMAP (un aliment nommé dans les deux langues ne compte qu'une fois) ; les autres libellés citent le premier mot-clé de leur liste trouvé dans l'un ou l'autre texte. `allergens_tags` en union avec le texte : un tag présent est lu comme « contient », son absence ne prouve rien ; table un pour un `ALLERGEN_TAG_TO_KEY` (14 tags canoniques), tag hors table ignoré ; le cœliaque lit aussi `en:gluten`. Champs C5 : `matchedText` (mot lu dans un texte, absent pour un tag seul) et `checkedAllergenCount`. En production, seuls les allergies et la grossesse sont atteints (`userProfileToCompatibilityProfile`) ; régimes, cœliaque, FODMAP et huile de palme ne le sont par aucun écran.
 - **Migration** : `009_stores_confidence_reports.sql` (table `product_reports` RLS + table `stores` seedée idempotente)
 
@@ -353,7 +353,7 @@ Le packaging cesse d'être informatif : il devient un **modificateur appliqué A
 - **`src/lib/scoring/packaging-modifier.ts`** — `computePackagingPenalty(packagings)` pur. Les matériaux à 0 point sont exclus des `factors` (pas de ligne fantôme).
 - **`src/lib/scoring/composite-score.ts`** — `composeScore(formulation, packagings) → CompositeScoringResult extends ScoringResult`. `ScoringResult` n'est PAS modifié (`history.tsx` en construit un littéral, 3 écrans le déclarent). La note composée est écrite dans `score_final` existant → rétrocompatibilité à diff nul. **Le packaging n'entre PAS dans `penalties[]`** : ce tableau est sérialisé dans `penalties_snapshot`, que `advanced-stats` agrège en « exposition toxique » — y verser `pet` le compterait comme un additif.
 - **`detectPackagingDetections`** extrait de `detectPackagingRisk` (`packaging-risks.ts`) : le flag food-contact était calculé, utilisé pour trier, puis **jeté** au `.map` final. `detectPackagingRisk` délègue désormais — ses 20 tests passent sans une retouche. Type `FoodContactStatus = 'confirmed' | 'unknown'` et non un booléen : ici `false` veut dire « on ne sait pas », les `food_contact === 0` étant déjà écartés en amont.
-- **Migration 016** `products.packaging_components jsonb NOT NULL DEFAULT '[]'` — `fetchProductByBarcode` télécharge sans filtre `fields=`, donc `packagings[]` était déjà dans la charge utile et jeté. Zéro requête réseau ajoutée. Obligatoire : `writeProductToCache` upsert l'objet entier.
+- **Migration 016** `products.packaging_components jsonb NOT NULL DEFAULT '[]'` — `fetchProductByBarcode` télécharge sans filtre `fields=`, donc `packagings[]` était déjà dans la charge utile et jeté. Zéro requête réseau ajoutée. Obligatoire, car la fiche normalisée s'écrit entière — par `writeProductToCache` jusqu'au lot C, par `cache-product` depuis ; en base (vérifié le 06/11/2026).
 - **UI — `ScoreFactorsCard`** (delay 180, entre le score 140 et `ScoreComparison` 220, aucune renumérotation) : « CE QUI INFLUENCE LA NOTE », ligne Formulation puis une ligne par matériau, total « Note globale ». Σ des lignes === note affichée exactement (répartition plus-fort-reste). Auto-garde `factors.length < 2 → null`.
 - **`ScoreBreakdownChart` reçoit `formulationScore`, pas la note** : ses barres décomposent la formulation (NOVA/additifs/macros/huiles). Les adosser à la note composée afficherait un total faux.
 - **Libellés** : `SCORE_LABEL_DEFAULT = 'Note globale'` ; nouveau `SCORE_LABEL_FORMULATION` passé explicitement par `CosmeticResultView` — le score cosmétique reste la seule formulation et le dit.
@@ -470,17 +470,19 @@ normalise avec le code de l'app et écrit avec la clé de service. Aucun contenu
   (`cached:false`, puis `cached:true`) ; (4) 019, sans attendre l'app : jusque-là, n'importe quel compte
   connecté écrit encore dans le cache ; (5) publier l'app. Les versions déjà installées survivent à 019 :
   leurs écritures sont refusées, elles avalent l'erreur et continuent de lire le cache et OFF.
-  **Fait le 06/11/2026** sur le projet `vivo` : (2) 018, (3) déploiement avec `verify_jwt` par défaut (le projet a
-  les clés historiques `eyJ`), vérifié sur un seul scan, avant 019, et (4) 019. Reste (5).
+  **Fait le 06/11/2026** sur le projet `vivo` : (1) 016 et 017 en base (requête : 3 colonnes), (2) 018,
+  (3) déploiement avec `verify_jwt` par défaut (le projet a les clés historiques `eyJ`), vérifié sur un seul scan,
+  avant 019, et (4) 019. Reste (5).
 - **Audit, en lecture seule** : `audit/06-cache-products.md` (requêtes SQL) et `audit/products-cache-audit.ts`
   (Deno : confrontation à OFF, 12 lectures par minute, rapport JSON local ; exclu du `tsconfig`). Les dates dans
   le futur se relèvent avant 018, qui en efface la trace. Après 018, une fiche suspecte se retire par `delete`,
-  jamais par `update` : le trigger la redaterait, donc la rafraîchirait. Requêtes (a) à (g) lancées, script non
-  lancé : résultats dans l'entrée « SOLDÉ » de la dette avant publication.
+  jamais par `update` : le trigger la redaterait, donc la rafraîchirait. Requêtes (a) à (g) lancées avant 018 ;
+  audit des 60 fiches les plus récentes en cours : voir l'entrée « Cache `products` » de la dette avant
+  publication.
 
 ## Dette avant publication
 
-### SOLDÉ le 06/11/2026 — le cache `products` n'est plus écrit que par le serveur (lot H, lot C)
+### Cache `products` : écriture FERMÉE le 06/11/2026, contenu d'avant 012 non vérifié (lot H, lot C)
 Jusqu'au lot C, 012 ouvrait `products` en INSERT et en UPDATE à tout compte connecté (`WITH CHECK (true)`),
 sans trigger ni contrôle des valeurs : n'importe quel compte pouvait écrire n'importe quelle fiche, sur toutes
 ses colonnes. `updated_at` était fixé par le client (`normalizeOFFProduct`), et `getOrFetchProduct` servait une
@@ -489,16 +491,21 @@ date était mise dans le futur. La note en dépendait (ingrédients, additifs, N
 verdict allergène aussi (`ingredients_raw`, `ingredients_text_fr`, `allergens_tags`), comme le nom, la marque
 et l'image affichés.
 
-**Réglé en production le 06/11/2026** (projet `vivo`) : 018 et 019 appliquées, `cache-product` déployée avec
-`verify_jwt` par défaut (le projet a les clés historiques `eyJ`). Voir la section « Cache produits écrit par
-le serveur — lot C ».
+**Écriture fermée en production le 06/11/2026** (projet `vivo`) : 018 et 019 appliquées, `cache-product`
+déployée avec `verify_jwt` par défaut (le projet a les clés historiques `eyJ`). Plus aucun client n'écrit le
+cache. Voir la section « Cache produits écrit par le serveur — lot C ».
+
+**Contenu non vérifié pour la période d'avant 012** : la RLS était alors désactivée sur `products` (C-001) ;
+avec les droits que Supabase accorde par défaut à `anon`, la clé publique de l'app suffisait pour écrire, sans
+compte. Audit des 60 fiches les plus récentes en cours.
 
 Constats d'Hector, le 06/11/2026 :
 - deux comptes en base, tous deux à Hector ; connexion anonyme désactivée ; confirmation d'e-mail activée ;
-- requêtes d'audit de `audit/06-cache-products.md` : (a) dates dans le futur 0 · (b) codes hors format 0 ·
-  (c) compteurs touchés 0 · (d) dates désaccordées 0 · (e) tags d'allergènes hors format 1 · (f) 350 fiches,
-  dont 55 fraîches · (g) 0 fiche cosmétique. Le seul tag hors format (code-barres 5411188115366) vient d'OFF ;
-- script d'audit non lancé, jugé inutile : personne d'autre n'a pu écrire.
+- requêtes d'audit de `audit/06-cache-products.md`, lancées avant 018 : (a) dates dans le futur 0 ·
+  (b) codes hors format 0 · (c) compteurs touchés 0 · (d) dates désaccordées 0 · (e) tags d'allergènes hors
+  format 1 · (f) 350 fiches, dont 55 fraîches · (g) 0 fiche cosmétique. Le seul tag hors format (code-barres
+  5411188115366) vient d'OFF ;
+- 016 et 017 en base (requête : 3 colonnes).
 
 **Non vérifié** : aucun scan testé APRÈS 019. Un seul scan a été testé, avant 019 : 351 fiches, 1 ligne au
 journal.
