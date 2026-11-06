@@ -421,7 +421,8 @@ normalise avec le code de l'app et écrit avec la clé de service. Aucun contenu
   `cache-audit.ts`. Deno ne lit ni l'alias `@/` ni les chemins sans extension : ces modules n'importent qu'en
   relatif, avec `.ts` — `tsconfig` : `allowImportingTsExtensions`, que seul tsc exige —, et
   `deno-portability.test.ts` parcourt le graphe d'imports de chaque point d'entrée Deno.
-- **Parcours de `cache-product`** (`supabase/functions/cache-product/index.ts`, que le lot n'a pas déployée) :
+- **Parcours de `cache-product`** (`supabase/functions/cache-product/index.ts`, déployée le 06/11/2026 sur le
+  projet `vivo`) :
   1. un code-barres de 8 à 14 chiffres (la clé de contrôle n'arrête aucun abus et écarterait les UPC-E) ;
   2. un utilisateur connecté, vérifié par Supabase Auth : la clé publique seule ne suffit pas, que `verify_jwt`
      soit actif ou non ;
@@ -451,7 +452,7 @@ normalise avec le code de l'app et écrit avec la clé de service. Aucun contenu
     tout, une date forgée (« 2099 ») reste périmée. Avant le lot C, une date illisible rendait la fiche fraîche.
   - Plus aucune écriture des deux caches, ni d'accès direct à la base (`/rest/v1/`, `.rpc`), dans `app/` ni
     `src/` (`cache-client.test.ts`).
-- **Migrations écrites, non appliquées** :
+- **Migrations, appliquées le 06/11/2026 sur le projet `vivo`** :
   - `018_cache_server_timestamps.sql` : trigger `set_cache_timestamps` (BEFORE INSERT OR UPDATE : `updated_at`
     du serveur, `created_at` conservé) sur les deux caches ; les fiches datées dans le futur sont rendues
     périmées AVANT la création du trigger, seule donnée modifiée ; table `cache_refresh_log` (compte, source,
@@ -469,25 +470,43 @@ normalise avec le code de l'app et écrit avec la clé de service. Aucun contenu
   (`cached:false`, puis `cached:true`) ; (4) 019, sans attendre l'app : jusque-là, n'importe quel compte
   connecté écrit encore dans le cache ; (5) publier l'app. Les versions déjà installées survivent à 019 :
   leurs écritures sont refusées, elles avalent l'erreur et continuent de lire le cache et OFF.
+  **Fait le 06/11/2026** sur le projet `vivo` : (2) 018, (3) déploiement avec `verify_jwt` par défaut (le projet a
+  les clés historiques `eyJ`), vérifié sur un seul scan, avant 019, et (4) 019. Reste (5).
 - **Audit, en lecture seule** : `audit/06-cache-products.md` (requêtes SQL) et `audit/products-cache-audit.ts`
   (Deno : confrontation à OFF, 12 lectures par minute, rapport JSON local ; exclu du `tsconfig`). Les dates dans
   le futur se relèvent avant 018, qui en efface la trace. Après 018, une fiche suspecte se retire par `delete`,
-  jamais par `update` : le trigger la redaterait, donc la rafraîchirait.
+  jamais par `update` : le trigger la redaterait, donc la rafraîchirait. Requêtes (a) à (g) lancées, script non
+  lancé : résultats dans l'entrée « SOLDÉ » de la dette avant publication.
 
 ## Dette avant publication
 
-### BLOQUANT avant publication — tout compte connecté peut empoisonner le cache `products` (lot H)
-012 ouvre `products` en INSERT et en UPDATE à tout compte connecté (`WITH CHECK (true)`), sans trigger ni
-contrôle des valeurs : n'importe quel compte peut écrire n'importe quelle fiche, sur toutes ses colonnes.
-`updated_at` est fixé par le client (`normalizeOFFProduct`), et `getOrFetchProduct` sert une fiche fraîche à
-tous sans relire OFF : une fiche réécrite est servie à tous pendant 7 jours, et sans fin si sa date est mise
-dans le futur. La note en dépend (ingrédients, additifs, NOVA, macros, emballage), le verdict allergène aussi
-(`ingredients_raw`, `ingredients_text_fr`, `allergens_tags`), comme le nom, la marque et l'image affichés.
+### SOLDÉ le 06/11/2026 — le cache `products` n'est plus écrit que par le serveur (lot H, lot C)
+Jusqu'au lot C, 012 ouvrait `products` en INSERT et en UPDATE à tout compte connecté (`WITH CHECK (true)`),
+sans trigger ni contrôle des valeurs : n'importe quel compte pouvait écrire n'importe quelle fiche, sur toutes
+ses colonnes. `updated_at` était fixé par le client (`normalizeOFFProduct`), et `getOrFetchProduct` servait une
+fiche fraîche à tous sans relire OFF : une fiche réécrite était servie à tous pendant 7 jours, et sans fin si sa
+date était mise dans le futur. La note en dépendait (ingrédients, additifs, NOVA, macros, emballage), le
+verdict allergène aussi (`ingredients_raw`, `ingredients_text_fr`, `allergens_tags`), comme le nom, la marque
+et l'image affichés.
 
-**Corrigé dans les fichiers par le lot C, pas encore en base** : fonction `cache-product`, client en lecture
-seule, migrations 018 et 019. Le risque reste entier tant que l'ordre de déploiement de la section « Cache
-produits écrit par le serveur — lot C » n'est pas allé jusqu'à 019. Les fiches déjà altérées se repèrent avec
-`audit/06-cache-products.md`.
+**Réglé en production le 06/11/2026** (projet `vivo`) : 018 et 019 appliquées, `cache-product` déployée avec
+`verify_jwt` par défaut (le projet a les clés historiques `eyJ`). Voir la section « Cache produits écrit par
+le serveur — lot C ».
+
+Constats d'Hector, le 06/11/2026 :
+- deux comptes en base, tous deux à Hector ; connexion anonyme désactivée ; confirmation d'e-mail activée ;
+- requêtes d'audit de `audit/06-cache-products.md` : (a) dates dans le futur 0 · (b) codes hors format 0 ·
+  (c) compteurs touchés 0 · (d) dates désaccordées 0 · (e) tags d'allergènes hors format 1 · (f) 350 fiches,
+  dont 55 fraîches · (g) 0 fiche cosmétique. Le seul tag hors format (code-barres 5411188115366) vient d'OFF ;
+- script d'audit non lancé, jugé inutile : personne d'autre n'a pu écrire.
+
+**Non vérifié** : aucun scan testé APRÈS 019. Un seul scan a été testé, avant 019 : 351 fiches, 1 ligne au
+journal.
+
+**À faire** : après quelques scans, vérifier que le nombre de fiches et le journal augmentent ensemble. Ce
+qu'on doit voir, par scan : aliment absent du cache, une fiche et une ligne de journal de plus (un cosmétique
+écrit dans `cosmetic_products`) ; fiche périmée ou produit inconnu d'OFF, une ligne de journal seulement ;
+fiche fraîche, rien. Les listes n'appellent pas la fonction, et le journal se purge au-delà de 2 jours.
 
 ### D1 — le « Mot détecté » du bandeau peut manquer à la liste affichée (lot S1b)
 Le moteur prend `matchedText` dans le premier texte qui le contient, le français d'abord ; la section
@@ -509,8 +528,9 @@ cosmétique se relisait sur OBF.
 
 Lot C : `cache-product` écrit `cosmetic_products` avec la clé de service, sans aucun INSERT ouvert aux
 clients, à chaque fiche cosmétique ouverte (`getOrFetchCosmetic`, appelé par `app/product/[barcode].tsx:478`) ;
-la liste d'une catégorie (`app/category/[slug].tsx`) ne le demande pas. Effectif une fois 018 appliquée et la
-fonction déployée : sans le journal de 018, la fonction refuse toute relecture.
+la liste d'une catégorie (`app/category/[slug].tsx`) ne le demande pas. En production depuis le 06/11/2026
+(018 appliquée, fonction déployée) ; aucune écriture de `cosmetic_products` n'y a encore été testée — le seul
+scan testé a écrit dans `products`.
 
 Reste : `useScanHistory` ne lit que `products`. L'historique ne nomme toujours pas un cosmétique (« Produit
 inconnu »), et le filtre « Incompatibles » les y range tous, provisoirement — jusqu'à une lecture de
@@ -532,11 +552,11 @@ la caméra : chaque consultation y devient un scan, compté par les compteurs, l
 le PDF. À trancher : quelles entrées sont un scan.
 
 ### Le journal `cache_refresh_log` n'est pas dans la politique de confidentialité (lot C)
-018 crée le journal des relectures de `cache-product` : identifiant du compte, source (OFF ou OBF) et date. Il
-sert aux quotas, n'est lisible que par le rôle de service, est purgé au-delà de 2 jours par la fonction et
-effacé avec le compte. L'article 7 de la politique de confidentialité (« Durée de conservation »,
-`app/settings/privacy.tsx:305-336`) ne le cite pas. Texte à écrire dans un lot légal, avec la version et la
-date de la politique.
+018, appliquée le 06/11/2026, crée le journal des relectures de `cache-product` : identifiant du compte, source
+(OFF ou OBF) et date. Il sert aux quotas, n'est lisible que par le rôle de service, est purgé au-delà de 2 jours
+par la fonction et effacé avec le compte. L'article 7 de la politique de confidentialité (« Durée de
+conservation », `app/settings/privacy.tsx:305-336`) ne le cite pas. Texte à écrire dans un lot légal, avec la
+version et la date de la politique.
 
 ### `analyze-ingredients` ne vérifie pas l'utilisateur et ne compte rien (relevé au lot C)
 `supabase/functions/analyze-ingredients/index.ts`, appelée par le scan OCR (`src/lib/api/ocr-scan.ts`), ne lit
