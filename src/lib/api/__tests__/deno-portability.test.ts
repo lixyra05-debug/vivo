@@ -18,7 +18,13 @@ import { normalizeOBFProduct } from '../obf-normalize';
 const ROOT = path.resolve(__dirname, '../../../..');
 
 /** Points d'entrée chargés par Deno (chemins depuis la racine du dépôt). */
-const DENO_ENTRIES: ReadonlyArray<string> = ['src/lib/api/off-normalize.ts', 'src/lib/api/obf-normalize.ts'];
+const DENO_ENTRIES: ReadonlyArray<string> = [
+  'src/lib/api/off-normalize.ts',
+  'src/lib/api/obf-normalize.ts',
+  'src/lib/api/cache-refresh-rules.ts',
+  'src/lib/api/cache-refresh-handler.ts',
+  'supabase/functions/cache-product/index.ts',
+];
 
 /** Ce qu'aucun module chargé par Deno ne doit atteindre. */
 const FORBIDDEN_FILES = new Set(['src/lib/api/supabase.ts']);
@@ -80,6 +86,18 @@ describe('Deno charge le code partagé tel qu’il est écrit (lot C)', () => {
     expect(problems).toEqual([]);
     // Le graphe est bien parcouru : il atteint les types et l'emballage.
     expect(files).toEqual(expect.arrayContaining(['src/lib/api/types.ts', 'src/data/packaging-risks.ts']));
+  });
+
+  it('la fonction cache-product normalise et décide avec le code de l’app', () => {
+    const { files } = walk(['supabase/functions/cache-product/index.ts']);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        'src/lib/api/cache-refresh-handler.ts',
+        'src/lib/api/off-normalize.ts',
+        'src/lib/api/obf-normalize.ts',
+        'src/lib/api/cache-refresh-rules.ts',
+      ]),
+    );
   });
 
   it('l’app et la fonction partagent la même normalisation (aucune copie)', () => {
