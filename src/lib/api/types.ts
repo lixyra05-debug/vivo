@@ -1,4 +1,4 @@
-import type { PackagingComponent } from '@/src/data/packaging-risks';
+import type { PackagingComponent } from '../../data/packaging-risks.ts';
 
 export type HealthProfile =
   | 'standard'
