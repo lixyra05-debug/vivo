@@ -75,8 +75,27 @@ function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || (Array.isArray(value) && value.length === 0);
 }
 
+/**
+ * Forme canonique d'une valeur JSON : les clés de chaque objet triées, récursivement ; l'ordre
+ * des éléments d'un tableau est gardé. PostgreSQL ne conserve pas l'ordre des clés d'un `jsonb` :
+ * `packaging_components` revient en `shape, material, food_contact`, quand la normalisation
+ * l'écrit en `material, shape, food_contact`. Comparé au texte près, tout emballage différait.
+ */
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value !== null && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(object)
+        .sort()
+        .map((key) => [key, canonical(object[key])]),
+    );
+  }
+  return value;
+}
+
 function same(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  return JSON.stringify(canonical(a ?? null)) === JSON.stringify(canonical(b ?? null));
 }
 
 /** `off` : la fiche OFF, ou `null` si OFF ne connaît pas le code-barres. */

@@ -87,3 +87,49 @@ describe('auditCachedRow — chaque fiche en cache confrontée à OFF (lot C)', 
     );
   });
 });
+
+describe('emballages relus d’un jsonb : l’ordre des clés ne compte pas, le contenu si', () => {
+  /**
+   * `packaging_components` de 3068320114453 tel que la base l'a rendu le 06/11/2026. PostgreSQL ne
+   * conserve pas l'ordre des clés d'un `jsonb` : il rend `shape, material, food_contact`, quand la
+   * normalisation écrit `material, shape, food_contact`. Comparé au texte près, tout emballage
+   * renseigné différait : l'audit du 06/11 en a classé 57 sur 60 en « ecart_inexplique ».
+   */
+  const FROM_DB = JSON.parse(
+    '[{"shape": "en:bottle", "material": "en:pet-transparent", "food_contact": 1}, ' +
+      '{"shape": "en:bottle-cap", "material": "en:plastic", "food_contact": 1}, ' +
+      '{"shape": null, "material": "en:plastic", "food_contact": 0}]',
+  ) as NonNullable<Product['packaging_components']>;
+
+  /** Les mêmes emballages, tels qu'OFF les servait le 06/11/2026 ; seul l'emballage vient de 3068320114453. */
+  const OFF_PET: AuditOffProduct = {
+    ...OFF,
+    packagings: [
+      { food_contact: 1, material: 'en:pet-transparent', number_of_units: 1, recycling: 'en:recycle', shape: 'en:bottle', weight_measured: 36.18 },
+      { food_contact: 1, material: 'en:plastic', number_of_units: 1, shape: 'en:bottle-cap', weight_measured: 1.86 },
+      { food_contact: 0, material: 'en:plastic' },
+    ],
+  };
+
+  const petRow = (packaging_components: Product['packaging_components']): Product => ({
+    ...normalizeOFFProduct(OFF_PET),
+    updated_at: CACHED_AT,
+    packaging_components,
+  });
+
+  it('mêmes emballages, clés dans un autre ordre : conforme', () => {
+    expect(auditCachedRow(petRow(FROM_DB), OFF_PET, NOW)).toEqual({ barcode: OFF.code, verdict: 'conforme', fields: [] });
+  });
+
+  it('contenu réellement différent — matière changée, ou composants permutés : toujours signalé', () => {
+    const glass = FROM_DB.map((c, i) => (i === 0 ? { ...c, material: 'en:glass' } : c));
+    const swapped = [FROM_DB[1], FROM_DB[0], FROM_DB[2]];
+    for (const stored of [glass, swapped]) {
+      expect(auditCachedRow(petRow(stored), OFF_PET, NOW)).toEqual({
+        barcode: OFF.code,
+        verdict: 'ecart_inexplique',
+        fields: ['packaging_components'],
+      });
+    }
+  });
+});
