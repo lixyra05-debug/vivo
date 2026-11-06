@@ -65,7 +65,8 @@ async function computeFoodScore(
   userProfile: UserProfile,
 ): Promise<RankedItem | null> {
   try {
-    const product = await getOrFetchProduct(result.barcode);
+    // Une liste ne demande pas de relecture au serveur (lot C) : le budget va aux fiches ouvertes.
+    const product = await getOrFetchProduct(result.barcode, { refresh: false });
     if (!product) return null;
     const scoring = composeScore(
       calculateScore(productToScoringInput(product), userProfile),
@@ -86,7 +87,8 @@ async function computeFoodScore(
 
 async function computeCosmeticScore(result: SearchResult): Promise<RankedItem | null> {
   try {
-    const product = await getOrFetchCosmetic(result.barcode);
+    // Une liste ne demande pas de relecture au serveur (lot C) : le budget va aux fiches ouvertes.
+    const product = await getOrFetchCosmetic(result.barcode, { refresh: false });
     if (!product) return null;
     const scoring = calculateCosmeticScore(cosmeticToScoringInput(product), 'standard');
     return {

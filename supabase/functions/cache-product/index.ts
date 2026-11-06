@@ -17,10 +17,12 @@ import {
   type Upstream,
 } from '../../../src/lib/api/cache-refresh-handler.ts';
 
+// `x-region` : functions-js l'ajoute quand le client fixe la région ; refusé
+// ici, le navigateur bloquerait chaque appel de la version web.
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-region',
 };
 
 /** Exigé par OFF : `AppName/Version (ContactEmail)`, comme le client. */

@@ -2,6 +2,8 @@ import { supabase } from './supabase';
 import type { CosmeticProduct, CosmeticScoringInput } from './types';
 import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 import { normalizeOBFProduct, type OBFProduct } from './obf-normalize';
+import { CLIENT_CLOCK_SKEW_MS, isCacheFresh } from './cache-refresh-rules';
+import { requestCacheRefresh, type CacheReadOptions } from './cache-refresh';
 import {
   normalizePackagings,
   type PackagingComponent,
@@ -9,7 +11,6 @@ import {
 
 const OBF_BASE = 'https://world.openbeautyfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // La normalisation vit dans `obf-normalize.ts`, que l'Edge Function
 // `cache-product` importe aussi (lot C) ; réexportée pour les appelants.
@@ -62,34 +63,25 @@ async function readCosmeticFromCache(barcode: string): Promise<CosmeticProduct |
   return data as CosmeticProduct;
 }
 
-function isCacheStale(product: CosmeticProduct): boolean {
-  const updated = product.updated_at ? new Date(product.updated_at).getTime() : 0;
-  return Date.now() - updated > CACHE_TTL_MS;
-}
-
-async function writeCosmeticToCache(product: CosmeticProduct): Promise<CosmeticProduct> {
-  const { data, error } = await supabase
-    .from('cosmetic_products')
-    .upsert(product, { onConflict: 'barcode' })
-    .select()
-    .maybeSingle();
-  if (error) return product;
-  return (data as CosmeticProduct) ?? product;
-}
-
-export async function getOrFetchCosmetic(barcode: string): Promise<CosmeticProduct | null> {
+/**
+ * La fiche d'un cosmétique : le cache s'il est frais, sinon une relecture d'OBF.
+ * Même règle que `getOrFetchProduct` : seul le serveur écrit (lot C).
+ */
+export async function getOrFetchCosmetic(
+  barcode: string,
+  options: CacheReadOptions = {},
+): Promise<CosmeticProduct | null> {
   const cached = await readCosmeticFromCache(barcode);
-  if (cached && !isCacheStale(cached)) return cached;
+  if (cached && isCacheFresh(cached.updated_at, Date.now(), CLIENT_CLOCK_SKEW_MS)) return cached;
+
+  if (options.refresh !== false) {
+    const refreshed = await requestCacheRefresh<CosmeticProduct>(barcode, 'cosmetic');
+    if (refreshed.kind === 'product') return refreshed.product;
+  }
 
   const obf = await fetchCosmeticByBarcode(barcode);
   if (!obf) return cached ?? null;
-
-  const normalized = normalizeOBFProduct(obf);
-  if (cached) {
-    normalized.scan_count = cached.scan_count;
-    normalized.created_at = cached.created_at;
-  }
-  return writeCosmeticToCache(normalized);
+  return normalizeOBFProduct(obf);
 }
 
 export function cosmeticToScoringInput(product: CosmeticProduct): CosmeticScoringInput {

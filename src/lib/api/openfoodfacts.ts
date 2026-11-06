@@ -3,6 +3,8 @@ import type { Product, ScoringInput } from './types';
 import { fetchCosmeticByBarcode, type OBFProduct } from './openbeautyfacts';
 import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 import { normalizeOFFProduct, type OFFProduct } from './off-normalize';
+import { CLIENT_CLOCK_SKEW_MS, isCacheFresh } from './cache-refresh-rules';
+import { requestCacheRefresh, type CacheReadOptions } from './cache-refresh';
 import {
   normalizePackagings,
   type PackagingComponent,
@@ -10,7 +12,6 @@ import {
 
 const OFF_BASE = 'https://fr.openfoodfacts.org/api/v2';
 const USER_AGENT = 'Vivo/1.0 (contact@lyxiria.com)';
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // La normalisation vit dans `off-normalize.ts`, que l'Edge Function
 // `cache-product` importe aussi (lot C) ; réexportée pour les appelants.
@@ -131,8 +132,6 @@ async function readProductFromCache(barcode: string): Promise<Product | null> {
     .eq('barcode', barcode)
     .maybeSingle();
   if (error || !data) return null;
-  const updated = data.updated_at ? new Date(data.updated_at).getTime() : 0;
-  if (Date.now() - updated > CACHE_TTL_MS) return data as Product;
   return data as Product;
 }
 
@@ -175,21 +174,6 @@ export async function fetchCachedProducts<T extends { barcode: string }>(
   return byBarcode;
 }
 
-function isCacheStale(product: Product): boolean {
-  const updated = product.updated_at ? new Date(product.updated_at).getTime() : 0;
-  return Date.now() - updated > CACHE_TTL_MS;
-}
-
-async function writeProductToCache(product: Product): Promise<Product> {
-  const { data, error } = await supabase
-    .from('products')
-    .upsert(product, { onConflict: 'barcode' })
-    .select()
-    .maybeSingle();
-  if (error) return product;
-  return (data as Product) ?? product;
-}
-
 /**
  * Recherche un produit en cascade : Open Food Facts (alimentaire) puis
  * Open Beauty Facts (cosmétique) en fallback. Retourne null si aucune source
@@ -208,19 +192,29 @@ export async function fetchProductMultiSource(
   return null;
 }
 
-export async function getOrFetchProduct(barcode: string): Promise<Product | null> {
+/**
+ * La fiche d'un aliment : le cache s'il est frais, sinon une relecture d'OFF.
+ *
+ * Seul le serveur écrit le cache (lot C) : l'Edge Function `cache-product`
+ * relit OFF elle-même et écrit. Injoignable — ou non sollicitée par une liste
+ * (`refresh: false`) —, elle laisse le client lire OFF directement : la fiche
+ * s'affiche, rien n'est écrit.
+ */
+export async function getOrFetchProduct(
+  barcode: string,
+  options: CacheReadOptions = {},
+): Promise<Product | null> {
   const cached = await readProductFromCache(barcode);
-  if (cached && !isCacheStale(cached)) return cached;
+  if (cached && isCacheFresh(cached.updated_at, Date.now(), CLIENT_CLOCK_SKEW_MS)) return cached;
+
+  if (options.refresh !== false) {
+    const refreshed = await requestCacheRefresh<Product>(barcode, 'food');
+    if (refreshed.kind === 'product') return refreshed.product;
+  }
 
   const off = await fetchProductByBarcode(barcode);
   if (!off) return cached ?? null;
-
-  const normalized = normalizeOFFProduct(off);
-  if (cached) {
-    normalized.scan_count = cached.scan_count;
-    normalized.created_at = cached.created_at;
-  }
-  return writeProductToCache(normalized);
+  return normalizeOFFProduct(off);
 }
 
 export function productToScoringInput(product: Product): ScoringInput {

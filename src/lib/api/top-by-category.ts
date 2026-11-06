@@ -62,7 +62,8 @@ async function rankCategoryItems(
   // Promise.allSettled : on tolère les rejets côté Supabase / OFF par produit.
   const settled = await Promise.allSettled(
     results.map(async (result): Promise<TopCategoryItem | null> => {
-      const product = await getOrFetchProduct(result.barcode);
+      // Une liste ne demande pas de relecture au serveur (lot C) : le budget va aux fiches ouvertes.
+      const product = await getOrFetchProduct(result.barcode, { refresh: false });
       if (!product) return null;
       const scoring = composeScore(
         calculateScore(productToScoringInput(product), userProfile),
