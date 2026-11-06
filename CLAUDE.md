@@ -409,6 +409,71 @@ compteurs de l'accueil (`useUserStats`, sans jointure) restaient justes.
   l'Historique ou les Favoris n'enregistre pas de nouveau scan — chaque réouverture ajoutait une ligne, comptée
   par les compteurs, la série, les badges, le récap et le PDF.
 
+## Cache produits écrit par le serveur — lot C (novembre 2026)
+Le client ne fait plus que lire `products` et `cosmetic_products`. Seule l'Edge Function `cache-product` les
+écrit : elle reçoit un code-barres et un type, relit Open Food Facts (ou Open Beauty Facts) elle-même,
+normalise avec le code de l'app et écrit avec la clé de service. Aucun contenu de fiche ne vient du client.
+
+- **Code partagé, importé tel quel par Deno** : `src/lib/api/off-normalize.ts` et `obf-normalize.ts` (la
+  normalisation, déplacée sans modification ; `openfoodfacts.ts` et `openbeautyfacts.ts` la réexportent),
+  `cache-refresh-rules.ts` (fraîcheur, code-barres, demande, quotas, ligne écrite), `cache-refresh-handler.ts`
+  (tout le parcours de la fonction, à dépendances injectées : Jest le teste sans exécuter la fonction) et
+  `cache-audit.ts`. Deno ne lit ni l'alias `@/` ni les chemins sans extension : ces modules n'importent qu'en
+  relatif, avec `.ts` — `tsconfig` : `allowImportingTsExtensions`, que seul tsc exige —, et
+  `deno-portability.test.ts` parcourt le graphe d'imports de chaque point d'entrée Deno.
+- **Parcours de `cache-product`** (`supabase/functions/cache-product/index.ts`, que le lot n'a pas déployée) :
+  1. un code-barres de 8 à 14 chiffres (la clé de contrôle n'arrête aucun abus et écarterait les UPC-E) ;
+  2. un utilisateur connecté, vérifié par Supabase Auth : la clé publique seule ne suffit pas, que `verify_jwt`
+     soit actif ou non ;
+  3. une fiche fraîche à l'horloge du serveur est servie, sans rien d'autre ;
+  4. une source en pause après un refus (429, 503) n'est pas appelée ;
+  5. la demande est inscrite au journal `cache_refresh_log` PUIS comptée — une rafale simultanée se voit
+     elle-même —, et retirée en cas de refus : 10 relectures par minute et 200 par jour pour un compte, 12 par
+     minute et par source pour tous. OFF limite la lecture de fiches à 15 requêtes par minute et par adresse IP
+     (documentation de l'API, novembre 2026 ; `PRD.md` §8.3 dit encore 100), et les Edge Functions sortent par
+     des adresses partagées. Journal illisible : aucun appel ;
+  6. relecture de la source (5 s au plus), écriture, réponse `{ product, cached, written }`.
+  Clés nouvelles (`SUPABASE_SECRET_KEYS`, `SUPABASE_PUBLISHABLE_KEYS`) ou héritées
+  (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`), injectées par la plateforme. Aucune dépendance externe,
+  aucune image stockée, aucun code-barres dans les journaux de la fonction — il passe en revanche dans les URL
+  de ses appels à la base, comme dans celles des lectures du client.
+- **Client** (`getOrFetchProduct`, `getOrFetchCosmetic`) : fiche fraîche → servie ; sinon `requestCacheRefresh`
+  (`cache-refresh.ts` ; sans session ou pour un code hors format, pas d'appel ; région `eu-west-1`, dont l'en-tête
+  `x-region` doit rester admis par le CORS de la fonction, sans quoi la version web échoue ; 10 s d'attente).
+  Toute erreur — 404 compris, que la passerelle renvoie aussi tant que la fonction n'est pas déployée —, un quota
+  atteint ou une fiche rendue pour un autre code → lecture directe d'OFF ou d'OBF, **sans écriture**.
+  - **Les listes ne demandent jamais de relecture** (`{ refresh: false }` : accueil, catégories, enseignes,
+    qui lisent jusqu'à 50 fiches à la fois) : le budget va aux fiches ouvertes, dont dépend l'historique.
+  - Budget local de 10 appels par minute, et pause après un refus (429, 5xx, `Retry-After`).
+  - Une panne qui empêche le cache de se remplir (fonction absente, 401, erreur serveur, fiche relue mais non
+    écrite) remonte une fois par session (`logger.error`, sans code-barres) ; une saturation reste une trace.
+  - Marge d'horloge de 24 heures côté téléphone (5 minutes côté serveur) : un appareil en retard ne relit pas
+    tout, une date forgée (« 2099 ») reste périmée. Avant le lot C, une date illisible rendait la fiche fraîche.
+  - Plus aucune écriture des deux caches, ni d'accès direct à la base (`/rest/v1/`, `.rpc`), dans `app/` ni
+    `src/` (`cache-client.test.ts`).
+- **Migrations écrites, non appliquées** :
+  - `018_cache_server_timestamps.sql` : trigger `set_cache_timestamps` (BEFORE INSERT OR UPDATE : `updated_at`
+    du serveur, `created_at` conservé) sur les deux caches ; les fiches datées dans le futur sont rendues
+    périmées AVANT la création du trigger, seule donnée modifiée ; table `cache_refresh_log` (compte, source,
+    date ; RLS sans politique, `REVOKE ALL` pour `anon` et `authenticated` ; purgée au-delà de 2 jours par la
+    fonction, pour tous les comptes ; effacée avec le compte) ;
+  - `019_cache_no_client_writes.sql` : retrait des deux politiques d'écriture de 012 et `REVOKE` des écritures
+    sur les deux caches pour `anon` et `authenticated`. Lecture publique et RLS conservées.
+
+  `schema-contract.test.ts` rejoue les politiques (nom entre guillemets ou nu), les triggers (moment compris),
+  le corps des fonctions SQL, les droits retirés et la RLS.
+- **Ordre de déploiement** : (1) 016 et 017 en base ; (2) 018 ; (3) déployer `cache-product` avec la CLI
+  Supabase (l'éditeur du tableau de bord n'embarque pas les fichiers de `src/`), avec `--no-verify-jwt` si le
+  projet est passé aux nouvelles clés (la vérification de la plateforme ne connaît que les clés héritées ; la
+  fonction vérifie l'utilisateur elle-même dans les deux cas), puis la vérifier par un appel réel
+  (`cached:false`, puis `cached:true`) ; (4) 019, sans attendre l'app : jusque-là, n'importe quel compte
+  connecté écrit encore dans le cache ; (5) publier l'app. Les versions déjà installées survivent à 019 :
+  leurs écritures sont refusées, elles avalent l'erreur et continuent de lire le cache et OFF.
+- **Audit, en lecture seule** : `audit/06-cache-products.md` (requêtes SQL) et `audit/products-cache-audit.ts`
+  (Deno : confrontation à OFF, 12 lectures par minute, rapport JSON local ; exclu du `tsconfig`). Les dates dans
+  le futur se relèvent avant 018, qui en efface la trace. Après 018, une fiche suspecte se retire par `delete`,
+  jamais par `update` : le trigger la redaterait, donc la rafraîchirait.
+
 ## Dette avant publication
 
 ### BLOQUANT avant publication — tout compte connecté peut empoisonner le cache `products` (lot H)
@@ -419,9 +484,10 @@ tous sans relire OFF : une fiche réécrite est servie à tous pendant 7 jours, 
 dans le futur. La note en dépend (ingrédients, additifs, NOVA, macros, emballage), le verdict allergène aussi
 (`ingredients_raw`, `ingredients_text_fr`, `allergens_tags`), comme le nom, la marque et l'image affichés.
 
-Piste à étudier, pas à appliquer : écriture par une Edge Function serveur qui reçoit le seul code-barres,
-relit OFF elle-même et fixe `updated_at` côté serveur ; le client ne garde que la lecture. Elle vaut aussi
-pour `cosmetic_products`. Aucune migration n'est écrite à ce stade.
+**Corrigé dans les fichiers par le lot C, pas encore en base** : fonction `cache-product`, client en lecture
+seule, migrations 018 et 019. Le risque reste entier tant que l'ordre de déploiement de la section « Cache
+produits écrit par le serveur — lot C » n'est pas allé jusqu'à 019. Les fiches déjà altérées se repèrent avec
+`audit/06-cache-products.md`.
 
 ### D1 — le « Mot détecté » du bandeau peut manquer à la liste affichée (lot S1b)
 Le moteur prend `matchedText` dans le premier texte qui le contient, le français d'abord ; la section
@@ -436,15 +502,19 @@ mots lus dans le seul texte principal (20466909 « egg », 8711200459926 « sesa
 explications sur 42 fiches. **À corriger avant publication**, dans un lot « liste affichée » (liste, carte,
 provenance du mot, soulignés d'OFF).
 
-### Le cache cosmétique ne se remplit pas : `cosmetic_products` n'a aucune politique d'écriture (lot H)
-008 n'ouvre que la lecture (`FOR SELECT`), et aucune migration n'ajoute INSERT ni UPDATE.
-`writeCosmeticToCache` est donc refusé par la RLS, et l'erreur avalée (`openbeautyfacts.ts:126`). Chaque
-fiche cosmétique se relit sur OBF ; l'historique ne peut pas nommer un cosmétique (« Produit inconnu »), et le
-filtre « Incompatibles » les y range tous, provisoirement.
+### Cache cosmétique : rempli par `cache-product` (lot C), pas encore lu par l'historique (lot H)
+008 n'ouvre que la lecture (`FOR SELECT`), et aucune migration n'ajoute INSERT ni UPDATE : jusqu'au lot C,
+`writeCosmeticToCache` était refusé par la RLS, l'erreur avalée, et le cache restait vide. Chaque fiche
+cosmétique se relisait sur OBF.
 
-À traiter par une migration dédiée, **jamais un INSERT ouvert** sur le modèle de 012 : l'entrée « BLOQUANT »
-ci-dessus en décrit le risque, et la piste d'écriture serveur qu'elle propose vaut ici aussi. Puis une
-lecture de `cosmetic_products` dans `useScanHistory`.
+Lot C : `cache-product` écrit `cosmetic_products` avec la clé de service, sans aucun INSERT ouvert aux
+clients, à chaque fiche cosmétique ouverte (`getOrFetchCosmetic`, appelé par `app/product/[barcode].tsx:478`) ;
+la liste d'une catégorie (`app/category/[slug].tsx`) ne le demande pas. Effectif une fois 018 appliquée et la
+fonction déployée : sans le journal de 018, la fonction refuse toute relecture.
+
+Reste : `useScanHistory` ne lit que `products`. L'historique ne nomme toujours pas un cosmétique (« Produit
+inconnu »), et le filtre « Incompatibles » les y range tous, provisoirement — jusqu'à une lecture de
+`cosmetic_products` dans `useScanHistory`.
 
 ### Course sur la note d'emballage : un scan peut s'enregistrer sans le malus (lot H)
 La fiche alimentaire enregistre le scan dès que la note existe, avec l'emballage connu à cet instant : la
@@ -460,6 +530,21 @@ Seuls l'Historique et les Favoris disent à la fiche qu'elle est rouverte (`from
 catégories, les enseignes, les alternatives et l'accueil (`router.push('/product/…')`) ouvrent la fiche comme
 la caméra : chaque consultation y devient un scan, compté par les compteurs, la série, les badges, le récap et
 le PDF. À trancher : quelles entrées sont un scan.
+
+### Le journal `cache_refresh_log` n'est pas dans la politique de confidentialité (lot C)
+018 crée le journal des relectures de `cache-product` : identifiant du compte, source (OFF ou OBF) et date. Il
+sert aux quotas, n'est lisible que par le rôle de service, est purgé au-delà de 2 jours par la fonction et
+effacé avec le compte. L'article 7 de la politique de confidentialité (« Durée de conservation »,
+`app/settings/privacy.tsx:305-336`) ne le cite pas. Texte à écrire dans un lot légal, avec la version et la
+date de la politique.
+
+### `analyze-ingredients` ne vérifie pas l'utilisateur et ne compte rien (relevé au lot C)
+`supabase/functions/analyze-ingredients/index.ts`, appelée par le scan OCR (`src/lib/api/ocr-scan.ts`), ne lit
+pas `Authorization` et n'a aucun quota : elle relaie seulement le 429 d'Anthropic (`:125-131`). Chaque appel
+admis coûte une requête à l'API Anthropic (`ANTHROPIC_API_KEY`, `:65`). Qui peut l'appeler dépend de
+`verify_jwt` et du type de clé, que rien dans le dépôt ne fixe (aucun `supabase/config.toml`) : un compte
+gratuit, la clé publique de l'app (présente dans chaque build) ou rien du tout. À traiter comme
+`cache-product` : utilisateur vérifié par Supabase Auth, quota par compte.
 
 ## Dette identifiée (non corrigée, à arbitrer)
 
@@ -563,9 +648,22 @@ muscade » et « beurre de cacao » (1 chacun). À traiter avec D-C (mots-clés,
 
 ### Une ligne d'historique sans fiche en cache s'affiche « Produit inconnu » (lot H)
 Le nom, la marque et la photo viennent du cache `products`. Si une migration de ce cache manque en base
-(016 `packaging_components`, 017 `ingredients_text_fr` et `allergens_tags`), `writeProductToCache` échoue
-(colonne absente, erreur avalée) : les produits scannés depuis ne sont pas mis en cache, et leur ligne n'a pas
-de fiche. Appliquer 016 et 017 avant de déployer.
+(016 `packaging_components`, 017 `ingredients_text_fr` et `allergens_tags`), l'écriture du cache échoue
+(colonne absente) — depuis le lot C, celle de `cache-product`, qui sert alors la fiche relue sans l'écrire :
+les produits scannés depuis ne sont pas mis en cache, et leur ligne n'a pas de fiche. Appliquer 016 et 017
+avant de déployer.
+
+Depuis le lot C, une fiche n'entre en cache que par `cache-product`. Fonction injoignable ou pas encore
+déployée, quota atteint (10 par minute et 200 par jour pour un compte, 12 par minute et par source pour tous),
+ou version installée après 019 : la fiche s'affiche, lue directement sur OFF, sans être mise en cache, et sa
+ligne d'historique dit « Produit inconnu » jusqu'à ce qu'une ouverture passe par la fonction.
+
+### `ocr-scan.ts` : toute erreur devient « Connexion impossible », et le délai n'interrompt rien (relevé au lot C)
+`src/lib/api/ocr-scan.ts:36` lit `error.status`, que functions-js ne fournit pas : le statut est dans
+`error.context`, une `Response`. Un 429, un 400 ou un 5xx d'`analyze-ingredients` donnent donc tous
+« Connexion impossible. » (`:40`) ; « Trop de scans » (`:37`) et « Image refusée » (`:38`) ne s'affichent
+jamais. L'`AbortController` (`:22-23`) n'est pas passé à `invoke` : `TIMEOUT_MS` (30 s, `:8`) n'interrompt
+pas l'appel. functions-js accepte une option `timeout` (voir `cache-refresh.ts`).
 
 ## Conventions
 - TypeScript strict (`strict: true`)

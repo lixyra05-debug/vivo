@@ -24,6 +24,8 @@ const DENO_ENTRIES: ReadonlyArray<string> = [
   'src/lib/api/cache-refresh-rules.ts',
   'src/lib/api/cache-refresh-handler.ts',
   'supabase/functions/cache-product/index.ts',
+  'src/lib/api/cache-audit.ts',
+  'audit/products-cache-audit.ts',
 ];
 
 /** Ce qu'aucun module chargé par Deno ne doit atteindre. */
