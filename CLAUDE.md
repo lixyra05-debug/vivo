@@ -725,6 +725,24 @@ ligne d'historique dit « Produit inconnu » jusqu'à ce qu'une ouverture passe 
 jamais. L'`AbortController` (`:22-23`) n'est pas passé à `invoke` : `TIMEOUT_MS` (30 s, `:8`) n'interrompt
 pas l'appel. functions-js accepte une option `timeout` (voir `cache-refresh.ts`).
 
+### Lot contenu — cinq points à trancher (S3, S1b)
+Relevés pendant S3 et S1b et laissés hors de ces lots par décision : ce sont des choix de contenu.
+- **Bouleau** (`plant-encyclopedia.ts:683`, `:685`) : la préparation demande une « consommation hydrique
+  abondante » ; les contre-indications citent l'œdème lié à une pathologie cardiaque ou rénale (« avis médical
+  obligatoire ») sans dire que cette consigne d'hydratation ne vaut pas pour ces patients. Reporté en S3 (C2b),
+  qui a recopié dans les contre-indications les limites de la préparation du ginseng et de la lavande.
+- **Ginseng** (`:830`, `:832`) : « Cure de 4-12 semaines max. », dans la préparation comme dans les
+  contre-indications, se lit comme une durée conseillée plutôt que comme un plafond.
+- **Bourrache** (`:516`, `:520`) : les contre-indications disent « Selon l'EFSA » ; la source citée au pied de
+  la fiche est l'ANSES (alcaloïdes pyrrolizidiniques, avis 2019).
+- **« Phytothérapie Premium »** (`content-database.ts:431`, `:748`) : deux commentaires de section rangent
+  24 + 10 cartes sous ce nom, alors que rien ne les verrouille — elles s'affichent à tous les paliers
+  (`FoodProductView.tsx:296`).
+- **Vinaigre et grossesse** (`compatibility-engine.ts:270`, `:272`) : « vinaigre d'alcool » et « vinaigre de
+  vin » se lisent « alcool » et « vin », interdits pendant la grossesse : 19 → 21 fiches sur 170 depuis S1b
+  (faux positif connu, entrée « Locutions » ci-dessus). Le halal lit les mêmes mots (`HALAL_FORBIDDEN`, `:242`,
+  `:244`). À trancher comme règle de contenu.
+
 ## Conventions
 - TypeScript strict (`strict: true`)
 - Nommage : PascalCase pour composants, camelCase pour fonctions/variables
