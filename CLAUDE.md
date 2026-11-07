@@ -322,7 +322,7 @@ Deux features GRATUITES qui enrichissent la fiche produit avec des données toxi
   - `countryCodeToFlag(code)` — accepte alpha-2 ("FR") ou alpha-3 ("FRA"). Mapping `ISO3_TO_ISO2` interne sur ~52 pays courants en agro/cosmétique. Conversion via Regional Indicator Symbols Unicode (codepoint 0x1F1E6 + offset). Renvoie `''` si conversion impossible.
   - User-Agent `Vivo/1.0 (https://vivo.lyxiria.com; tech@lyxiria.com)` pour politesse Wikidata. Timeout 5s, pas de retries (`fetchWithTimeout` retries: 0).
   - `src/components/product/ConglomerateSection.tsx` — GlassCard `🏢 Maison-mère`. Skeleton 2 barres pendant la résolution Wikidata. Owner name + drapeau emoji + countryName + lien `Voir sur Wikidata` → `Linking.openURL('https://www.wikidata.org/wiki/{Q-ID}')`. Pas de drapeau si `countryCode === null` (R3 plan validé). Renvoie `null` si owner introuvable ou brand vide.
-- **Pipeline data** *(source corrigée mai 2026 — voir « Source packaging » ci-dessous)* :
+- **Pipeline data** *(source corrigée août 2026 — voir « Source packaging » ci-dessous)* :
   - `fetchProductPackagings(barcode)` dans `src/lib/api/openfoodfacts.ts` (`fields=packagings`), `fetchCosmeticPackagings(barcode)` dans `openbeautyfacts.ts`. Les deux passent par `normalizePackagings()` exporté de `packaging-risks.ts`.
   - `app/product/[barcode].tsx` : 2 `useQuery` (food + cosmetic) staleTime 24h, props `packagings={…data ?? []}` propagées vers les vues.
 
@@ -632,7 +632,7 @@ reconnu, le moteur répond `verified` ; `isProductCompatible` l'écarte quand m�
 comme du X.
 
 ### `ScoreComparison` tient une quatrième échelle de score
-Le lot « cohérence » de mai 2026 a unifié trois échelles : le verdict (`getScoreVerdict`), le libellé lu
+Le lot « cohérence » d'août 2026 a unifié trois échelles : le verdict (`getScoreVerdict`), le libellé lu
 par les lecteurs d'écran (`ScoreCircle`, ex-`COLOR_LABEL`) et les couleurs de l'écran OCR
 (ex-`ocrScoreColor`, seuils 75/50/30). `ScoreComparison` n'était dans aucun des périmètres et diverge
 encore sur deux points :
