@@ -13,8 +13,12 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "testTimeout": 30000,
     "setupFiles": [
       "<rootDir>/jest.setup.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup-after-env.js"
     ]
   },
   "dependencies": {

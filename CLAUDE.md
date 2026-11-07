@@ -592,9 +592,9 @@ invisible et une incohérence visible, on garde l'invisible.
 ce qui rendrait l'écart lisible sans changer l'axe de tri. Le champ existe déjà sur
 `CompositeScoringResult`, il n'est simplement pas consommé.
 
-### Tests d'écran instables sous charge : des budgets en temps réel (S3, S1b, lot A/B)
-Quatre tests d'écran tombent par intermittence quand la machine est sursouscrite (plusieurs suites Jest à
-la fois, par exemple des agents en parallèle), et passent seuls :
+### SOLDÉ — tests d'écran instables sous charge : des budgets communs (S3, S1b, lot A/B)
+Quatre tests d'écran tombaient par intermittence quand la machine était sursouscrite (plusieurs suites Jest
+à la fois, par exemple des agents en parallèle), et passaient seuls :
 - `app/__tests__/explore.test.tsx:88`, « … et debounce » : plafond Jest de 5 s par test. Ses minuteurs sont
   simulés depuis 3cf4bb0 (FadeIn et Skeleton neutralisés) : son `findByText` avance le temps simulé, et seul
   le plafond réel peut le couper ;
@@ -612,8 +612,13 @@ durée suit la charge. Sur 45 runs complets (répétition du lot C, 06/11/2026),
 à 11,5 s sous deux suites simultanées. À froid, ces trois fichiers lancés seuls portent « Free » à 707 ms,
 pour un budget de 1 000 ms.
 
-**Conséquence pratique** : le compte d'un run complet peut varier d'une exécution à l'autre. Avant de conclure
-à une régression sur l'un de ces tests, le relancer seul.
+**Soldé (lot A/B)** : les budgets sont fixés une fois — Jest coupe un test à 30 s (`testTimeout`,
+`package.json`), `findBy*` et `waitFor` attendent 15 s (`asyncUtilTimeout`, `jest.setup-after-env.js`), et les
+deux bornes de 4 000 ms de la catégorie sont retirées. Sous deux suites simultanées, 0 échec sur 1 330 dans
+chacune, contre 1 dans chacune avant (le scan alimentaire) — mesure qui repose sur un seul essai de chaque
+côté, pour un phénomène aléatoire. Garde : `app/__tests__/test-budgets.test.ts`
+(budgets communs, aucun budget plus court fixé à la main). En contrepartie, un test bloqué met 30 s à
+échouer, et un `findBy` qui ne trouve rien, 15 s.
 
 ### `accessibilityElementsHidden` est iOS-only sur deux composants
 `ScoreCircle.tsx` (3 nœuds) et `ScoreBreakdownChart.tsx` masquent leurs enfants avec

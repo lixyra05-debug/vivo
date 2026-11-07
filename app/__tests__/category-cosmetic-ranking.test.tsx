@@ -178,7 +178,7 @@ describe('S3-3 — catégorie cosmétique : un non-évalué ne compte pas parmi 
     async (_cas, profil) => {
       mockProfile = profil;
       const { findAllByRole, getByLabelText, queryAllByRole, queryByText } = rendreEcran();
-      await findAllByRole('button', { name: /^Rang / }, { timeout: 4000 });
+      await findAllByRole('button', { name: /^Rang / });
       fireEvent.press(getByLabelText('Afficher uniquement les produits compatibles avec mon profil'));
       // Les deux produits évalués, sans gluten, franchissent la barrière de score (≥ 50).
       expect([note('Aqua, Glycerin'), note('Aqua, Methylparaben')].every((n) => n >= 50)).toBe(
@@ -197,7 +197,7 @@ describe('S3-3 — catégorie cosmétique : un non-évalué ne compte pas parmi 
 
   it('« Vérifié fabricant » n’accompagne pas « Non évalué » ; les autres niveaux restent', async () => {
     const { findAllByRole } = rendreEcran();
-    const rangs = await findAllByRole('button', { name: /^Rang / }, { timeout: 4000 });
+    const rangs = await findAllByRole('button', { name: /^Rang / });
     expect(
       rangs.map(
         (r) => within(r).queryByLabelText(/^Niveau de confiance/)?.props.accessibilityLabel ?? null,
