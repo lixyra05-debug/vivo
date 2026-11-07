@@ -592,15 +592,28 @@ invisible et une incohérence visible, on garde l'invisible.
 ce qui rendrait l'écart lisible sans changer l'axe de tri. Le champ existe déjà sur
 `CompositeScoringResult`, il n'est simplement pas consommé.
 
-### `ExploreScreen › debounce` est instable en parallèle
-`app/__tests__/explore.test.tsx` — le test « affiche les résultats de recherche après la frappe
-(>2 caractères) et debounce » passe systématiquement seul
-(`npx jest --runTestsByPath app/__tests__/explore.test.tsx --runInBand`) mais tombe par intermittence
-dans un run complet. Il enchaîne un debounce réel et plusieurs `waitFor` ; sous charge parallèle les
-délais dérivent.
+### Tests d'écran instables sous charge : des budgets en temps réel (S3, S1b, lot A/B)
+Quatre tests d'écran tombent par intermittence quand la machine est sursouscrite (plusieurs suites Jest à
+la fois, par exemple des agents en parallèle), et passent seuls :
+- `app/__tests__/explore.test.tsx:88`, « … et debounce » : plafond Jest de 5 s par test. Ses minuteurs sont
+  simulés depuis 3cf4bb0 (FadeIn et Skeleton neutralisés) : son `findByText` avance le temps simulé, et seul
+  le plafond réel peut le couper ;
+- `app/__tests__/store-ranking.test.tsx:67`, « Free » : `findByText` attend 1 000 ms par défaut
+  (`asyncUtilTimeout` de @testing-library/react-native), en temps réel ;
+- `app/__tests__/category-cosmetic-ranking.test.tsx:177`, « allergie au gluten » : `findAllByRole` borné à
+  la main à 4 000 ms, sous le plafond de 5 s ;
+- `app/__tests__/product-food-scan-history.test.tsx:172`, observé lors d'un seul essai, le 07/11/2026,
+  sous deux suites simultanées : « Exceeded timeout of 5000 ms », dans les deux.
 
-**Conséquence pratique** : le compte de tests d'un run complet varie d'une exécution à l'autre. Avant
-de conclure à une régression sur ce test, le relancer SEUL. Non corrigé — hors périmètre du lot score.
+Cause commune : un budget fixé en temps réel (5 s par test, 1 s par `findBy`, 4 s à la main) pour un travail
+de calcul — le rendu complet d'un écran, qui charge au premier rendu une partie de ses modules — dont la
+durée suit la charge. Sur 45 runs complets (répétition du lot C, 06/11/2026), les trois premiers durent
+193, 109 et 122 ms en médiane, 595, 385 et 1 878 ms au plus ; le scan alimentaire, 205 ms en médiane, monte
+à 11,5 s sous deux suites simultanées. À froid, ces trois fichiers lancés seuls portent « Free » à 707 ms,
+pour un budget de 1 000 ms.
+
+**Conséquence pratique** : le compte d'un run complet peut varier d'une exécution à l'autre. Avant de conclure
+à une régression sur l'un de ces tests, le relancer seul.
 
 ### `accessibilityElementsHidden` est iOS-only sur deux composants
 `ScoreCircle.tsx` (3 nœuds) et `ScoreBreakdownChart.tsx` masquent leurs enfants avec
