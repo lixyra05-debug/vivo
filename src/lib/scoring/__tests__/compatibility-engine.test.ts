@@ -1277,3 +1277,28 @@ describe('checkCompatibility — graphie lue et allergies cherchées (C5)', () =
     ).toBe(0);
   });
 });
+
+describe('checkCompatibility — D-D : hors allergènes, le pluriel n’est pas lu (limite connue)', () => {
+  /**
+   * D-D (CLAUDE.md, « Dette identifiée ») : depuis S1, seul `allergenPattern` admet le pluriel en -s.
+   * Les autres lecteurs du texte passent par `textContainsAny` → `matchesWord`, au mot exact. Le
+   * bébé cosmétique (`BABY_FORBIDDEN_COSMETIC`) cherche « parfum » : une liste qui n'écrit que
+   * « PARFUMS » passe le contrôle. Fiche OBF réelle 3256227446948 (« Liquide Vaisselle parfum
+   * amande », lue le 07/11/2026), traitée par l'app comme un cosmétique.
+   * `it.failing` : le test échoue tant que D-D n'est pas corrigé, et Jest le compte comme attendu ;
+   * le jour où le pluriel sera lu, il deviendra rouge et devra passer en `it`.
+   */
+  it.failing('bébé, cosmétique : « PARFUMS » au pluriel est lu comme « parfum » (3256227446948)', () => {
+    const inci =
+      '5% et plus, mais moins de 15%: AGENTS DE SURFACE ANIONIQUES, Moins de 5% : AGENTS DE SURFACE AMPHOTERES, AGENTS DE SURFACE NON IONIQUES. Également: PARFUMS, SODIUM BENZOATÉ.';
+    const result = checkCompatibility(
+      makeCosmetic({ ingredients_inci: inci }),
+      makeCosmeticScoring(),
+      emptyProfile({ conditions: ['bebe'] }),
+    );
+    expect(result.isCompatible).toBe(false);
+    expect(result.incompatibilities).toContainEqual(
+      expect.objectContaining({ type: 'condition', severity: 'blocker' }),
+    );
+  });
+});

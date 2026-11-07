@@ -77,7 +77,7 @@ App mobile React Native/Expo de scanning nutritionnel pour le marché français.
 - **Confiance & signalement** : `ConfidenceBadge` sous le header produit, `ReportButton` discret avec modal slide (5 raisons FR + description optionnelle), pas de photo MVP
 - **Adapter user→compat** : `userProfileToCompatibilityProfile` mappe `diabetic→diabete`, `pregnant→enceinte`, `child→bebe` ; renvoie `null` si standard sans allergie pour masquer le toggle
 - **Sources des allergènes (lot S1b)** : `normalizeOFFProduct` copie `ingredients_text_fr` (texte français, `null` si absent) et `allergens_tags` (déclaration de la fiche, saisie communautaire) dans `products` ; `ingredients_raw` reste la langue principale, et lui seul nourrit la note. **Migration `017_products_allergen_sources.sql`** : en base (vérifié le 06/11/2026) ; elle devait précéder tout déploiement, car la fiche normalisée s'écrit entière — par `writeProductToCache` jusqu'au lot C, par `cache-product` depuis.
-- **Lecture de la compatibilité (lot S1b)** : tous les lecteurs du texte — allergies, régimes, grossesse, cœliaque, FODMAP, huile de palme — lisent le texte français ET le texte principal (lecture cumulée : aucune alerte perdue). L'ordre, le français d'abord, ne décide que du mot affiché : `matchedText` d'une allergie, nom d'un déclencheur FODMAP (un aliment nommé dans les deux langues ne compte qu'une fois) ; les autres libellés citent le premier mot-clé de leur liste trouvé dans l'un ou l'autre texte. `allergens_tags` en union avec le texte : un tag présent est lu comme « contient », son absence ne prouve rien ; table un pour un `ALLERGEN_TAG_TO_KEY` (14 tags canoniques), tag hors table ignoré ; le cœliaque lit aussi `en:gluten`. Champs C5 : `matchedText` (mot lu dans un texte, absent pour un tag seul) et `checkedAllergenCount`. En production, seuls les allergies et la grossesse sont atteints (`userProfileToCompatibilityProfile`) ; régimes, cœliaque, FODMAP et huile de palme ne le sont par aucun écran.
+- **Lecture de la compatibilité (lot S1b)** : tous les lecteurs du texte — allergies, régimes, grossesse, cœliaque, FODMAP, huile de palme — lisent le texte français ET le texte principal (lecture cumulée : aucune alerte perdue). L'ordre, le français d'abord, ne décide que du mot affiché : `matchedText` d'une allergie, nom d'un déclencheur FODMAP (un aliment nommé dans les deux langues ne compte qu'une fois) ; les autres libellés citent le premier mot-clé de leur liste trouvé dans l'un ou l'autre texte. `allergens_tags` en union avec le texte : un tag présent est lu comme « contient », son absence ne prouve rien ; table un pour un `ALLERGEN_TAG_TO_KEY` (14 tags canoniques), tag hors table ignoré ; le cœliaque lit aussi `en:gluten`. Champs C5 : `matchedText` (mot lu dans un texte, absent pour un tag seul) et `checkedAllergenCount`. En production, seuls les allergies et la grossesse sont atteints (`userProfileToCompatibilityProfile`), ainsi que le bébé pour un cosmétique : son contrôle lit la liste INCI (profil `child` → `bebe`, `profile-adapter.ts:28` ; entrée « D-D ») ; régimes, cœliaque, FODMAP et huile de palme ne le sont par aucun écran.
 - **Migration** : `009_stores_confidence_reports.sql` (table `product_reports` RLS + table `stores` seedée idempotente)
 
 ## Sprint 1 — Corrections audit (avril 2026)
@@ -672,6 +672,21 @@ vinaigre (d'alcool, de vin) → grossesse et halal 19 → 21 chacun ; « arôme 
 sans porc 0 → 1 ; « Sans gluten » → allergie au gluten et cœliaque 3 → 4 ; « noix de coco » → fruits à
 coque 1 → 2 ; « pomme de terre » → déclencheur FODMAP « pomme » 9 → 11 fiches. Inchangés : « noix de
 muscade » et « beurre de cacao » (1 chacun). À traiter avec D-C (mots-clés, locutions) et D-E (négations).
+
+### D-D — hors allergènes, le pluriel n'est pas lu (`matchesWord`)
+Depuis S1, seul `allergenPattern` (`compatibility-engine.ts:365`) admet le pluriel en -s, l'accent omis et la
+ligature œ. Les autres lecteurs du texte cherchent le mot exact (`textContainsAny` → `matchesWord`, `:310`) :
+végane, végétarien, halal, casher, sans porc, grossesse (aliment et cosmétique), bébé cosmétique, huile de
+palme ; les déclencheurs FODMAP aussi (`:745`).
+
+Le bébé cosmétique est atteint en production : profil `child` → `bebe` (`profile-adapter.ts:28`), fiche
+(`app/product/[barcode].tsx:521`) et liste d'une catégorie. Une liste qui n'écrit que « PARFUMS » passe
+`BABY_FORBIDDEN_COSMETIC` (`:283`). Cas réel : OBF 3256227446948 (« Également: PARFUMS, SODIUM BENZOATÉ. »).
+Rare, les listes INCI s'écrivant au singulier : sur les 100 premières fiches OBF trouvées pour « parfums »,
+une seule l'écrit sans le singulier ; aucune des 100 premières pour « fragrances » (07/11/2026).
+
+Figé par un test `it.failing` (`compatibility-engine.test.ts`, describe « D-D »), qui deviendra rouge le jour
+où le pluriel sera lu et devra alors passer en `it`. Non corrigé.
 
 ### Une ligne d'historique sans fiche en cache s'affiche « Produit inconnu » (lot H)
 Le nom, la marque et la photo viennent du cache `products`. Si une migration de ce cache manque en base
